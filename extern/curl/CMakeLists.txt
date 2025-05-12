@@ -1339,7 +1339,7 @@ if(USE_LIBIDN2 AND NOT USE_APPLE_IDN AND NOT USE_WIN32_IDN)
 endif()
 
 # libpsl
-option(CURL_USE_LIBPSL "Use libpsl" ON)
+option(CURL_USE_LIBPSL "Use libpsl" OFF)
 mark_as_advanced(CURL_USE_LIBPSL)
 set(USE_LIBPSL OFF)
 
