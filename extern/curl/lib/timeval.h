@@ -7,7 +7,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -20,11 +20,25 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 
 #include "curl_setup.h"
 
 #include "timediff.h"
+
+#ifndef BUILDING_LIBCURL
+/* this renames the functions so that the tool code can use the same code
+   without getting symbol collisions */
+#define Curl_now curlx_now
+#define Curl_timediff(a,b) curlx_timediff(a,b)
+#define Curl_timediff_ceil(a,b) curlx_timediff_ceil(a,b)
+#define Curl_timediff_us(a,b) curlx_timediff_us(a,b)
+
+/* For tool or tests, we must initialize before calling Curl_now() */
+void curlx_now_init(void);
+#endif
 
 struct curltime {
   time_t tv_sec; /* seconds */
@@ -34,16 +48,24 @@ struct curltime {
 struct curltime Curl_now(void);
 
 /*
- * Make sure that the first argument (t1) is the more recent time and t2 is
- * the older time, as otherwise you get a weird negative time-diff back...
+ * Make sure that the first argument (newer) is the more recent time and older
+ * is the older time, as otherwise you get a weird negative time-diff back...
  *
  * Returns: the time difference in number of milliseconds.
  */
-timediff_t Curl_timediff(struct curltime t1, struct curltime t2);
+timediff_t Curl_timediff(struct curltime newer, struct curltime older);
 
 /*
- * Make sure that the first argument (t1) is the more recent time and t2 is
- * the older time, as otherwise you get a weird negative time-diff back...
+ * Make sure that the first argument (newer) is the more recent time and older
+ * is the older time, as otherwise you get a weird negative time-diff back...
+ *
+ * Returns: the time difference in number of milliseconds, rounded up.
+ */
+timediff_t Curl_timediff_ceil(struct curltime newer, struct curltime older);
+
+/*
+ * Make sure that the first argument (newer) is the more recent time and older
+ * is the older time, as otherwise you get a weird negative time-diff back...
  *
  * Returns: the time difference in number of microseconds.
  */

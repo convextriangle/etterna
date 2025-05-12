@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -18,11 +18,16 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 #include "tool_setup.h"
 
 #include "tool_cfgable.h"
+#include "tool_formparse.h"
+#include "tool_paramhlp.h"
 #include "tool_main.h"
+#include "curlx.h"
 
 #include "memdebug.h" /* keep this as LAST include */
 
@@ -30,15 +35,10 @@ void config_init(struct OperationConfig *config)
 {
   memset(config, 0, sizeof(struct OperationConfig));
 
-  config->postfieldsize = -1;
   config->use_httpget = FALSE;
   config->create_dirs = FALSE;
   config->maxredirs = DEFAULT_MAXREDIRS;
-  config->proto = CURLPROTO_ALL;
   config->proto_present = FALSE;
-  config->proto_redir = CURLPROTO_ALL & /* All except FILE, SCP and SMB */
-    ~(CURLPROTO_FILE | CURLPROTO_SCP | CURLPROTO_SMB |
-      CURLPROTO_SMBS);
   config->proto_redir_present = FALSE;
   config->proto_default = NULL;
   config->tcp_nodelay = TRUE; /* enabled by default */
@@ -46,61 +46,65 @@ void config_init(struct OperationConfig *config)
   config->http09_allowed = FALSE;
   config->ftp_skip_ip = TRUE;
   config->file_clobber_mode = CLOBBER_DEFAULT;
+  config->upload_flags = CURLULFLAG_SEEN;
+  curlx_dyn_init(&config->postdata, MAX_FILE2MEMORY);
 }
 
 static void free_config_fields(struct OperationConfig *config)
 {
   struct getout *urlnode;
 
-  Curl_safefree(config->random_file);
-  Curl_safefree(config->egd_file);
-  Curl_safefree(config->useragent);
-  Curl_safefree(config->altsvc);
-  Curl_safefree(config->hsts);
+  curlx_safefree(config->useragent);
+  curlx_safefree(config->altsvc);
+  curlx_safefree(config->hsts);
+  curlx_safefree(config->haproxy_clientip);
   curl_slist_free_all(config->cookies);
-  Curl_safefree(config->cookiejar);
+  curlx_safefree(config->cookiejar);
   curl_slist_free_all(config->cookiefiles);
 
-  Curl_safefree(config->postfields);
-  Curl_safefree(config->referer);
+  curlx_dyn_free(&config->postdata);
+  curlx_safefree(config->query);
+  curlx_safefree(config->referer);
 
-  Curl_safefree(config->headerfile);
-  Curl_safefree(config->ftpport);
-  Curl_safefree(config->iface);
+  curlx_safefree(config->headerfile);
+  curlx_safefree(config->ftpport);
+  curlx_safefree(config->iface);
 
-  Curl_safefree(config->range);
+  curlx_safefree(config->range);
 
-  Curl_safefree(config->userpwd);
-  Curl_safefree(config->tls_username);
-  Curl_safefree(config->tls_password);
-  Curl_safefree(config->tls_authtype);
-  Curl_safefree(config->proxy_tls_username);
-  Curl_safefree(config->proxy_tls_password);
-  Curl_safefree(config->proxy_tls_authtype);
-  Curl_safefree(config->proxyuserpwd);
-  Curl_safefree(config->proxy);
+  curlx_safefree(config->userpwd);
+  curlx_safefree(config->tls_username);
+  curlx_safefree(config->tls_password);
+  curlx_safefree(config->tls_authtype);
+  curlx_safefree(config->proxy_tls_username);
+  curlx_safefree(config->proxy_tls_password);
+  curlx_safefree(config->proxy_tls_authtype);
+  curlx_safefree(config->proxyuserpwd);
+  curlx_safefree(config->proxy);
 
-  Curl_safefree(config->dns_ipv6_addr);
-  Curl_safefree(config->dns_ipv4_addr);
-  Curl_safefree(config->dns_interface);
-  Curl_safefree(config->dns_servers);
+  curlx_safefree(config->dns_ipv6_addr);
+  curlx_safefree(config->dns_ipv4_addr);
+  curlx_safefree(config->dns_interface);
+  curlx_safefree(config->dns_servers);
 
-  Curl_safefree(config->noproxy);
+  curlx_safefree(config->noproxy);
 
-  Curl_safefree(config->mail_from);
+  curlx_safefree(config->mail_from);
   curl_slist_free_all(config->mail_rcpt);
-  Curl_safefree(config->mail_auth);
+  curlx_safefree(config->mail_auth);
 
-  Curl_safefree(config->netrc_file);
-  Curl_safefree(config->output_dir);
+  curlx_safefree(config->netrc_file);
+  curlx_safefree(config->output_dir);
+  curlx_safefree(config->proto_str);
+  curlx_safefree(config->proto_redir_str);
 
   urlnode = config->url_list;
   while(urlnode) {
     struct getout *next = urlnode->next;
-    Curl_safefree(urlnode->url);
-    Curl_safefree(urlnode->outfile);
-    Curl_safefree(urlnode->infile);
-    Curl_safefree(urlnode);
+    curlx_safefree(urlnode->url);
+    curlx_safefree(urlnode->outfile);
+    curlx_safefree(urlnode->infile);
+    curlx_safefree(urlnode);
     urlnode = next;
   }
   config->url_list = NULL;
@@ -108,44 +112,48 @@ static void free_config_fields(struct OperationConfig *config)
   config->url_get = NULL;
   config->url_out = NULL;
 
-  Curl_safefree(config->doh_url);
-  Curl_safefree(config->cipher_list);
-  Curl_safefree(config->proxy_cipher_list);
-  Curl_safefree(config->cert);
-  Curl_safefree(config->proxy_cert);
-  Curl_safefree(config->cert_type);
-  Curl_safefree(config->proxy_cert_type);
-  Curl_safefree(config->cacert);
-  Curl_safefree(config->login_options);
-  Curl_safefree(config->proxy_cacert);
-  Curl_safefree(config->capath);
-  Curl_safefree(config->proxy_capath);
-  Curl_safefree(config->crlfile);
-  Curl_safefree(config->pinnedpubkey);
-  Curl_safefree(config->proxy_pinnedpubkey);
-  Curl_safefree(config->proxy_crlfile);
-  Curl_safefree(config->key);
-  Curl_safefree(config->proxy_key);
-  Curl_safefree(config->key_type);
-  Curl_safefree(config->proxy_key_type);
-  Curl_safefree(config->key_passwd);
-  Curl_safefree(config->proxy_key_passwd);
-  Curl_safefree(config->pubkey);
-  Curl_safefree(config->hostpubmd5);
-  Curl_safefree(config->hostpubsha256);
-  Curl_safefree(config->engine);
-  Curl_safefree(config->etag_save_file);
-  Curl_safefree(config->etag_compare_file);
-  Curl_safefree(config->request_target);
-  Curl_safefree(config->customrequest);
-  Curl_safefree(config->krblevel);
-
-  Curl_safefree(config->oauth_bearer);
-  Curl_safefree(config->sasl_authzid);
-
-  Curl_safefree(config->unix_socket_path);
-  Curl_safefree(config->writeout);
-  Curl_safefree(config->proto_default);
+#ifndef CURL_DISABLE_IPFS
+  curlx_safefree(config->ipfs_gateway);
+#endif /* !CURL_DISABLE_IPFS */
+  curlx_safefree(config->doh_url);
+  curlx_safefree(config->cipher_list);
+  curlx_safefree(config->proxy_cipher_list);
+  curlx_safefree(config->cipher13_list);
+  curlx_safefree(config->proxy_cipher13_list);
+  curlx_safefree(config->cert);
+  curlx_safefree(config->proxy_cert);
+  curlx_safefree(config->cert_type);
+  curlx_safefree(config->proxy_cert_type);
+  curlx_safefree(config->cacert);
+  curlx_safefree(config->login_options);
+  curlx_safefree(config->proxy_cacert);
+  curlx_safefree(config->capath);
+  curlx_safefree(config->proxy_capath);
+  curlx_safefree(config->crlfile);
+  curlx_safefree(config->pinnedpubkey);
+  curlx_safefree(config->proxy_pinnedpubkey);
+  curlx_safefree(config->proxy_crlfile);
+  curlx_safefree(config->key);
+  curlx_safefree(config->proxy_key);
+  curlx_safefree(config->key_type);
+  curlx_safefree(config->proxy_key_type);
+  curlx_safefree(config->key_passwd);
+  curlx_safefree(config->proxy_key_passwd);
+  curlx_safefree(config->pubkey);
+  curlx_safefree(config->hostpubmd5);
+  curlx_safefree(config->hostpubsha256);
+  curlx_safefree(config->engine);
+  curlx_safefree(config->etag_save_file);
+  curlx_safefree(config->etag_compare_file);
+  curlx_safefree(config->ssl_ec_curves);
+  curlx_safefree(config->request_target);
+  curlx_safefree(config->customrequest);
+  curlx_safefree(config->krblevel);
+  curlx_safefree(config->oauth_bearer);
+  curlx_safefree(config->sasl_authzid);
+  curlx_safefree(config->unix_socket_path);
+  curlx_safefree(config->writeout);
+  curlx_safefree(config->proto_default);
 
   curl_slist_free_all(config->quote);
   curl_slist_free_all(config->postquote);
@@ -164,14 +172,17 @@ static void free_config_fields(struct OperationConfig *config)
   curl_slist_free_all(config->resolve);
   curl_slist_free_all(config->connect_to);
 
-  Curl_safefree(config->preproxy);
-  Curl_safefree(config->proxy_service_name);
-  Curl_safefree(config->service_name);
-
-  Curl_safefree(config->ftp_account);
-  Curl_safefree(config->ftp_alternative_to_user);
-
-  Curl_safefree(config->aws_sigv4);
+  curlx_safefree(config->preproxy);
+  curlx_safefree(config->proxy_service_name);
+  curlx_safefree(config->service_name);
+  curlx_safefree(config->ftp_account);
+  curlx_safefree(config->ftp_alternative_to_user);
+  curlx_safefree(config->aws_sigv4);
+  curlx_safefree(config->proto_str);
+  curlx_safefree(config->proto_redir_str);
+  curlx_safefree(config->ech);
+  curlx_safefree(config->ech_config);
+  curlx_safefree(config->ech_public);
 }
 
 void config_free(struct OperationConfig *config)

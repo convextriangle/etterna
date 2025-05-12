@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -18,12 +18,14 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 #include "test.h"
 
 #include "memdebug.h"
 
-static char data[]=
+static char testdata[]=
   "dummy";
 
 struct WriteThis {
@@ -34,7 +36,7 @@ struct WriteThis {
 static size_t read_callback(char *ptr, size_t size, size_t nmemb, void *userp)
 {
   struct WriteThis *pooh = (struct WriteThis *)userp;
-  int eof = !*pooh->readptr;
+  int eof;
 
   if(size*nmemb < 1)
     return 0;
@@ -52,13 +54,12 @@ static size_t read_callback(char *ptr, size_t size, size_t nmemb, void *userp)
   return 0;                         /* no more data left to deliver */
 }
 
-int test(char *URL)
+CURLcode test(char *URL)
 {
   CURL *easy = NULL;
   curl_mime *mime = NULL;
   curl_mimepart *part;
-  CURLcode result;
-  int res = TEST_ERR_FAILURE;
+  CURLcode res = TEST_ERR_FAILURE;
   struct WriteThis pooh;
 
   /*
@@ -83,8 +84,8 @@ int test(char *URL)
   test_setopt(easy, CURLOPT_HEADER, 1L);
 
   /* Prepare the callback structure. */
-  pooh.readptr = data;
-  pooh.sizeleft = (curl_off_t) strlen(data);
+  pooh.readptr = testdata;
+  pooh.sizeleft = (curl_off_t) strlen(testdata);
 
   /* Build the mime tree. */
   mime = curl_mime_init(easy);
@@ -98,10 +99,9 @@ int test(char *URL)
   test_setopt(easy, CURLOPT_MIMEPOST, mime);
 
   /* Send data. */
-  result = curl_easy_perform(easy);
-  if(result) {
+  res = curl_easy_perform(easy);
+  if(res != CURLE_OK) {
     fprintf(stderr, "curl_easy_perform() failed\n");
-    res = (int) result;
   }
 
 test_cleanup:

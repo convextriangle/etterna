@@ -1,3 +1,5 @@
+#ifndef HEADER_CURL_TEST_H
+#define HEADER_CURL_TEST_H
 /***************************************************************************
  *                                  _   _ ____  _
  *  Project                     ___| | | |  _ \| |
@@ -5,7 +7,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -17,6 +19,8 @@
  *
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
+ *
+ * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
 
@@ -40,6 +44,17 @@
 
 #include "curl_printf.h"
 
+/* GCC <4.6 does not support '#pragma GCC diagnostic push' and
+   does not support 'pragma GCC diagnostic' inside functions. */
+#if (defined(__GNUC__) && \
+  ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 6))))
+#define CURL_GNUC_DIAG
+#endif
+
+#ifdef _WIN32
+#define sleep(sec) Sleep((sec)*1000)
+#endif
+
 #define test_setopt(A,B,C)                                      \
   if((res = curl_easy_setopt((A), (B), (C))) != CURLE_OK)       \
     goto test_cleanup
@@ -50,6 +65,7 @@
 
 extern char *libtest_arg2; /* set by first.c to the argv[2] or NULL */
 extern char *libtest_arg3; /* set by first.c to the argv[3] or NULL */
+extern char *libtest_arg4; /* set by first.c to the argv[4] or NULL */
 
 /* argc and argv as passed in to the main() function */
 extern int test_argc;
@@ -62,14 +78,14 @@ extern int select_wrapper(int nfds, fd_set *rd, fd_set *wr, fd_set *exc,
 
 extern void wait_ms(int ms); /* wait this many milliseconds */
 
-extern int test(char *URL); /* the actual test function provided by each
-                               individual libXXX.c file */
+#ifndef CURLTESTS_BUNDLED_TEST_H
+extern CURLcode test(char *URL); /* the actual test function provided by each
+                                    individual libXXX.c file */
+#endif
 
 extern char *hexdump(const unsigned char *buffer, size_t len);
 
-#ifdef UNITTESTS
 extern int unitfail;
-#endif
 
 /*
 ** TEST_ERR_* values must be greater than CURL_LAST CURLcode in order
@@ -80,18 +96,18 @@ extern int unitfail;
 ** For portability reasons TEST_ERR_* values should be less than 127.
 */
 
-#define TEST_ERR_MAJOR_BAD     (CURLcode) 126
-#define TEST_ERR_RUNS_FOREVER  (CURLcode) 125
-#define TEST_ERR_EASY_INIT     (CURLcode) 124
-#define TEST_ERR_MULTI         (CURLcode) 123
-#define TEST_ERR_NUM_HANDLES   (CURLcode) 122
-#define TEST_ERR_SELECT        (CURLcode) 121
-#define TEST_ERR_SUCCESS       (CURLcode) 120
-#define TEST_ERR_FAILURE       (CURLcode) 119
-#define TEST_ERR_USAGE         (CURLcode) 118
-#define TEST_ERR_FOPEN         (CURLcode) 117
-#define TEST_ERR_FSTAT         (CURLcode) 116
-#define TEST_ERR_BAD_TIMEOUT   (CURLcode) 115
+#define TEST_ERR_MAJOR_BAD     CURLE_RESERVED126
+#define TEST_ERR_RUNS_FOREVER  CURLE_RESERVED125
+#define TEST_ERR_EASY_INIT     CURLE_RESERVED124
+#define TEST_ERR_MULTI         CURLE_RESERVED123
+#define TEST_ERR_NUM_HANDLES   CURLE_RESERVED122
+#define TEST_ERR_SELECT        CURLE_RESERVED121
+#define TEST_ERR_SUCCESS       CURLE_RESERVED120
+#define TEST_ERR_FAILURE       CURLE_RESERVED119
+#define TEST_ERR_USAGE         CURLE_RESERVED118
+#define TEST_ERR_FOPEN         CURLE_RESERVED117
+#define TEST_ERR_FSTAT         CURLE_RESERVED116
+#define TEST_ERR_BAD_TIMEOUT   CURLE_RESERVED115
 
 /*
 ** Macros for test source code readability/maintainability.
@@ -436,12 +452,14 @@ extern int unitfail;
   tv_test_start = tutil_tvnow(); \
 } while(0)
 
-#define exe_test_timedout(Y,Z) do {                                    \
-  if(tutil_tvdiff(tutil_tvnow(), tv_test_start) > TEST_HANG_TIMEOUT) { \
-    fprintf(stderr, "%s:%d ABORTING TEST, since it seems "             \
-                    "that it would have run forever.\n", (Y), (Z));    \
-    res = TEST_ERR_RUNS_FOREVER;                                       \
-  }                                                                    \
+#define exe_test_timedout(Y,Z) do {                                       \
+  long timediff = tutil_tvdiff(tutil_tvnow(), tv_test_start);             \
+  if(timediff > (TEST_HANG_TIMEOUT)) {                                    \
+    fprintf(stderr, "%s:%d ABORTING TEST, since it seems "                \
+            "that it would have run forever (%ld ms > %ld ms)\n",         \
+            (Y), (Z), timediff, (long) (TEST_HANG_TIMEOUT));              \
+    res = TEST_ERR_RUNS_FOREVER;                                          \
+  }                                                                       \
 } while(0)
 
 #define res_test_timedout() \
@@ -483,4 +501,30 @@ extern int unitfail;
 #define global_init(A) \
   chk_global_init((A), (__FILE__), (__LINE__))
 
+#ifndef CURLTESTS_BUNDLED_TEST_H
+#define NO_SUPPORT_BUILT_IN                     \
+  CURLcode test(char *URL)                      \
+  {                                             \
+    (void)URL;                                  \
+    fprintf(stderr, "Missing support\n");       \
+    return CURLE_UNSUPPORTED_PROTOCOL;          \
+  }
+#endif
+
 /* ---------------------------------------------------------------- */
+
+#endif /* HEADER_CURL_TEST_H */
+
+#ifdef CURLTESTS_BUNDLED_TEST_H
+extern CURLcode test(char *URL); /* the actual test function provided by each
+                                    individual libXXX.c file */
+
+#undef NO_SUPPORT_BUILT_IN
+#define NO_SUPPORT_BUILT_IN                     \
+  CURLcode test(char *URL)                      \
+  {                                             \
+    (void)URL;                                  \
+    fprintf(stderr, "Missing support\n");       \
+    return CURLE_UNSUPPORTED_PROTOCOL;          \
+  }
+#endif

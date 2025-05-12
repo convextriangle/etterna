@@ -6,7 +6,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2020, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -18,6 +18,8 @@
 #
 # This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 # KIND, either express or implied.
+#
+# SPDX-License-Identifier: curl
 #
 ###########################################################################
 # Determine if curl-config --version matches the curl --version
@@ -33,7 +35,7 @@ my $what=$ARGV[2];
 open(CURL, "$ARGV[1]") || die "Can't open curl --version list in $ARGV[1]\n";
 $_ = <CURL>;
 chomp;
-/libcurl\/([\.\d]+((-DEV)|(-\d+))?)/;
+/libcurl\/([\.\d]+((-DEV)|(-rc\d)|(-\d+))?)/;
 my $version = $1;
 close CURL;
 
@@ -45,7 +47,7 @@ $_ = <CURLCONFIG>;
 chomp;
 my $filever=$_;
 if ( $what eq "version" ) {
-    if($filever =~ /^libcurl ([\.\d]+((-DEV)|(-\d+))?)$/) {
+    if($filever =~ /^libcurl ([\.\d]+((-DEV)|(-rc\d)|(-\d+))?)$/) {
         $curlconfigversion = $1;
     }
     else {
@@ -61,7 +63,7 @@ else { # "vernum" case
         $curlconfigversion = "illegal value";
     }
 
-    # Strip off the -DEV from the curl version if it's there
+    # Strip off the -DEV and -rc suffixes from the curl version if they're there
     $version =~ s/-\w*$//;
 }
 close CURLCONFIG;

@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -18,6 +18,8 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 #include "test.h"
 
@@ -29,22 +31,22 @@
 #define TEST_HANG_TIMEOUT 60 * 1000
 
 static char const testData[] = ".abc\0xyz";
-static off_t const testDataSize = sizeof(testData) - 1;
+static curl_off_t const testDataSize = sizeof(testData) - 1;
 
-int test(char *URL)
+CURLcode test(char *URL)
 {
   CURL *easy;
   CURLM *multi_handle;
   int still_running; /* keep number of running handles */
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int msgs_left; /* how many messages are left */
-  int res = CURLE_OK;
+  CURLcode res = CURLE_OK;
 
   start_test_timing();
 
   global_init(CURL_GLOBAL_ALL);
 
-  /* Allocate one CURL handle per transfer */
+  /* Allocate one curl handle per transfer */
   easy = curl_easy_init();
 
   /* init a multi stack */
@@ -55,8 +57,7 @@ int test(char *URL)
 
   /* set the options (I left out a few, you'll get the point anyway) */
   curl_easy_setopt(easy, CURLOPT_URL, URL);
-  curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE_LARGE,
-                   (curl_off_t)testDataSize);
+  curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE_LARGE, testDataSize);
   curl_easy_setopt(easy, CURLOPT_POSTFIELDS, testData);
 
   /* we start some action by calling perform right away */
@@ -108,12 +109,13 @@ int test(char *URL)
        curl_multi_fdset() doc. */
 
     if(maxfd == -1) {
-#if defined(WIN32) || defined(_WIN32)
+#ifdef _WIN32
       Sleep(100);
       rc = 0;
 #else
       /* Portable sleep for platforms other than Windows. */
-      struct timeval wait = { 0, 100 * 1000 }; /* 100ms */
+      struct timeval wait = {0};
+      wait.tv_usec = 100 * 1000; /* 100ms */
       rc = select(0, NULL, NULL, NULL, &wait);
 #endif
     }
@@ -150,7 +152,7 @@ int test(char *URL)
 test_cleanup:
   curl_multi_cleanup(multi_handle);
 
-  /* Free the CURL handles */
+  /* Free the curl handles */
   curl_easy_cleanup(easy);
   curl_global_cleanup();
 

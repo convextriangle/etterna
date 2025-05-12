@@ -31,23 +31,19 @@ Funny-head: yesyes
 <server>
 http
 </server>
- <name>
+<name>
 --remove-on-error
- </name>
+</name>
  <command option="no-output">
-http://%HOSTIP:%HTTPPORT/%TESTNUMBER -o log/save-%TESTNUMBER --remove-on-error
+http://%HOSTIP:%HTTPPORT/%TESTNUMBER -o %LOGDIR/save-%TESTNUMBER --remove-on-error
 </command>
 </client>
 
 #
-# Verify data after the test has been "shot". hyper doesn't do error 18
+# Verify data after the test has been "shot"
 <verify>
 <errorcode>
-%if hyper
-56
-%else
 18
-%endif
 </errorcode>
 <protocol>
 GET /%TESTNUMBER HTTP/1.1
@@ -58,7 +54,7 @@ Accept: */*
 </protocol>
 
 # the file should be empty now
-<file name="log/save-%TESTNUMBER">
+<file name="%LOGDIR/save-%TESTNUMBER">
 </file>
 </verify>
 </testcase>

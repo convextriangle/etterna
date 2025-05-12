@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2021, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -18,12 +18,14 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 #include "test.h"
 
 #include "memdebug.h"
 
-int test(char *URL)
+CURLcode test(char *URL)
 {
   const unsigned char a[] = {0x2f, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
                              0x91, 0xa2, 0xb3, 0xc4, 0xd5, 0xe6, 0xf7};
@@ -41,12 +43,12 @@ int test(char *URL)
   }
 
   asize = (int)sizeof(a);
-  ptr = curl_easy_escape(NULL, (char *)a, asize);
+  ptr = curl_easy_escape(NULL, (const char *)a, asize);
   printf("%s\n", ptr);
   curl_free(ptr);
 
   /* deprecated API */
-  ptr = curl_escape((char *)a, asize);
+  ptr = curl_escape((const char *)a, asize);
   if(!ptr) {
     res = TEST_ERR_MAJOR_BAD;
     goto test_cleanup;
@@ -73,17 +75,17 @@ int test(char *URL)
   curl_free(ptr);
 
   /* weird input length */
-  ptr = curl_easy_escape(NULL, (char *)a, -1);
+  ptr = curl_easy_escape(NULL, (const char *)a, -1);
   printf("escape -1 length: %s\n", ptr);
 
   /* weird input length */
   outlen = 2017; /* just a value */
-  ptr = curl_easy_unescape(NULL, (char *)"moahahaha", -1, &outlen);
+  ptr = curl_easy_unescape(NULL, "moahahaha", -1, &outlen);
   printf("unescape -1 length: %s %d\n", ptr, outlen);
 
 test_cleanup:
   curl_free(ptr);
   curl_global_cleanup();
 
-  return (int)res;
+  return res;
 }

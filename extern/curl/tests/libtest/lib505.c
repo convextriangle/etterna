@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2021, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -17,6 +17,8 @@
  *
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
+ *
+ * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
 #include "test.h"
@@ -34,7 +36,7 @@
  * Example based on source code provided by Erick Nuwendam. Thanks!
  */
 
-int test(char *URL)
+CURLcode test(char *URL)
 {
   CURL *curl;
   CURLcode res = CURLE_OK;
@@ -54,25 +56,29 @@ int test(char *URL)
 
   hd_src = fopen(libtest_arg2, "rb");
   if(!hd_src) {
-    fprintf(stderr, "fopen failed with error: %d %s\n",
+    fprintf(stderr, "fopen failed with error (%d) %s\n",
             errno, strerror(errno));
-    fprintf(stderr, "Error opening file: %s\n", libtest_arg2);
+    fprintf(stderr, "Error opening file '%s'\n", libtest_arg2);
     return TEST_ERR_MAJOR_BAD; /* if this happens things are major weird */
   }
 
   /* get the file size of the local file */
+#ifdef UNDER_CE
+  hd = stat(libtest_arg2, &file_info);
+#else
   hd = fstat(fileno(hd_src), &file_info);
+#endif
   if(hd == -1) {
     /* can't open file, bail out */
-    fprintf(stderr, "fstat() failed with error: %d %s\n",
+    fprintf(stderr, "fstat() failed with error (%d) %s\n",
             errno, strerror(errno));
-    fprintf(stderr, "ERROR: cannot open file %s\n", libtest_arg2);
+    fprintf(stderr, "Error opening file '%s'\n", libtest_arg2);
     fclose(hd_src);
     return TEST_ERR_MAJOR_BAD;
   }
 
   if(!file_info.st_size) {
-    fprintf(stderr, "ERROR: file %s has zero size!\n", libtest_arg2);
+    fprintf(stderr, "File %s has zero size!\n", libtest_arg2);
     fclose(hd_src);
     return TEST_ERR_MAJOR_BAD;
   }

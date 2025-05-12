@@ -6,7 +6,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -19,6 +19,8 @@
 # This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 # KIND, either express or implied.
 #
+# SPDX-License-Identifier: curl
+#
 ###########################################################################
 
 use strict;
@@ -26,21 +28,23 @@ use warnings;
 use Getopt::Long();
 use Pod::Usage();
 
-my $curl = 'curl';
+my $opts_dir = '../docs/cmdline-opts';
 my $shell = 'zsh';
 my $help = 0;
 Getopt::Long::GetOptions(
-    'curl=s' => \$curl,
+    'opts-dir=s' => \$opts_dir,
     'shell=s' => \$shell,
     'help' => \$help,
 ) or Pod::Usage::pod2usage();
 Pod::Usage::pod2usage() if $help;
 
-my $regex = '\s+(?:(-[^\s]+),\s)?(--[^\s]+)\s*(\<.+?\>)?\s+(.*)';
-my @opts = parse_main_opts('--help all', $regex);
+my @opts = parse_main_opts($opts_dir);
 
 if ($shell eq 'fish') {
     print "# curl fish completion\n\n";
+    print "# Complete file paths after @\n";
+    print q(complete -c curl -n 'string match -qr "^@" -- (commandline -ct)' -k -xa "(printf '%s\n' -- @(__fish_complete_suffix --complete=(commandline -ct | string replace -r '^@' '') ''))");
+    print "\n\n";
     print qq{$_ \n} foreach (@opts);
 } elsif ($shell eq 'zsh') {
     my $opts_str;
@@ -71,22 +75,42 @@ EOS
 }
 
 sub parse_main_opts {
-    my ($cmd, $regex) = @_;
+    my ($opts_dir) = @_;
 
-    my @list;
-    my @lines = call_curl($cmd);
+    my (@files, @list);
+    my ($dir_handle, $file_content);
 
-    foreach my $line (@lines) {
-        my ($short, $long, $arg, $desc) = ($line =~ /^$regex/) or next;
+    opendir($dir_handle, $opts_dir) || die "Unable to open dir: $opts_dir due to error: $!";
+    @files = readdir($dir_handle);
+    closedir($dir_handle) || die "Unable to close handle on dir: $opts_dir due to error: $!";
 
-        my $option = '';
+    # We want regular files that end with .md and don't start with an underscore
+    # Edge case: MANPAGE.md doesn't start with an underscore but also isn't documentation for an option
+    @files = grep { $_ =~ /\.md$/i && !/^_/ && -f "$opts_dir/$_" && $_ ne "MANPAGE.md" } @files;
+
+    for my $file (@files) {
+        open(my $doc_handle, '<', "$opts_dir/$file") || die "Unable to open file: $file due to error: $!";
+        $file_content = join('', <$doc_handle>);
+        close($doc_handle) || die "Unable to close file: $file due to error: $!";
+
+        # Extract the curldown header section demarcated by ---
+        $file_content =~ /^---\s*\n(.*?)\n---\s*\n/s || die "Unable to parse file $file";
+
+        $file_content = $1;
+        my ($short, $long, $arg, $desc);
+
+        if ($file_content =~ /^Short:\s+(.*)\s*$/im) {$short = "-$1";}
+        if ($file_content =~ /^Long:\s+(.*)\s*$/im) {$long = "--$1";}
+        if ($file_content =~ /^Arg:\s+(.*)\s*$/im) {$arg = $1;}
+        if ($file_content =~ /^Help:\s+(.*)\s*$/im) {$desc = $1;}
 
         $arg =~ s/\:/\\\:/g if defined $arg;
-
         $desc =~ s/'/'\\''/g if defined $desc;
         $desc =~ s/\[/\\\[/g if defined $desc;
         $desc =~ s/\]/\\\]/g if defined $desc;
         $desc =~ s/\:/\\\:/g if defined $desc;
+
+        my $option = '';
 
         if ($shell eq 'fish') {
             $option .= "complete --command curl";
@@ -118,16 +142,17 @@ sub parse_main_opts {
             }
         }
 
-        push @list, $option;
+        push(@list, $option);
     }
 
     # Sort longest first, because zsh won't complete an option listed
-    # after one that's a prefix of it.
+    # after one that's a prefix of it. When length is equal, fall back
+    # to stringwise cmp.
     @list = sort {
         $a =~ /([^=]*)/; my $ma = $1;
         $b =~ /([^=]*)/; my $mb = $1;
 
-        length($mb) <=> length($ma)
+        length($mb) <=> length($ma) || $ma cmp $mb
     } @list if $shell eq 'zsh';
 
     return @list;
@@ -135,17 +160,6 @@ sub parse_main_opts {
 
 sub trim { my $s = shift; $s =~ s/^\s+|\s+$//g; return $s };
 sub strip_dash { my $s = shift; $s =~ s/^-+//g; return $s };
-
-sub call_curl {
-    my ($cmd) = @_;
-    my $output = `"$curl" $cmd`;
-    if ($? == -1) {
-        die "Could not run curl: $!";
-    } elsif ((my $exit_code = $? >> 8) != 0) {
-        die "curl returned $exit_code with output:\n$output";
-    }
-    return split /\n/, $output;
-}
 
 __END__
 
@@ -157,8 +171,8 @@ completion.pl - Generates tab-completion files for various shells
 
 completion.pl [options...]
 
-    --curl   path to curl executable
-    --shell  zsh/fish
-    --help   prints this help
+    --opts_dir path to cmdline-opts directory
+    --shell    zsh/fish
+    --help     prints this help
 
 =cut
