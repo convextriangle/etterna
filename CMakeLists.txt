@@ -1,5 +1,5 @@
 # ROOT CMakeLists.txt
-cmake_minimum_required(VERSION 3.15.0)
+cmake_minimum_required(VERSION 3.19.0)
 
 # Policies
 cmake_policy(SET CMP0076 NEW)  # Tell cmake to convert target_sources input from relative path to absolute path
