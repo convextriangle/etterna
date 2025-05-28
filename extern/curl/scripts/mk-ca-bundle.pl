@@ -6,7 +6,7 @@
 # *                            | (__| |_| |  _ <| |___
 # *                             \___|\___/|_| \_\_____|
 # *
-# * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+# * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 # *
 # * This software is licensed as described in the file COPYING, which
 # * you should have received as part of this distribution. The terms
@@ -18,6 +18,8 @@
 # *
 # * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 # * KIND, either express or implied.
+# *
+# * SPDX-License-Identifier: curl
 # *
 # ***************************************************************************
 # This Perl script creates a fresh ca-bundle.crt file for use with libcurl.
@@ -133,8 +135,6 @@ if(defined($urls{$opt_d})) {
 else {
   $url = $opt_d;
 }
-
-my $curl = `curl -V`;
 
 if ($opt_i) {
   print ("=" x 78 . "\n");
@@ -312,6 +312,7 @@ if(!$opt_n) {
 
   # If we have an HTTPS URL then use curl
   if($url =~ /^https:\/\//i) {
+    my $curl = `curl -V`;
     if($curl) {
       if($curl =~ /^Protocols:.* https( |$)/m) {
         report "Get certdata with curl!";
@@ -406,6 +407,8 @@ print CRT <<EOT;
 ## Bundle of CA Root Certificates
 ##
 ## Certificate data from Mozilla ${datesrc}: ${currentdate} GMT
+##
+## Find updated versions here: https://curl.se/docs/caextract.html
 ##
 ## This is a bundle of X.509 certificates of public Certificate Authorities
 ## (CA). These were automatically extracted from Mozilla's root certificates
@@ -546,48 +549,6 @@ while (<TXT>) {
         shift @octets;
         for (@octets) {
           $cka_value .= chr(oct);
-        }
-      }
-      next;
-    }
-    elsif (/^CKA_NSS_SERVER_DISTRUST_AFTER (CK_BBOOL CK_FALSE|MULTILINE_OCTAL)/) {
-      # Example:
-      # CKA_NSS_SERVER_DISTRUST_AFTER MULTILINE_OCTAL
-      # \062\060\060\066\061\067\060\060\060\060\060\060\132
-      # END
-      if($1 eq "MULTILINE_OCTAL") {
-        my @timestamp;
-        while (<TXT>) {
-          last if (/^END/);
-          chomp;
-          my @octets = split(/\\/);
-          shift @octets;
-          for (@octets) {
-            push @timestamp, chr(oct);
-          }
-        }
-        scalar(@timestamp) == 13 or die "Failed parsing timestamp";
-        # A trailing Z in the timestamp signifies UTC
-        if($timestamp[12] ne "Z") {
-          report "distrust date stamp is not using UTC";
-        }
-        # Example date: 200617000000Z
-        # Means 2020-06-17 00:00:00 UTC
-        my $distrustat =
-          timegm($timestamp[10] . $timestamp[11], # second
-                 $timestamp[8] . $timestamp[9],   # minute
-                 $timestamp[6] . $timestamp[7],   # hour
-                 $timestamp[4] . $timestamp[5],   # day
-                 ($timestamp[2] . $timestamp[3]) - 1, # month
-                 "20" . $timestamp[0] . $timestamp[1]); # year
-        if(time >= $distrustat) {
-          # not trusted anymore
-          $skipnum++;
-          report "Skipping: $main_block_name is not trusted anymore" if ($opt_v);
-          $valid = 0;
-        }
-        else {
-          # still trusted
         }
       }
       next;

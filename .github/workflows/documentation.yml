@@ -46,13 +46,13 @@ jobs:
       - name: Run LDoc
         run: |
           cd build
-          make ldoc
+          make ldoc BUILD_TESTS="FALSE" BUILD_EXAMPLES="FALSE"
           sudo mv ldoc_output ../_site/ldoc
       #Doxygen build
       - name: Run Doxygen
         run: |
           cd build
-          make doxygen
+          make doxygen BUILD_TESTS="FALSE" BUILD_EXAMPLES="FALSE"
           sudo mv doxygen ../_site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2021, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -18,45 +18,79 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 
 #include "timeval.h"
 
-#if defined(WIN32) && !defined(MSDOS)
+#ifdef _WIN32
 
-/* set in win32_init() */
-extern LARGE_INTEGER Curl_freq;
-extern bool Curl_isVistaOrGreater;
+#include <curl/curl.h>
+#ifdef BUILDING_LIBCURL
+#include "system_win32.h"
+#else
+#include "version_win32.h"
+
+static LARGE_INTEGER s_freq;
+static bool s_isVistaOrGreater;
+
+/* For tool or tests, we must initialize before calling Curl_now() */
+void curlx_now_init(void)
+{
+  if(curlx_verify_windows_version(6, 0, 0, PLATFORM_WINNT,
+                                  VERSION_GREATER_THAN_EQUAL))
+    s_isVistaOrGreater = true;
+  else
+    s_isVistaOrGreater = false;
+
+  QueryPerformanceFrequency(&s_freq);
+}
+#endif
 
 /* In case of bug fix this function has a counterpart in tool_util.c */
 struct curltime Curl_now(void)
 {
   struct curltime now;
-  if(Curl_isVistaOrGreater) { /* QPC timer might have issues pre-Vista */
+  bool isVistaOrGreater;
+#ifdef BUILDING_LIBCURL
+  isVistaOrGreater = Curl_isVistaOrGreater;
+#else
+  isVistaOrGreater = s_isVistaOrGreater;
+#endif
+  if(isVistaOrGreater) { /* QPC timer might have issues pre-Vista */
     LARGE_INTEGER count;
+    LARGE_INTEGER freq;
+#ifdef BUILDING_LIBCURL
+    freq = Curl_freq;
+#else
+    freq = s_freq;
+#endif
+    DEBUGASSERT(freq.QuadPart);
     QueryPerformanceCounter(&count);
-    now.tv_sec = (time_t)(count.QuadPart / Curl_freq.QuadPart);
-    now.tv_usec = (int)((count.QuadPart % Curl_freq.QuadPart) * 1000000 /
-                        Curl_freq.QuadPart);
+    now.tv_sec = (time_t)(count.QuadPart / freq.QuadPart);
+    now.tv_usec = (int)((count.QuadPart % freq.QuadPart) * 1000000 /
+                        freq.QuadPart);
   }
   else {
     /* Disable /analyze warning that GetTickCount64 is preferred  */
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:28159)
 #endif
     DWORD milliseconds = GetTickCount();
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #pragma warning(pop)
 #endif
 
-    now.tv_sec = milliseconds / 1000;
-    now.tv_usec = (milliseconds % 1000) * 1000;
+    now.tv_sec = (time_t)(milliseconds / 1000);
+    now.tv_usec = (int)((milliseconds % 1000) * 1000);
   }
   return now;
 }
 
-#elif defined(HAVE_CLOCK_GETTIME_MONOTONIC)
+#elif defined(HAVE_CLOCK_GETTIME_MONOTONIC) ||  \
+  defined(HAVE_CLOCK_GETTIME_MONOTONIC_RAW)
 
 struct curltime Curl_now(void)
 {
@@ -75,7 +109,7 @@ struct curltime Curl_now(void)
 
   /*
   ** clock_gettime() may be defined by Apple's SDK as weak symbol thus
-  ** code compiles but fails during run-time if clock_gettime() is
+  ** code compiles but fails during runtime if clock_gettime() is
   ** called on unsupported OS version.
   */
 #if defined(__APPLE__) && defined(HAVE_BUILTIN_AVAILABLE) && \
@@ -85,6 +119,19 @@ struct curltime Curl_now(void)
     have_clock_gettime = TRUE;
 #endif
 
+#ifdef HAVE_CLOCK_GETTIME_MONOTONIC_RAW
+  if(
+#if defined(__APPLE__) && defined(HAVE_BUILTIN_AVAILABLE) &&    \
+        (HAVE_BUILTIN_AVAILABLE == 1)
+    have_clock_gettime &&
+#endif
+    (0 == clock_gettime(CLOCK_MONOTONIC_RAW, &tsnow))) {
+    cnow.tv_sec = tsnow.tv_sec;
+    cnow.tv_usec = (int)(tsnow.tv_nsec / 1000);
+  }
+  else
+#endif
+
   if(
 #if defined(__APPLE__) && defined(HAVE_BUILTIN_AVAILABLE) && \
         (HAVE_BUILTIN_AVAILABLE == 1)
@@ -92,18 +139,18 @@ struct curltime Curl_now(void)
 #endif
     (0 == clock_gettime(CLOCK_MONOTONIC, &tsnow))) {
     cnow.tv_sec = tsnow.tv_sec;
-    cnow.tv_usec = (unsigned int)(tsnow.tv_nsec / 1000);
+    cnow.tv_usec = (int)(tsnow.tv_nsec / 1000);
   }
   /*
   ** Even when the configure process has truly detected monotonic clock
   ** availability, it might happen that it is not actually available at
-  ** run-time. When this occurs simply fallback to other time source.
+  ** runtime. When this occurs simply fallback to other time source.
   */
 #ifdef HAVE_GETTIMEOFDAY
   else {
     (void)gettimeofday(&now, NULL);
     cnow.tv_sec = now.tv_sec;
-    cnow.tv_usec = (unsigned int)now.tv_usec;
+    cnow.tv_usec = (int)now.tv_usec;
   }
 #else
   else {
@@ -122,7 +169,7 @@ struct curltime Curl_now(void)
 struct curltime Curl_now(void)
 {
   /*
-  ** Monotonic timer on Mac OS is provided by mach_absolute_time(), which
+  ** Monotonic timer on macOS is provided by mach_absolute_time(), which
   ** returns time in Mach "absolute time units," which are platform-dependent.
   ** To convert to nanoseconds, one must use conversion factors specified by
   ** mach_timebase_info().
@@ -191,6 +238,20 @@ timediff_t Curl_timediff(struct curltime newer, struct curltime older)
   else if(diff <= (TIMEDIFF_T_MIN/1000))
     return TIMEDIFF_T_MIN;
   return diff * 1000 + (newer.tv_usec-older.tv_usec)/1000;
+}
+
+/*
+ * Returns: time difference in number of milliseconds, rounded up.
+ * For too large diffs it returns max value.
+ */
+timediff_t Curl_timediff_ceil(struct curltime newer, struct curltime older)
+{
+  timediff_t diff = (timediff_t)newer.tv_sec-older.tv_sec;
+  if(diff >= (TIMEDIFF_T_MAX/1000))
+    return TIMEDIFF_T_MAX;
+  else if(diff <= (TIMEDIFF_T_MIN/1000))
+    return TIMEDIFF_T_MIN;
+  return diff * 1000 + (newer.tv_usec - older.tv_usec + 999)/1000;
 }
 
 /*

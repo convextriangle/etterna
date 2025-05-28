@@ -7,7 +7,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -20,50 +20,63 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 #include "server_setup.h"
 
+enum {
+  DOCNUMBER_NOTHING    = -7,
+  DOCNUMBER_QUIT       = -6,
+  DOCNUMBER_BADCONNECT = -5,
+  DOCNUMBER_INTERNAL   = -4,
+  DOCNUMBER_CONNECT    = -3,
+  DOCNUMBER_WERULEZ    = -2,
+  DOCNUMBER_404        = -1
+};
+
 char *data_to_hex(char *data, size_t len);
-void logmsg(const char *msg, ...);
-long timediff(struct timeval newer, struct timeval older);
+void logmsg(const char *msg, ...) CURL_PRINTF(1, 2);
+void loghex(unsigned char *buffer, ssize_t len);
+unsigned char byteval(char *value);
 
-#define TEST_DATA_PATH "%s/data/test%ld"
-#define ALTTEST_DATA_PATH "%s/log/test%ld"
+#define SERVERLOGS_LOCKDIR "lock"  /* within logdir */
 
-#define SERVERLOGS_LOCK "log/serverlogs.lock"
+/* global variables */
+extern const char *srcpath;  /* where to find the 'data' dir */
+extern const char *pidname;
+extern const char *portname;
+extern const char *serverlogfile;  /* log file name */
+extern int serverlogslocked;
+extern const char *configfile;
+extern const char *logdir;
+extern char loglockfile[256];
+#ifdef USE_IPV6
+extern bool use_ipv6;
+#endif
+extern const char *ipv_inuse;
+extern unsigned short server_port;
+extern const char *socket_type;
+extern int socket_domain;
 
-/* global variable, where to find the 'data' dir */
-extern const char *path;
-
-/* global variable, log file name */
-extern const char *serverlogfile;
-
-extern const char *cmdfile;
-
-#ifdef WIN32
-#include <process.h>
-#include <fcntl.h>
-
-#define sleep(sec) Sleep ((sec)*1000)
-
-#undef perror
-#define perror(m) win32_perror(m)
-void win32_perror(const char *msg);
-
-void win32_init(void);
-void win32_cleanup(void);
-#endif  /* WIN32 */
+#ifdef _WIN32
+int win32_init(void);
+const char *sstrerror(int err);
+#else
+#define sstrerror(e) strerror(e)
+#endif
 
 /* fopens the test case file */
-FILE *test2fopen(long testno);
+FILE *test2fopen(long testno, const char *logdir);
 
-int wait_ms(int timeout_ms);
+#include "timeval.h"
+
+int wait_ms(timediff_t timeout_ms);
 curl_off_t our_getpid(void);
 int write_pidfile(const char *filename);
 int write_portfile(const char *filename, int port);
 void set_advisor_read_lock(const char *filename);
 void clear_advisor_read_lock(const char *filename);
-int strncasecompare(const char *first, const char *second, size_t max);
 
 /* global variable which if set indicates that the program should finish */
 extern volatile int got_exit_signal;
@@ -71,7 +84,7 @@ extern volatile int got_exit_signal;
 /* global variable which if set indicates the first signal handled */
 extern volatile int exit_signal;
 
-#ifdef WIN32
+#ifdef _WIN32
 /* global event which if set indicates that the program should finish */
 extern HANDLE exit_event;
 #endif
@@ -79,14 +92,16 @@ extern HANDLE exit_event;
 void install_signal_handlers(bool keep_sigalrm);
 void restore_signal_handlers(bool keep_sigalrm);
 
-#ifdef USE_UNIX_SOCKETS
+#include <curl/curl.h> /* for curl_socket_t */
 
+#ifdef USE_UNIX_SOCKETS
 #ifdef HAVE_SYS_UN_H
 #include <sys/un.h> /* for sockaddr_un */
-#endif /* HAVE_SYS_UN_H */
-
+#endif
 int bind_unix_socket(curl_socket_t sock, const char *unix_socket,
-        struct sockaddr_un *sau);
-#endif  /* USE_UNIX_SOCKETS */
+                     struct sockaddr_un *sau);
+#endif /* USE_UNIX_SOCKETS */
+
+unsigned short util_ultous(unsigned long ulnum);
 
 #endif  /* HEADER_CURL_SERVER_UTIL_H */

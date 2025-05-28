@@ -1,3 +1,9 @@
+<!--
+Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+
+SPDX-License-Identifier: curl
+-->
+
 # Items to be removed from future curl releases
 
 If any of these deprecated features is a cause for concern for you, please
@@ -6,41 +12,48 @@ email the
 as soon as possible and explain to us why this is a problem for you and
 how your use case cannot be satisfied properly using a workaround.
 
-## NSS
+## TLS libraries without 1.3 support
 
-We remove support for building curl with the NSS TLS library in August 2022.
+curl drops support for TLS libraries without TLS 1.3 capability after May
+2025.
 
-- There are very few users left who use curl+NSS
-- NSS has very few users outside of curl as well (primarily Firefox)
-- NSS is harder than ever to find documentation for
-- NSS was always "best" used with Red Hat Linux when they provided additional
-  features on top of the regular NSS that is not shipped by the vanilla library
+It requires that a curl build using the library should be able to negotiate
+and use TLS 1.3, or else it is not good enough.
 
-Starting in 7.82.0, building curl to use NSS configure requires the additional
-flag --with-nss-deprecated in an attempt to highlight these plans.
+As of May 2024, the libraries that need to get fixed to remain supported after
+May 2025 are: BearSSL and Secure Transport.
 
-## NPN
+## msh3 support
 
-We make selecting NPN a no-op starting in August 2022.
+The msh3 backed for QUIC and HTTP/3 was introduced in April 2022 but has never
+been made to work properly. It has seen no visible traction or developer
+activity from the msh3 main author (or anyone else seemingly interested) in
+two years. As a non-functional backend, it only adds friction and "weight" to
+the development and maintenance.
 
-**Next Protocol Negotiation** is a TLS extension that was created and used for
-agreeing to use the SPDY protocol (the precursor to HTTP/2) for HTTPS. In the
-early days of HTTP/2, before the spec was finalized and shipped, the protocol
-could be enabled using this extension with some servers.
+Meanwhile, we have a fully working backend in the ngtcp2 one and we have two
+fully working backends in OpenSSL-QUIC and quiche well on their way of ending
+their experimental status in a future.
 
-curl supports the NPN extension with some TLS backends since then, with a
-command line option `--npn` and in libcurl with `CURLOPT_SSL_ENABLE_NPN`.
+We remove msh3 support from the curl source tree in July 2025.
 
-HTTP/2 proper is made to use the ALPN (Application-Layer Protocol Negotiation)
-extension and the NPN extension has no purposes anymore. The HTTP/2 spec was
-published in May 2015.
+## winbuild build system
 
-Today, use of NPN in the wild should be extremely rare and most likely totally
-extinct. Chrome removed NPN support in Chrome 51, shipped in
-June 2016. Removed in Firefox 53, April 2017.
+curl drops support for the winbuild build method after September 2025.
 
-## past removals
+We recommend migrating to CMake. See the migration guide in
+`docs/INSTALL-CMAKE.md`.
+
+## Past removals
 
  - Pipelining
  - axTLS
  - PolarSSL
+ - NPN
+ - Support for systems without 64-bit data types
+ - NSS
+ - gskit
+ - MinGW v1
+ - NTLM_WB
+ - space-separated `NOPROXY` patterns
+ - hyper

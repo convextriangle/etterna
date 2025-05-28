@@ -6,7 +6,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2020, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -18,6 +18,8 @@
 #
 # This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 # KIND, either express or implied.
+#
+# SPDX-License-Identifier: curl
 #
 ###########################################################################
 # Prepare a directory with known files and clean up afterwards
@@ -64,6 +66,9 @@ if ($ARGV[0] eq "prepare")
     # represented exactly on a FAT filesystem.
     utime time, timegm(0,0,12,31,11,100), "rofile.txt";
     chmod 0444, "rofile.txt";
+    if($^O eq 'cygwin') {
+      system "chattr +r rofile.txt";
+    }
 
     exit 0;
 }
@@ -73,13 +78,17 @@ elsif ($ARGV[0] eq "postprocess")
     my $logfile = $ARGV[2];
 
     # Clean up the test directory
+    if($^O eq 'cygwin') {
+      system "chattr -r $dirname/rofile.txt";
+    }
+    chmod 0666, "$dirname/rofile.txt";
     unlink "$dirname/rofile.txt";
     unlink "$dirname/plainfile.txt";
     rmdir "$dirname/asubdir";
 
     rmdir $dirname || die "$!";
 
-    if ($logfile) {
+    if ($logfile && -s $logfile) {
         # Process the directory file to remove all information that
         # could be inconsistent from one test run to the next (e.g.
         # file date) or may be unsupported on some platforms (e.g.
@@ -108,18 +117,11 @@ elsif ($ARGV[0] eq "postprocess")
                 # consistent for across all test systems and filesystems
                 push @canondir, "d?????????    N U         U               N ???  N NN:NN $8\n";
             } elsif ($1 eq "-") {
-                # Replace missing group and other permissions with user
-                # permissions (eg. on Windows) due to them being shown as *
-                my ($u, $g, $o) = ($2, $3, $4);
-                if($g eq "**") {
-                    $g = $u;
-                }
-                if($o eq "**") {
-                    $o = $u;
-                }
+                # Ignore group and other permissions, because these may vary on
+                # some systems (e.g. on Windows)
                 # Erase user and group names, as they are not consistent across
                 # all test systems
-                my $line = sprintf("%s%s?%s?%s?%5d U         U %15d %s %s\n", $1,$u,$g,$o,$5,$6,$7,$8);
+                my $line = sprintf("%s%s???????%5d U         U %15d %s %s\n", $1,$2,$5,$6,$7,$8);
                 push @canondir, $line;
             } else {
                 # Unexpected format; just pass it through and let the test fail

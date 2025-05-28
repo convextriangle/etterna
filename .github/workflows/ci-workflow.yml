@@ -39,7 +39,7 @@ jobs:
         run: sudo apt update && sudo apt install ${{ matrix.cfg.cpp-version }} nasm ninja-build libglew-dev libxrandr-dev libxtst-dev libpulse-dev libasound-dev libogg-dev libvorbis-dev xorg-dev libcurl4-openssl-dev
 
       - name: Generate CMake
-        run: mkdir main/build && cd main/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+        run: mkdir main/build && cd main/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=FALSE -DBUILD_EXAMPLES=FALSE ..
         env:
           CXX: ${{matrix.cfg.cpp-version}}
 
@@ -135,7 +135,7 @@ jobs:
           echo "ETT_MAC_SYS_NAME=M1" >> $GITHUB_ENV
 
       - name: Generate CMake
-        run: mkdir main/build && cd main/build && cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_CRASHPAD=OFF -G Ninja ..
+        run: mkdir main/build && cd main/build && cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_CRASHPAD=OFF -DBUILD_TESTS=FALSE -DBUILD_EXAMPLES=FALSE -G Ninja ..
 
       - name: Build Project
         run: cd main/build && ninja
@@ -238,7 +238,7 @@ jobs:
           echo "ETT_MAC_SYS_NAME=Darwin-x64" >> $GITHUB_ENV
 
       - name: Generate CMake
-        run: mkdir main/build && cd main/build && cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -DCMAKE_BUILD_TYPE=RelWithDebInfo -G Ninja ..
+        run: mkdir main/build && cd main/build && cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=FALSE -DBUILD_EXAMPLES=FALSE -G Ninja ..
 
       - name: Build Project
         run: cd main/build && ninja
@@ -322,7 +322,7 @@ jobs:
           path: tools
 
       - name: Install homebrew packages
-        run: brew install cmake nasm ninja && brew tap etternagame/etterna && brew update && HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1 brew install etternagame/etterna/openssl@1.1_osx_high_sierra
+        run: brew install cmake nasm ninja openssl && brew tap etternagame/etterna && brew update && HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
 
       - name: Update CPack Environment
         if: ${{matrix.cfg.dist}}
@@ -330,7 +330,7 @@ jobs:
           echo "ETT_MAC_SYS_NAME=High-Sierra" >> $GITHUB_ENV
 
       - name: Generate CMake
-        run: mkdir main/build && cd main/build && cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl@1.1_osx_high_sierra -DWITH_CRASHPAD=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo -G Ninja ..
+        run: mkdir main/build && cd main/build && cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -DWITH_CRASHPAD=OFF -DBUILD_TESTS=FALSE -DBUILD_EXAMPLES=FALSE -DCMAKE_BUILD_TYPE=RelWithDebInfo -G Ninja ..
 
       - name: Build Project
         run: cd main/build && ninja
@@ -437,7 +437,7 @@ jobs:
       
       - name: Install openSSL (i386)
         if: ${{ matrix.cfg.arch == 'x86' }}
-        run: choco install openssl --version=1.1.1.2100 -y --x86
+        run: choco install openssl --version=3.5.0 -y --x86
 
       - name: Install chocolatey packages (x64)
         if: ${{ matrix.cfg.arch == 'x64' }}
@@ -445,7 +445,7 @@ jobs:
 
       - name: Install openSSL (x64)
         if: ${{ matrix.cfg.arch == 'x64' }}
-        run: choco install openssl --version=1.1.1.2100 -y
+        run: choco install openssl --version=3.5.0 -y
 
       - name: Configure MSBuild
         uses: ilammy/msvc-dev-cmd@v1
@@ -453,7 +453,7 @@ jobs:
           arch: ${{ matrix.cfg.arch }}
 
       - name: Generate CMake
-        run: mkdir main/build && cd main/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+        run: mkdir main/build && cd main/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=FALSE -DBUILD_EXAMPLES=FALSE ..
         env:
           DXSDK_DIR: "${{github.workspace}}/dxsdk/"
 

@@ -6,7 +6,7 @@ rem *                             / __| | | | |_) | |
 rem *                            | (__| |_| |  _ <| |___
 rem *                             \___|\___/|_| \_\_____|
 rem *
-rem * Copyright (C) 2014 - 2022, Steve Holme, <steve_holme@hotmail.com>.
+rem * Copyright (C) Steve Holme, <steve_holme@hotmail.com>.
 rem *
 rem * This software is licensed as described in the file COPYING, which
 rem * you should have received as part of this distribution. The terms
@@ -18,6 +18,8 @@ rem * furnished to do so, under the terms of the COPYING file.
 rem *
 rem * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 rem * KIND, either express or implied.
+rem *
+rem * SPDX-License-Identifier: curl
 rem *
 rem ***************************************************************************
 
@@ -113,7 +115,7 @@ rem ***************************************************************************
   if "%CHECK_SRC%" == "TRUE" (
     rem Check the src directory
     if exist %SRC_DIR%\src (
-      for /f "delims=" %%i in ('dir "%SRC_DIR%\src\*.c.*" /b 2^>NUL') do @perl "%SRC_DIR%\scripts\checksrc.pl" "-D%SRC_DIR%\src" -Wtool_hugehelp.c "%%i"
+      for /f "delims=" %%i in ('dir "%SRC_DIR%\src\*.c.*" /b 2^>NUL') do @perl "%SRC_DIR%\scripts\checksrc.pl" "-D%SRC_DIR%\src" -Wtool_ca_embed.c -Wtool_hugehelp.c "%%i"
       for /f "delims=" %%i in ('dir "%SRC_DIR%\src\*.h.*" /b 2^>NUL') do @perl "%SRC_DIR%\scripts\checksrc.pl" "-D%SRC_DIR%\src" "%%i"
     )
   )
@@ -173,7 +175,7 @@ rem ***************************************************************************
   if "%CHECK_EXAMPLES%" == "TRUE" (
     rem Check the docs\examples directory
     if exist %SRC_DIR%\docs\examples (
-      for /f "delims=" %%i in ('dir "%SRC_DIR%\docs\examples\*.c.*" /b 2^>NUL') do @perl "%SRC_DIR%\scripts\checksrc.pl" "-D%SRC_DIR%\docs\examples" -ASNPRINTF "%%i"
+      for /f "delims=" %%i in ('dir "%SRC_DIR%\docs\examples\*.c.*" /b 2^>NUL') do @perl "%SRC_DIR%\scripts\checksrc.pl" "-D%SRC_DIR%\docs\examples" "%%i"
     )
   )
 

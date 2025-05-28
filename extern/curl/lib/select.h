@@ -7,7 +7,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -19,6 +19,8 @@
  *
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
+ *
+ * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
 
@@ -34,8 +36,7 @@
  * Definition of pollfd struct and constants for platforms lacking them.
  */
 
-#if !defined(HAVE_STRUCT_POLLFD) && \
-    !defined(HAVE_SYS_POLL_H) && \
+#if !defined(HAVE_SYS_POLL_H) && \
     !defined(HAVE_POLL_H) && \
     !defined(POLLIN)
 
@@ -92,7 +93,7 @@ int Curl_wait_ms(timediff_t timeout_ms);
 #define FDSET_SOCK(x) 1
 #define VERIFY_SOCK(x) do { \
   if(!VALID_SOCK(x)) { \
-    SET_SOCKERRNO(WSAEINVAL); \
+    SET_SOCKERRNO(SOCKEINVAL); \
     return -1; \
   } \
 } while(0)
@@ -104,10 +105,44 @@ int Curl_wait_ms(timediff_t timeout_ms);
 
 #define VERIFY_SOCK(x) do {                     \
     if(!VALID_SOCK(x) || !FDSET_SOCK(x)) {      \
-      SET_SOCKERRNO(EINVAL);                    \
+      SET_SOCKERRNO(SOCKEINVAL);                \
       return -1;                                \
     }                                           \
   } while(0)
 #endif
+
+struct curl_pollfds {
+  struct pollfd *pfds;
+  unsigned int n;
+  unsigned int count;
+  BIT(allocated_pfds);
+};
+
+void Curl_pollfds_init(struct curl_pollfds *cpfds,
+                       struct pollfd *static_pfds,
+                       unsigned int static_count);
+
+void Curl_pollfds_reset(struct curl_pollfds *cpfds);
+
+void Curl_pollfds_cleanup(struct curl_pollfds *cpfds);
+
+CURLcode Curl_pollfds_add_ps(struct curl_pollfds *cpfds,
+                             struct easy_pollset *ps);
+
+CURLcode Curl_pollfds_add_sock(struct curl_pollfds *cpfds,
+                               curl_socket_t sock, short events);
+
+struct Curl_waitfds {
+  struct curl_waitfd *wfds;
+  unsigned int n;
+  unsigned int count;
+};
+
+void Curl_waitfds_init(struct Curl_waitfds *cwfds,
+                       struct curl_waitfd *static_wfds,
+                       unsigned int static_count);
+
+unsigned int Curl_waitfds_add_ps(struct Curl_waitfds *cwfds,
+                                 struct easy_pollset *ps);
 
 #endif /* HEADER_CURL_SELECT_H */

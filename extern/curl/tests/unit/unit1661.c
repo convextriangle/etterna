@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2021, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -18,10 +18,12 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 #include "curlcheck.h"
-
 #include "bufref.h"
+#include "memdebug.h"
 
 static struct bufref bufref;
 
@@ -42,11 +44,12 @@ static CURLcode unit_setup(void)
 
 static void unit_stop(void)
 {
+  Curl_bufref_free(&bufref);
 }
 
 UNITTEST_START
 {
-  char *buffer = NULL;
+  const char *buffer = NULL;
   CURLcode result = CURLE_OK;
 
   /**
@@ -69,7 +72,7 @@ UNITTEST_START
   abort_unless(buffer, "Out of memory");
   Curl_bufref_set(&bufref, buffer, 13, test_free);
 
-  fail_unless((char *) bufref.ptr == buffer, "Referenced data badly set");
+  fail_unless((const char *)bufref.ptr == buffer, "Referenced data badly set");
   fail_unless(bufref.len == 13, "Data size badly set");
   fail_unless(bufref.dtor == test_free, "Destructor badly set");
 
@@ -77,7 +80,7 @@ UNITTEST_START
    * testing Curl_bufref_ptr
    */
 
-  fail_unless((char *) Curl_bufref_ptr(&bufref) == buffer,
+  fail_unless((const char *) Curl_bufref_ptr(&bufref) == buffer,
               "Wrong pointer value returned");
 
   /**
@@ -93,12 +96,14 @@ UNITTEST_START
   result = Curl_bufref_memdup(&bufref, "1661", 3);
   abort_unless(result == CURLE_OK, curl_easy_strerror(result));
   fail_unless(freecount == 1, "Destructor not called");
-  fail_unless((char *) bufref.ptr != buffer, "Returned pointer not set");
-  buffer = (char *) Curl_bufref_ptr(&bufref);
+  fail_unless((const char *)bufref.ptr != buffer, "Returned pointer not set");
+  buffer = (const char *)Curl_bufref_ptr(&bufref);
   fail_unless(buffer, "Allocated pointer is NULL");
   fail_unless(bufref.len == 3, "Wrong data size stored");
-  fail_unless(!buffer[3], "Duplicated data should have been truncated");
-  fail_unless(!strcmp(buffer, "166"), "Bad duplicated data");
+  if(buffer) {
+    fail_unless(!buffer[3], "Duplicated data should have been truncated");
+    fail_unless(!strcmp(buffer, "166"), "Bad duplicated data");
+  }
 
   /**
    * testing Curl_bufref_free

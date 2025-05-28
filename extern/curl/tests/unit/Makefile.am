@@ -5,7 +5,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -17,6 +17,8 @@
 #
 # This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 # KIND, either express or implied.
+#
+# SPDX-License-Identifier: curl
 #
 ###########################################################################
 AUTOMAKE_OPTIONS = foreign nostdinc
@@ -34,9 +36,10 @@ AM_CPPFLAGS = -I$(top_srcdir)/include        \
               -I$(top_builddir)/lib          \
               -I$(top_srcdir)/lib            \
               -I$(top_srcdir)/src            \
-              -I$(top_srcdir)/tests/libtest
+              -I$(top_srcdir)/tests/libtest  \
+              -I$(top_srcdir)/tests/unit
 
-EXTRA_DIST = Makefile.inc CMakeLists.txt README.md
+EXTRA_DIST = CMakeLists.txt README.md
 
 CFLAGS += @CURL_CFLAG_EXTRAS@
 
@@ -45,23 +48,40 @@ LIBS = $(BLANK_AT_MAKETIME)
 
 LDADD = $(top_builddir)/src/libcurltool.la   \
         $(top_builddir)/lib/libcurlu.la      \
-        @LDFLAGS@ @LIBCURL_LIBS@ @NSS_LIBS@
+        @LIBCURL_PC_LDFLAGS_PRIVATE@ @LIBCURL_PC_LIBS_PRIVATE@
 
 AM_CPPFLAGS += -DCURL_STATICLIB -DUNITTESTS
+if DEBUGBUILD
+AM_CPPFLAGS += -DDEBUGBUILD
+endif
+if CURLDEBUG
+AM_CPPFLAGS += -DCURLDEBUG
+endif
 
+if BUILD_UNITTESTS
+if USE_TEST_BUNDLES
+unit_bundle.c: $(top_srcdir)/tests/mk-bundle.pl Makefile.inc
+	@PERL@ $(top_srcdir)/tests/mk-bundle.pl $(srcdir) > unit_bundle.c
+
+noinst_PROGRAMS = units
+nodist_units_SOURCES = unit_bundle.c
+CLEANFILES = unit_bundle.c
+else
 # Makefile.inc provides neat definitions
 include Makefile.inc
+noinst_PROGRAMS = $(UNITPROGS)
+endif
+else
+noinst_PROGRAMS =
+endif
 
 CHECKSRC = $(CS_$(V))
 CS_0 = @echo "  RUN     " $@;
 CS_1 =
 CS_ = $(CS_0)
 
+# ignore generated C files since they play by slightly different rules!
 checksrc:
-	$(CHECKSRC)@PERL@ $(top_srcdir)/scripts/checksrc.pl $(srcdir)/*.[ch]
-
-if BUILD_UNITTESTS
-noinst_PROGRAMS = $(UNITPROGS)
-else
-noinst_PROGRAMS =
-endif
+	$(CHECKSRC)(@PERL@ $(top_srcdir)/scripts/checksrc.pl -D$(srcdir) \
+	  -W$(srcdir)/unit_bundle.c \
+	  $(srcdir)/*.[ch])

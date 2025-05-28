@@ -5,7 +5,7 @@
 #                            | (__| |_| |  _ <| |___
 #                             \___|\___/|_| \_\_____|
 #
-# Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution. The terms
@@ -17,6 +17,8 @@
 #
 # This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 # KIND, either express or implied.
+#
+# SPDX-License-Identifier: curl
 #
 ###########################################################################
 
@@ -37,62 +39,72 @@ LIB_VAUTH_CFILES =      \
 
 LIB_VAUTH_HFILES =      \
   vauth/digest.h        \
-  vauth/ntlm.h          \
   vauth/vauth.h
 
 LIB_VTLS_CFILES =           \
   vtls/bearssl.c            \
-  vtls/gskit.c              \
+  vtls/cipher_suite.c       \
   vtls/gtls.c               \
   vtls/hostcheck.c          \
   vtls/keylog.c             \
   vtls/mbedtls.c            \
   vtls/mbedtls_threadlock.c \
-  vtls/nss.c                \
   vtls/openssl.c            \
   vtls/rustls.c             \
   vtls/schannel.c           \
   vtls/schannel_verify.c    \
   vtls/sectransp.c          \
   vtls/vtls.c               \
+  vtls/vtls_scache.c        \
+  vtls/vtls_spack.c         \
   vtls/wolfssl.c            \
   vtls/x509asn1.c
 
 LIB_VTLS_HFILES =           \
   vtls/bearssl.h            \
-  vtls/gskit.h              \
+  vtls/cipher_suite.h       \
   vtls/gtls.h               \
   vtls/hostcheck.h          \
   vtls/keylog.h             \
   vtls/mbedtls.h            \
   vtls/mbedtls_threadlock.h \
-  vtls/nssg.h               \
   vtls/openssl.h            \
   vtls/rustls.h             \
   vtls/schannel.h           \
+  vtls/schannel_int.h       \
   vtls/sectransp.h          \
   vtls/vtls.h               \
+  vtls/vtls_int.h           \
+  vtls/vtls_scache.h        \
+  vtls/vtls_spack.h         \
   vtls/wolfssl.h            \
   vtls/x509asn1.h
 
 LIB_VQUIC_CFILES = \
-  vquic/msh3.c   \
-  vquic/ngtcp2.c   \
-  vquic/quiche.c   \
-  vquic/vquic.c
+  vquic/curl_msh3.c   \
+  vquic/curl_ngtcp2.c   \
+  vquic/curl_osslq.c   \
+  vquic/curl_quiche.c   \
+  vquic/vquic.c \
+  vquic/vquic-tls.c
 
 LIB_VQUIC_HFILES = \
-  vquic/msh3.h   \
-  vquic/ngtcp2.h   \
-  vquic/quiche.h   \
-  vquic/vquic.h
+  vquic/curl_msh3.h   \
+  vquic/curl_ngtcp2.h   \
+  vquic/curl_osslq.h   \
+  vquic/curl_quiche.h   \
+  vquic/vquic.h    \
+  vquic/vquic_int.h \
+  vquic/vquic-tls.h
 
 LIB_VSSH_CFILES =  \
   vssh/libssh.c    \
   vssh/libssh2.c   \
+  vssh/curl_path.c \
   vssh/wolfssh.c
 
-LIB_VSSH_HFILES =  \
+LIB_VSSH_HFILES =    \
+  vssh/curl_path.h   \
   vssh/ssh.h
 
 LIB_CFILES =         \
@@ -101,14 +113,20 @@ LIB_CFILES =         \
   asyn-ares.c        \
   asyn-thread.c      \
   base64.c           \
+  bufq.c             \
   bufref.c           \
-  c-hyper.c          \
+  cf-h1-proxy.c      \
+  cf-h2-proxy.c      \
+  cf-haproxy.c       \
+  cf-https-connect.c \
+  cf-socket.c        \
+  cfilters.c         \
   conncache.c        \
+  cshutdn.c          \
   connect.c          \
   content_encoding.c \
   cookie.c           \
   curl_addrinfo.c    \
-  curl_ctype.c       \
   curl_des.c         \
   curl_endian.c      \
   curl_fnmatch.c     \
@@ -118,31 +136,34 @@ LIB_CFILES =         \
   curl_memrchr.c     \
   curl_multibyte.c   \
   curl_ntlm_core.c   \
-  curl_ntlm_wb.c     \
-  curl_path.c        \
   curl_range.c       \
   curl_rtmp.c        \
   curl_sasl.c        \
+  curl_sha512_256.c  \
   curl_sspi.c        \
   curl_threads.c     \
+  curl_trc.c         \
+  cw-out.c           \
+  cw-pause.c         \
   dict.c             \
   doh.c              \
-  dotdot.c           \
   dynbuf.c           \
+  dynhds.c           \
   easy.c             \
   easygetopt.c       \
   easyoptions.c      \
   escape.c           \
   file.c             \
   fileinfo.c         \
+  fopen.c            \
   formdata.c         \
   ftp.c              \
   ftplistparser.c    \
   getenv.c           \
   getinfo.c          \
   gopher.c           \
-  h2h3.c             \
   hash.c             \
+  hash_offt.c        \
   headers.c          \
   hmac.c             \
   hostasyn.c         \
@@ -152,14 +173,16 @@ LIB_CFILES =         \
   hostsyn.c          \
   hsts.c             \
   http.c             \
+  http1.c            \
   http2.c            \
+  http_aws_sigv4.c   \
   http_chunks.c      \
   http_digest.c      \
   http_negotiate.c   \
   http_ntlm.c        \
   http_proxy.c       \
-  http_aws_sigv4.c   \
-  idn_win32.c        \
+  httpsrr.c          \
+  idn.c              \
   if2ip.c            \
   imap.c             \
   inet_ntop.c        \
@@ -167,6 +190,7 @@ LIB_CFILES =         \
   krb5.c             \
   ldap.c             \
   llist.c            \
+  macos.c            \
   md4.c              \
   md5.c              \
   memdebug.c         \
@@ -174,8 +198,10 @@ LIB_CFILES =         \
   mprintf.c          \
   mqtt.c             \
   multi.c            \
+  multi_ev.c         \
   netrc.c            \
   nonblock.c         \
+  noproxy.c          \
   openldap.c         \
   parsedate.c        \
   pingpong.c         \
@@ -184,6 +210,7 @@ LIB_CFILES =         \
   psl.c              \
   rand.c             \
   rename.c           \
+  request.c          \
   rtsp.c             \
   select.c           \
   sendf.c            \
@@ -201,9 +228,9 @@ LIB_CFILES =         \
   splay.c            \
   strcase.c          \
   strdup.c           \
+  strequal.c         \
   strerror.c         \
-  strtok.c           \
-  strtoofft.c        \
+  strparse.c         \
   system_win32.c     \
   telnet.c           \
   tftp.c             \
@@ -215,16 +242,23 @@ LIB_CFILES =         \
   version.c          \
   version_win32.c    \
   warnless.c         \
-  wildcard.c
+  ws.c
 
 LIB_HFILES =         \
   altsvc.h           \
   amigaos.h          \
   arpa_telnet.h      \
   asyn.h             \
+  bufq.h             \
   bufref.h           \
-  c-hyper.h          \
+  cf-h1-proxy.h      \
+  cf-h2-proxy.h      \
+  cf-haproxy.h       \
+  cf-https-connect.h \
+  cf-socket.h        \
+  cfilters.h         \
   conncache.h        \
+  cshutdn.h          \
   connect.h          \
   content_encoding.h \
   cookie.h           \
@@ -246,8 +280,6 @@ LIB_HFILES =         \
   curl_memrchr.h     \
   curl_multibyte.h   \
   curl_ntlm_core.h   \
-  curl_ntlm_wb.h     \
-  curl_path.h        \
   curl_printf.h      \
   curl_range.h       \
   curl_rtmp.h        \
@@ -255,61 +287,76 @@ LIB_HFILES =         \
   curl_setup.h       \
   curl_setup_once.h  \
   curl_sha256.h      \
+  curl_sha512_256.h  \
   curl_sspi.h        \
   curl_threads.h     \
+  curl_trc.h         \
   curlx.h            \
+  cw-out.h           \
+  cw-pause.h         \
   dict.h             \
   doh.h              \
-  dotdot.h           \
   dynbuf.h           \
+  dynhds.h           \
+  easy_lock.h        \
   easyif.h           \
   easyoptions.h      \
   escape.h           \
   file.h             \
   fileinfo.h         \
+  fopen.h            \
   formdata.h         \
   ftp.h              \
   ftplistparser.h    \
+  functypes.h        \
   getinfo.h          \
   gopher.h           \
-  h2h3.h             \
   hash.h             \
+  hash_offt.h        \
   headers.h          \
   hostip.h           \
   hsts.h             \
   http.h             \
+  http1.h            \
   http2.h            \
+  http_aws_sigv4.h   \
   http_chunks.h      \
   http_digest.h      \
   http_negotiate.h   \
   http_ntlm.h        \
   http_proxy.h       \
-  http_aws_sigv4.h   \
+  httpsrr.h          \
+  idn.h              \
   if2ip.h            \
   imap.h             \
   inet_ntop.h        \
   inet_pton.h        \
   llist.h            \
+  macos.h            \
   memdebug.h         \
   mime.h             \
   mqtt.h             \
   multihandle.h      \
+  multi_ev.h         \
   multiif.h          \
   netrc.h            \
   nonblock.h         \
+  noproxy.h          \
   parsedate.h        \
   pingpong.h         \
   pop3.h             \
   progress.h         \
   psl.h              \
-  quic.h             \
   rand.h             \
   rename.h           \
+  request.h          \
   rtsp.h             \
   select.h           \
   sendf.h            \
   setopt.h           \
+  setup-os400.h      \
   setup-vms.h        \
+  setup-win32.h      \
   share.h            \
   sigpipe.h          \
   slist.h            \
@@ -323,8 +370,7 @@ LIB_HFILES =         \
   strcase.h          \
   strdup.h           \
   strerror.h         \
-  strtok.h           \
-  strtoofft.h        \
+  strparse.h         \
   system_win32.h     \
   telnet.h           \
   tftp.h             \
@@ -336,7 +382,7 @@ LIB_HFILES =         \
   urldata.h          \
   version_win32.h    \
   warnless.h         \
-  wildcard.h
+  ws.h
 
 LIB_RCFILES = libcurl.rc
 

@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -18,27 +18,21 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 #include "test.h"
 
 #include "warnless.h"
 #include "memdebug.h"
 
-/* For Windows, mainly (may be moved in a config file?) */
-#ifndef STDIN_FILENO
-  #define STDIN_FILENO 0
-#endif
-#ifndef STDOUT_FILENO
-  #define STDOUT_FILENO 1
-#endif
-#ifndef STDERR_FILENO
-  #define STDERR_FILENO 2
-#endif
-
-int test(char *URL)
+CURLcode test(char *URL)
 {
   CURLcode res;
   CURL *curl;
+#ifdef LIB696
+  int transfers = 0;
+#endif
 
   if(curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
     fprintf(stderr, "curl_global_init() failed\n");
@@ -56,42 +50,68 @@ int test(char *URL)
   test_setopt(curl, CURLOPT_CONNECT_ONLY, 1L);
   test_setopt(curl, CURLOPT_VERBOSE, 1L);
 
+#ifdef LIB696
+again:
+#endif
+
   res = curl_easy_perform(curl);
 
   if(!res) {
-    /* we are connected, now get a HTTP document the raw way */
+    /* we are connected, now get an HTTP document the raw way */
     const char *request =
       "GET /556 HTTP/1.1\r\n"
       "Host: ninja\r\n\r\n";
-    size_t iolen = 0;
+    const char *sbuf = request;
+    size_t sblen = strlen(request);
+    size_t nwritten = 0, nread = 0;
 
-    res = curl_easy_send(curl, request, strlen(request), &iolen);
+    do {
+      char buf[1024];
 
-    if(!res) {
-      /* we assume that sending always work */
-
-      do {
-        char buf[1024];
-        /* busy-read like crazy */
-        res = curl_easy_recv(curl, buf, sizeof(buf), &iolen);
-
-        if(iolen) {
-          /* send received stuff to stdout */
-          if(!write(STDOUT_FILENO, buf, iolen))
-            break;
+      if(sblen) {
+        res = curl_easy_send(curl, sbuf, sblen, &nwritten);
+        if(res && res != CURLE_AGAIN)
+          break;
+        if(nwritten > 0) {
+          sbuf += nwritten;
+          sblen -= nwritten;
         }
+      }
 
-      } while((res == CURLE_OK && iolen) || (res == CURLE_AGAIN));
-    }
+      /* busy-read like crazy */
+      res = curl_easy_recv(curl, buf, sizeof(buf), &nread);
 
-    if(iolen)
-      res = (CURLcode)TEST_ERR_FAILURE;
+      if(nread) {
+        /* send received stuff to stdout */
+#ifdef UNDER_CE
+        if((size_t)fwrite(buf, sizeof(buf[0]), nread, stdout) != nread) {
+#else
+        if((size_t)write(STDOUT_FILENO, buf, nread) != nread) {
+#endif
+          fprintf(stderr, "write() failed: errno %d (%s)\n",
+                  errno, strerror(errno));
+          res = TEST_ERR_FAILURE;
+          break;
+        }
+      }
+
+    } while((res == CURLE_OK && nread) || (res == CURLE_AGAIN));
+
+    if(res && res != CURLE_AGAIN)
+      res = TEST_ERR_FAILURE;
   }
+
+#ifdef LIB696
+  ++transfers;
+  /* perform the transfer a second time */
+  if(!res && transfers == 1)
+    goto again;
+#endif
 
 test_cleanup:
 
   curl_easy_cleanup(curl);
   curl_global_cleanup();
 
-  return (int)res;
+  return res;
 }
