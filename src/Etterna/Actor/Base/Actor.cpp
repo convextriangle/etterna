@@ -2728,6 +2728,26 @@ class LunaActor : public Luna<Actor>
 			return 0;
 		return 1;
 	}
+	static int SetVertexShaderD3D(T* p, lua_State* L)
+	{
+		p->SetVertexShaderD3D(SArg(1));
+		COMMON_RETURN_SELF;
+	}
+	static int SetFragmentShaderD3D(T* p, lua_State* L)
+	{
+		p->SetFragmentShaderD3D(SArg(1));
+		COMMON_RETURN_SELF;
+	}
+	static int SetVertexShaderOGL(T* p, lua_State* L)
+	{
+		p->SetVertexShaderOGL(SArg(1));
+		COMMON_RETURN_SELF;
+	}
+	static int SetFragmentShaderOGL(T* p, lua_State* L)
+	{
+		p->SetFragmentShaderOGL(SArg(1));
+		COMMON_RETURN_SELF;
+	}
 	DEFINE_METHOD(GetTrueX, GetTrueX());
 	DEFINE_METHOD(GetTrueY, GetTrueY());
 	DEFINE_METHOD(GetTrueZ, GetTrueZ());
@@ -2909,6 +2929,11 @@ class LunaActor : public Luna<Actor>
 		ADD_METHOD(RemoveWrapperState);
 		ADD_METHOD(GetNumWrapperStates);
 		ADD_METHOD(GetWrapperState);
+
+		ADD_METHOD(SetVertexShaderD3D);
+		ADD_METHOD(SetFragmentShaderD3D);
+		ADD_METHOD(SetVertexShaderOGL);
+		ADD_METHOD(SetFragmentShaderOGL);
 
 		ADD_METHOD(Draw);
 

@@ -8,6 +8,7 @@
 #include "Tween.h"
 
 #include <map>
+#include <filesystem>
 
 class XNode;
 struct lua_State;
@@ -807,6 +808,46 @@ class Actor : public MessageSubscriber
 	virtual void SetSecondsIntoAnimation(float /*unused*/) {}
 	virtual void SetUpdateRate(float /*unused*/) {}
 	virtual auto GetUpdateRate() -> float { return 1.0F; }
+	
+	virtual void SetFragmentShaderD3D(const std::string& sPath)
+	{
+		m_fragmentShaderD3D = sPath;
+	}
+
+	virtual std::filesystem::path GetFragmentShaderD3D()
+	{
+		return m_fragmentShaderD3D;
+	}
+
+	virtual void SetVertexShaderD3D(const std::string& sPath)
+	{
+		m_vertexShaderD3D = sPath;
+	}
+
+	virtual std::filesystem::path GetVertexShaderD3D()
+	{
+		return m_vertexShaderD3D;
+	}
+
+	virtual void SetFragmentShaderOGL(const std::string& sPath)
+	{
+		m_fragmentShaderOGL = sPath;
+	}
+
+	virtual std::filesystem::path GetFragmentShaderOGL()
+	{
+		return m_fragmentShaderOGL;
+	}
+
+	virtual void SetVertexShaderOGL(const std::string& sPath)
+	{
+		m_vertexShaderOGL = sPath;
+	}
+
+	virtual std::filesystem::path GetVertexShaderOGL()
+	{
+		return m_vertexShaderOGL;
+	}
 
 	std::unique_ptr<LuaClass> m_pLuaInstance;
 
@@ -917,6 +958,14 @@ class Actor : public MessageSubscriber
 	 *
 	 * The lower this number is, the sooner it is drawn. */
 	int m_iDrawOrder{};
+
+	// for now - since Direct3D and OpenGL use HLSL and GLSL, make the user
+	// do the conversion manually (also SPIRV-Cross?) >:)
+	// and technically D3D refers to fragment shaders as pixels shaders (afaik) but i'm not going to bother
+	std::filesystem::path m_vertexShaderD3D;
+	std::filesystem::path m_fragmentShaderD3D;
+	std::filesystem::path m_vertexShaderOGL;
+	std::filesystem::path m_fragmentShaderOGL;
 
 	// render states
 	BlendMode m_BlendMode;
