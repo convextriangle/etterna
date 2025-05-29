@@ -86,6 +86,10 @@ class RageDisplay_D3D : public RageDisplay
 	auto CreateCompiledGeometry() -> RageCompiledGeometry* override;
 	void DeleteCompiledGeometry(RageCompiledGeometry* p) override;
 
+	void SetShaderFromPath(std::filesystem::path path,
+						   bool isVertexShader) override;
+	void UnsetCurrentShader(bool isVertexShader) override;
+
   protected:
 	void DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts) override;
 	void DrawQuadStripInternal(const RageSpriteVertex v[],

@@ -517,7 +517,11 @@ Actor::Draw()
 		ASSERT(m_pTempState != nullptr);
 		if (PartiallyOpaque()) {
 			this->BeginDraw();
+
+			// note that this is only a proof-of-concept (for now) and might be somewhat insane for normal usage
+			auto result = this->SetShadersForDisplay();
 			this->DrawPrimitives();
+			this->UnsetShadersForDisplay(result);
 			this->EndDraw();
 		}
 		this->PostDraw();
@@ -1646,6 +1650,50 @@ void
 Actor::HandleMessage(const Message& msg)
 {
 	PlayCommandNoRecurse(msg);
+}
+
+Actor::SetShadersResult
+Actor::SetShadersForDisplay()
+{
+	Actor::SetShadersResult result = SetShadersResult::SetNone;
+	if (DISPLAY->IsD3D()) {
+		DISPLAY->SetShaderFromPath(m_fragmentShaderD3D, false);
+		DISPLAY->SetShaderFromPath(m_vertexShaderD3D, true);
+
+		result = m_fragmentShaderD3D.empty() ? SetShadersResult::SetNone : SetShadersResult::SetFragment;
+		if (!m_vertexShaderD3D.empty()) {
+			result = result == SetShadersResult::SetNone
+				? SetShadersResult::SetVertex
+				: SetShadersResult::SetBoth;
+		}
+	}
+	else {
+		DISPLAY->SetShaderFromPath(m_fragmentShaderOGL, false);
+		DISPLAY->SetShaderFromPath(m_vertexShaderOGL, true);
+
+		result = m_fragmentShaderOGL.empty() ? SetShadersResult::SetNone
+											 : SetShadersResult::SetFragment;
+		if (!m_vertexShaderOGL.empty()) {
+			result = result == SetShadersResult::SetNone
+					   ? SetShadersResult::SetVertex
+					   : SetShadersResult::SetBoth;
+		}
+	}
+
+	return result;
+}
+
+void
+Actor::UnsetShadersForDisplay(Actor::SetShadersResult previousResult)
+{
+	if (previousResult == SetShadersResult::SetBoth ||
+		previousResult == SetShadersResult::SetVertex) {
+		DISPLAY->UnsetCurrentShader(true);
+	}
+	if (previousResult == SetShadersResult::SetBoth ||
+		previousResult == SetShadersResult::SetFragment) {
+		DISPLAY->UnsetCurrentShader(false);
+	}
 }
 
 void

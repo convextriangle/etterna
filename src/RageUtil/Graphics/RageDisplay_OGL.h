@@ -122,6 +122,10 @@ class RageDisplay_Legacy : public RageDisplay
 
 	std::string GetTextureDiagnostics(unsigned id) const override;
 
+	void SetShaderFromPath(std::filesystem::path path,
+						   bool isVertexShader) override;
+	void UnsetCurrentShader(bool isVertexShader) override;
+
   protected:
 	void DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts) override;
 	void DrawQuadStripInternal(const RageSpriteVertex v[],

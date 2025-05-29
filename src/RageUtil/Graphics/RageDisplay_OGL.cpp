@@ -2927,6 +2927,17 @@ RageDisplay_Legacy::GetTextureDiagnostics(unsigned iTexture) const
 	return std::string();
 }
 
+void
+RageDisplay_Legacy::SetShaderFromPath(std::filesystem::path path,
+									  bool isVertexShader)
+{
+}
+
+void
+RageDisplay_Legacy::UnsetCurrentShader(bool isVertexShader)
+{
+}
+
 /*
  * XXX: Things like this only have to be set once per context - making
  * SetDefault call These kinds of functions is wasteful. -Colby

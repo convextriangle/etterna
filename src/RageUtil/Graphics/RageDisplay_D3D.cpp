@@ -1143,6 +1143,20 @@ RageDisplay_D3D::DeleteCompiledGeometry(RageCompiledGeometry* p)
 }
 
 void
+RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
+								   bool isVertexShader)
+{
+	if (path.empty()) {
+		return;
+	}
+}
+
+void
+RageDisplay_D3D::UnsetCurrentShader(bool isVertexShader)
+{
+}
+
+void
 RageDisplay_D3D::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 {
 	// there isn't a quad primitive in D3D, so we have to fake it with indexed

@@ -988,6 +988,16 @@ class Actor : public MessageSubscriber
 	static std::vector<float> g_vfCurrentBGMBeatPlayer;
 	static std::vector<float> g_vfCurrentBGMBeatPlayerNoOffset;
 
+	enum class SetShadersResult
+	{
+		SetNone,
+		SetVertex,
+		SetFragment,
+		SetBoth
+	};
+	// does not work for inheritance w/ ActorFrame (yet)
+	virtual SetShadersResult SetShadersForDisplay();
+	virtual void UnsetShadersForDisplay(SetShadersResult previousResult);
   private:
 	// commands
 	std::map<std::string, apActorCommands> m_mapNameToCommands;

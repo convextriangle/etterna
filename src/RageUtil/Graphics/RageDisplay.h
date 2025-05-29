@@ -9,6 +9,7 @@
 #include <chrono>
 #include <set>
 #include <utility>
+#include <filesystem>
 
 class DisplaySpec;
 using DisplaySpecs = std::set<DisplaySpec>;
@@ -463,6 +464,10 @@ class RageDisplay
 	{
 		return nullptr;
 	} // allocates a surface.  Caller must delete it.
+
+	virtual void SetShaderFromPath(std::filesystem::path path,
+								   bool isVertexShader) = 0;
+	virtual void UnsetCurrentShader(bool isVertexShader) = 0;
 
   protected:
 	virtual void DrawQuadsInternal(const RageSpriteVertex v[],
