@@ -12,12 +12,13 @@
 #include "RageUtil/Misc/RageTypes.h"
 #include "RageUtil/Utils/RageUtil.h"
 #include "archutils/Win32/GraphicsWindow.h"
+#include "RageUtil/File/RageFileManager.h"
 
 #include <algorithm>
 #include <map>
 #include <list>
 #include <chrono>
-
+#include <fstream>
 
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -1142,6 +1143,113 @@ RageDisplay_D3D::DeleteCompiledGeometry(RageCompiledGeometry* p)
 	delete p;
 }
 
+IDirect3DPixelShader9*
+GetPixelShader(const std::string& resolvedPath)
+{
+	LPCSTR profile = D3DXGetPixelShaderProfile(g_pd3dDevice);
+	LPD3DXBUFFER shaderBuffer = NULL;
+	LPD3DXBUFFER errorBuffer = NULL;
+	auto result = D3DXCompileShaderFromFile(resolvedPath.c_str(),
+											NULL,
+											NULL,
+											"main",
+											profile,
+											0,
+											&shaderBuffer,
+											&errorBuffer,
+											NULL);
+
+	// silent fail for testing
+	if (result != D3D_OK) {
+		Locator::getLogger()->warn("RageDisplay_D3D D3DXCompileShaderFromFile "
+								   "failed for {} - {}",
+								   resolvedPath,
+								   GetErrorString(result));
+		errorBuffer->Release();
+		return NULL;
+	}
+
+	IDirect3DPixelShader9* shader = NULL;
+	result = g_pd3dDevice->CreatePixelShader(
+	  (DWORD*)shaderBuffer->GetBufferPointer(), &shader);
+
+	if (result != D3D_OK) {
+		Locator::getLogger()->warn("RageDisplay_D3D "
+								   "CreatePixelShader failed for {} - {}",
+								   resolvedPath,
+								   GetErrorString(result));
+		shaderBuffer->Release();
+		return NULL;
+	}
+
+	shaderBuffer->Release();
+	result = g_pd3dDevice->SetPixelShader(shader);
+	if (result != D3D_OK) {
+		Locator::getLogger()->warn("RageDisplay_D3D "
+								   "SetPixelShader failed for {} - {}",
+								   resolvedPath,
+								   GetErrorString(result));
+		return NULL;
+	}
+
+	return shader;
+}
+
+IDirect3DVertexShader9*
+GetVertexShader(const std::string& resolvedPath)
+{
+	LPCSTR profile = D3DXGetVertexShaderProfile(g_pd3dDevice);
+	LPD3DXBUFFER shaderBuffer = NULL;
+	LPD3DXBUFFER errorBuffer = NULL;
+	auto result = D3DXCompileShaderFromFile(resolvedPath.c_str(),
+											NULL,
+											NULL,
+											"main",
+											profile,
+											0,
+											&shaderBuffer,
+											&errorBuffer,
+											NULL);
+
+	// silent fail for testing
+	if (result != D3D_OK) {
+		Locator::getLogger()->warn("RageDisplay_D3D D3DXCompileShaderFromFile "
+								   "failed for {} - {}",
+								   resolvedPath,
+								   GetErrorString(result));
+		errorBuffer->Release();
+		return NULL;
+	}
+
+	IDirect3DVertexShader9* shader = NULL;
+	result = g_pd3dDevice->CreateVertexShader(
+	  (DWORD*)shaderBuffer->GetBufferPointer(), &shader);
+
+	if (result != D3D_OK) {
+		Locator::getLogger()->warn("RageDisplay_D3D "
+								   "CreateVertexShader failed for {} - {}",
+								   resolvedPath,
+								   GetErrorString(result));
+		shaderBuffer->Release();
+		return NULL;
+	}
+
+	shaderBuffer->Release();
+	result = g_pd3dDevice->SetVertexShader(shader);
+	if (result != D3D_OK) {
+		Locator::getLogger()->warn("RageDisplay_D3D "
+								   "SetVertexShader failed for {} - {}",
+								   resolvedPath,
+								   GetErrorString(result));
+		return NULL;
+	}
+
+	return shader;
+}
+
+IDirect3DPixelShader9* pixelShader = NULL;
+IDirect3DVertexShader9* vertexShader = NULL;
+
 void
 RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
 								   bool isVertexShader)
@@ -1149,11 +1257,25 @@ RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
 	if (path.empty()) {
 		return;
 	}
+	auto resolvedPath = FILEMAN->ResolvePath(path.string()).substr(1);
+	if (isVertexShader) {
+		vertexShader = vertexShader == NULL ? GetVertexShader(resolvedPath) : vertexShader;
+	}
+	else {
+		pixelShader =
+		  pixelShader == NULL ? GetPixelShader(resolvedPath) : pixelShader;
+	}
 }
 
 void
 RageDisplay_D3D::UnsetCurrentShader(bool isVertexShader)
 {
+	if (isVertexShader) {
+		g_pd3dDevice->SetVertexShader(nullptr);
+	} else {
+		auto result = g_pd3dDevice->SetPixelShader(nullptr);
+		if (result != D3D_OK){}
+	}
 }
 
 void
@@ -1185,7 +1307,7 @@ RageDisplay_D3D::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 	}
 
 	SendCurrentMatrices();
-	g_pd3dDevice->DrawIndexedPrimitiveUP(
+	auto result = g_pd3dDevice->DrawIndexedPrimitiveUP(
 	  D3DPT_TRIANGLELIST,
 	  // PrimitiveType
 	  0,
