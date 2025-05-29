@@ -1183,14 +1183,6 @@ GetPixelShader(const std::string& resolvedPath)
 	}
 
 	shaderBuffer->Release();
-	result = g_pd3dDevice->SetPixelShader(shader);
-	if (result != D3D_OK) {
-		Locator::getLogger()->warn("RageDisplay_D3D "
-								   "SetPixelShader failed for {} - {}",
-								   resolvedPath,
-								   GetErrorString(result));
-		return NULL;
-	}
 
 	return shader;
 }
@@ -1235,20 +1227,15 @@ GetVertexShader(const std::string& resolvedPath)
 	}
 
 	shaderBuffer->Release();
-	result = g_pd3dDevice->SetVertexShader(shader);
-	if (result != D3D_OK) {
-		Locator::getLogger()->warn("RageDisplay_D3D "
-								   "SetVertexShader failed for {} - {}",
-								   resolvedPath,
-								   GetErrorString(result));
-		return NULL;
-	}
 
 	return shader;
 }
 
 IDirect3DPixelShader9* pixelShader = NULL;
 IDirect3DVertexShader9* vertexShader = NULL;
+
+bool usingVertexShader = false;
+bool usingPixelShader = false;
 
 void
 RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
@@ -1259,9 +1246,11 @@ RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
 	}
 	auto resolvedPath = FILEMAN->ResolvePath(path.string()).substr(1);
 	if (isVertexShader) {
+		usingVertexShader = true;
 		vertexShader = vertexShader == NULL ? GetVertexShader(resolvedPath) : vertexShader;
 	}
 	else {
+		usingPixelShader = true;
 		pixelShader =
 		  pixelShader == NULL ? GetPixelShader(resolvedPath) : pixelShader;
 	}
@@ -1301,7 +1290,50 @@ RageDisplay_D3D::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 		vIndices[i * 6 + 5] = i * 4 + 0;
 	}
 
-	if (g_lastFVF != D3DFVF_RageSpriteVertex) {
+	if (usingVertexShader && vertexShader != NULL) {
+		usingVertexShader = false;
+		D3DVERTEXELEMENT9 decl[] = { { 0,
+									   offsetof(RageSpriteVertex, p),
+									   D3DDECLTYPE_FLOAT3,
+									   D3DDECLMETHOD_DEFAULT,
+									   D3DDECLUSAGE_POSITION,
+									   0 },
+									 { 0,
+									   offsetof(RageSpriteVertex, n),
+									   D3DDECLTYPE_FLOAT3,
+									   D3DDECLMETHOD_DEFAULT,
+									   D3DDECLUSAGE_NORMAL,
+									   0 },
+									 { 0,
+									   offsetof(RageSpriteVertex, c),
+									   D3DDECLTYPE_D3DCOLOR,
+									   D3DDECLMETHOD_DEFAULT,
+									   D3DDECLUSAGE_COLOR,
+									   0 },
+									 { 0,
+									   offsetof(RageSpriteVertex, t),
+									   D3DDECLTYPE_FLOAT2,
+									   D3DDECLMETHOD_DEFAULT,
+									   D3DDECLUSAGE_TEXCOORD,
+									   0 },
+        D3DDECL_END()
+				};
+
+		IDirect3DVertexDeclaration9* vertexDecl = NULL;
+		if (FAILED(g_pd3dDevice->CreateVertexDeclaration(decl, &vertexDecl))) {
+			Locator::getLogger()->warn("wat");
+		}
+		if (FAILED(g_pd3dDevice->SetVertexDeclaration(vertexDecl))) {
+			Locator::getLogger()->warn("wat");
+		}
+		if (FAILED(g_pd3dDevice->SetVertexShader(vertexShader))) {
+					Locator::getLogger()->warn("wat");
+				}
+		if (FAILED(g_pd3dDevice->SetPixelShader(pixelShader))) {
+					Locator::getLogger()->warn("wat");
+				}
+	}
+	else if (g_lastFVF != D3DFVF_RageSpriteVertex) {
 		g_lastFVF = D3DFVF_RageSpriteVertex;
 		g_pd3dDevice->SetFVF(D3DFVF_RageSpriteVertex);
 	}
