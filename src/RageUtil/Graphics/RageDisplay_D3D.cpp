@@ -47,97 +47,97 @@
 const WCHAR* WINAPI DXGetErrorStringW( _In_ HRESULT hr )
 {
 #define  CHK_ERRA(hrchk) \
-        case hrchk: \
-             return L## #hrchk;
+		case hrchk: \
+			 return L## #hrchk;
 
 #define HRESULT_FROM_WIN32b(x) ((HRESULT)(x) <= 0 ? ((HRESULT)(x)) : ((HRESULT) (((x) & 0x0000FFFF) | (FACILITY_WIN32 << 16) | 0x80000000)))
 
 #define  CHK_ERR_WIN32A(hrchk) \
-        case HRESULT_FROM_WIN32b(hrchk): \
-        case hrchk: \
-             return L## #hrchk;
+		case HRESULT_FROM_WIN32b(hrchk): \
+		case hrchk: \
+			 return L## #hrchk;
 
    switch(hr)
    {
 // Common Win32 error codes
-        CHK_ERRA(S_OK)
-        CHK_ERRA(S_FALSE)
+		CHK_ERRA(S_OK)
+		CHK_ERRA(S_FALSE)
 
 // d3d9.h error codes
 //      CHK_ERRA(D3D_OK)
-        CHK_ERRA(D3DERR_WRONGTEXTUREFORMAT)
-        CHK_ERRA(D3DERR_UNSUPPORTEDCOLOROPERATION)
-        CHK_ERRA(D3DERR_UNSUPPORTEDCOLORARG)
-        CHK_ERRA(D3DERR_UNSUPPORTEDALPHAOPERATION)
-        CHK_ERRA(D3DERR_UNSUPPORTEDALPHAARG)
-        CHK_ERRA(D3DERR_TOOMANYOPERATIONS)
-        CHK_ERRA(D3DERR_CONFLICTINGTEXTUREFILTER)
-        CHK_ERRA(D3DERR_UNSUPPORTEDFACTORVALUE)
-        CHK_ERRA(D3DERR_CONFLICTINGRENDERSTATE)
-        CHK_ERRA(D3DERR_UNSUPPORTEDTEXTUREFILTER)
-        CHK_ERRA(D3DERR_CONFLICTINGTEXTUREPALETTE)
-        CHK_ERRA(D3DERR_DRIVERINTERNALERROR)
-        CHK_ERRA(D3DERR_NOTFOUND)
-        CHK_ERRA(D3DERR_MOREDATA)
-        CHK_ERRA(D3DERR_DEVICELOST)
-        CHK_ERRA(D3DERR_DEVICENOTRESET)
-        CHK_ERRA(D3DERR_NOTAVAILABLE)
-        CHK_ERRA(D3DERR_OUTOFVIDEOMEMORY)
-        CHK_ERRA(D3DERR_INVALIDDEVICE)
-        CHK_ERRA(D3DERR_INVALIDCALL)
-        CHK_ERRA(D3DERR_DRIVERINVALIDCALL)
-        //CHK_ERRA(D3DERR_WASSTILLDRAWING)
-        CHK_ERRA(D3DOK_NOAUTOGEN)
+		CHK_ERRA(D3DERR_WRONGTEXTUREFORMAT)
+		CHK_ERRA(D3DERR_UNSUPPORTEDCOLOROPERATION)
+		CHK_ERRA(D3DERR_UNSUPPORTEDCOLORARG)
+		CHK_ERRA(D3DERR_UNSUPPORTEDALPHAOPERATION)
+		CHK_ERRA(D3DERR_UNSUPPORTEDALPHAARG)
+		CHK_ERRA(D3DERR_TOOMANYOPERATIONS)
+		CHK_ERRA(D3DERR_CONFLICTINGTEXTUREFILTER)
+		CHK_ERRA(D3DERR_UNSUPPORTEDFACTORVALUE)
+		CHK_ERRA(D3DERR_CONFLICTINGRENDERSTATE)
+		CHK_ERRA(D3DERR_UNSUPPORTEDTEXTUREFILTER)
+		CHK_ERRA(D3DERR_CONFLICTINGTEXTUREPALETTE)
+		CHK_ERRA(D3DERR_DRIVERINTERNALERROR)
+		CHK_ERRA(D3DERR_NOTFOUND)
+		CHK_ERRA(D3DERR_MOREDATA)
+		CHK_ERRA(D3DERR_DEVICELOST)
+		CHK_ERRA(D3DERR_DEVICENOTRESET)
+		CHK_ERRA(D3DERR_NOTAVAILABLE)
+		CHK_ERRA(D3DERR_OUTOFVIDEOMEMORY)
+		CHK_ERRA(D3DERR_INVALIDDEVICE)
+		CHK_ERRA(D3DERR_INVALIDCALL)
+		CHK_ERRA(D3DERR_DRIVERINVALIDCALL)
+		//CHK_ERRA(D3DERR_WASSTILLDRAWING)
+		CHK_ERRA(D3DOK_NOAUTOGEN)
 
-	    // Extended for Windows Vista
-	    CHK_ERRA(D3DERR_DEVICEREMOVED)
-	    CHK_ERRA(S_NOT_RESIDENT)
-	    CHK_ERRA(S_RESIDENT_IN_SHARED_MEMORY)
-	    CHK_ERRA(S_PRESENT_MODE_CHANGED)
-	    CHK_ERRA(S_PRESENT_OCCLUDED)
-	    CHK_ERRA(D3DERR_DEVICEHUNG)
+		// Extended for Windows Vista
+		CHK_ERRA(D3DERR_DEVICEREMOVED)
+		CHK_ERRA(S_NOT_RESIDENT)
+		CHK_ERRA(S_RESIDENT_IN_SHARED_MEMORY)
+		CHK_ERRA(S_PRESENT_MODE_CHANGED)
+		CHK_ERRA(S_PRESENT_OCCLUDED)
+		CHK_ERRA(D3DERR_DEVICEHUNG)
 
-        // Extended for Windows 7
-        CHK_ERRA(D3DERR_UNSUPPORTEDOVERLAY)
-        CHK_ERRA(D3DERR_UNSUPPORTEDOVERLAYFORMAT)
-        CHK_ERRA(D3DERR_CANNOTPROTECTCONTENT)
-        CHK_ERRA(D3DERR_UNSUPPORTEDCRYPTO)
-        CHK_ERRA(D3DERR_PRESENT_STATISTICS_DISJOINT)
+		// Extended for Windows 7
+		CHK_ERRA(D3DERR_UNSUPPORTEDOVERLAY)
+		CHK_ERRA(D3DERR_UNSUPPORTEDOVERLAYFORMAT)
+		CHK_ERRA(D3DERR_CANNOTPROTECTCONTENT)
+		CHK_ERRA(D3DERR_UNSUPPORTEDCRYPTO)
+		CHK_ERRA(D3DERR_PRESENT_STATISTICS_DISJOINT)
 
 // dxgi.h error codes
-        CHK_ERRA(DXGI_STATUS_OCCLUDED)
-        CHK_ERRA(DXGI_STATUS_CLIPPED)
-        CHK_ERRA(DXGI_STATUS_NO_REDIRECTION)
-        CHK_ERRA(DXGI_STATUS_NO_DESKTOP_ACCESS)
-        CHK_ERRA(DXGI_STATUS_GRAPHICS_VIDPN_SOURCE_IN_USE)
-        CHK_ERRA(DXGI_STATUS_MODE_CHANGED)
-        CHK_ERRA(DXGI_STATUS_MODE_CHANGE_IN_PROGRESS)
-        CHK_ERRA(DXGI_ERROR_INVALID_CALL)
-        CHK_ERRA(DXGI_ERROR_NOT_FOUND)
-        CHK_ERRA(DXGI_ERROR_MORE_DATA)
-        CHK_ERRA(DXGI_ERROR_UNSUPPORTED)
-        CHK_ERRA(DXGI_ERROR_DEVICE_REMOVED)
-        CHK_ERRA(DXGI_ERROR_DEVICE_HUNG)
-        CHK_ERRA(DXGI_ERROR_DEVICE_RESET)
-        CHK_ERRA(DXGI_ERROR_WAS_STILL_DRAWING)
-        CHK_ERRA(DXGI_ERROR_FRAME_STATISTICS_DISJOINT)
-        CHK_ERRA(DXGI_ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE)
-        CHK_ERRA(DXGI_ERROR_DRIVER_INTERNAL_ERROR)
-        CHK_ERRA(DXGI_ERROR_NONEXCLUSIVE)
-        CHK_ERRA(DXGI_ERROR_NOT_CURRENTLY_AVAILABLE)
-        CHK_ERRA(DXGI_ERROR_REMOTE_CLIENT_DISCONNECTED)
-        CHK_ERRA(DXGI_ERROR_REMOTE_OUTOFMEMORY)
+		CHK_ERRA(DXGI_STATUS_OCCLUDED)
+		CHK_ERRA(DXGI_STATUS_CLIPPED)
+		CHK_ERRA(DXGI_STATUS_NO_REDIRECTION)
+		CHK_ERRA(DXGI_STATUS_NO_DESKTOP_ACCESS)
+		CHK_ERRA(DXGI_STATUS_GRAPHICS_VIDPN_SOURCE_IN_USE)
+		CHK_ERRA(DXGI_STATUS_MODE_CHANGED)
+		CHK_ERRA(DXGI_STATUS_MODE_CHANGE_IN_PROGRESS)
+		CHK_ERRA(DXGI_ERROR_INVALID_CALL)
+		CHK_ERRA(DXGI_ERROR_NOT_FOUND)
+		CHK_ERRA(DXGI_ERROR_MORE_DATA)
+		CHK_ERRA(DXGI_ERROR_UNSUPPORTED)
+		CHK_ERRA(DXGI_ERROR_DEVICE_REMOVED)
+		CHK_ERRA(DXGI_ERROR_DEVICE_HUNG)
+		CHK_ERRA(DXGI_ERROR_DEVICE_RESET)
+		CHK_ERRA(DXGI_ERROR_WAS_STILL_DRAWING)
+		CHK_ERRA(DXGI_ERROR_FRAME_STATISTICS_DISJOINT)
+		CHK_ERRA(DXGI_ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE)
+		CHK_ERRA(DXGI_ERROR_DRIVER_INTERNAL_ERROR)
+		CHK_ERRA(DXGI_ERROR_NONEXCLUSIVE)
+		CHK_ERRA(DXGI_ERROR_NOT_CURRENTLY_AVAILABLE)
+		CHK_ERRA(DXGI_ERROR_REMOTE_CLIENT_DISCONNECTED)
+		CHK_ERRA(DXGI_ERROR_REMOTE_OUTOFMEMORY)
 
-        default: return L"Unknown error.";
-    }
+		default: return L"Unknown error.";
+	}
 }
 
 auto GetErrorString(HRESULT hr) -> std::string
 {
 	Locator::getLogger()->warn("RageDisplay_D3D::GetErrorString() - HR {}",
 							   static_cast<long>(hr));
-    const wchar_t* msg = DXGetErrorStringW(hr);
-    if (msg) {
+	const wchar_t* msg = DXGetErrorStringW(hr);
+	if (msg) {
 		auto r = WStringToString(std::wstring(msg));
 		if (r.compare("Unknown error.") == 0) {
 			return fmt::format("Unknown error: HR {}", static_cast<long>(hr));
@@ -1102,10 +1102,7 @@ class RageCompiledGeometrySWD3D : public RageCompiledGeometry
 									   reinterpret_cast<D3DMATRIX*>(&m));
 		}
 
-		if (g_lastFVF != D3DFVF_RageModelVertex) {
-			g_lastFVF = D3DFVF_RageModelVertex;
-			g_pd3dDevice->SetFVF(D3DFVF_RageModelVertex);
-		}
+		RageDisplay_D3D::SetShadersOrFVF(D3DFVF_RageModelVertex);
 
 		g_pd3dDevice->DrawIndexedPrimitiveUP(
 		  D3DPT_TRIANGLELIST,
@@ -1267,6 +1264,85 @@ RageDisplay_D3D::UnsetCurrentShader(bool isVertexShader)
 	}
 }
 
+constexpr D3DVERTEXELEMENT9 spriteDecl[] = { { 0,
+							offsetof(RageSpriteVertex, p),
+							D3DDECLTYPE_FLOAT3,
+							D3DDECLMETHOD_DEFAULT,
+							D3DDECLUSAGE_POSITION,
+							0 },
+						{ 0,
+							offsetof(RageSpriteVertex, n),
+							D3DDECLTYPE_FLOAT3,
+							D3DDECLMETHOD_DEFAULT,
+							D3DDECLUSAGE_NORMAL,
+							0 },
+						{ 0,
+							offsetof(RageSpriteVertex, c),
+							D3DDECLTYPE_D3DCOLOR,
+							D3DDECLMETHOD_DEFAULT,
+							D3DDECLUSAGE_COLOR,
+							0 },
+						{ 0,
+							offsetof(RageSpriteVertex, t),
+							D3DDECLTYPE_FLOAT2,
+							D3DDECLMETHOD_DEFAULT,
+							D3DDECLUSAGE_TEXCOORD,
+							0 },
+						D3DDECL_END() };
+
+constexpr D3DVERTEXELEMENT9 modelDecl[] = { { 0,
+							offsetof(RageModelVertex, p),
+							D3DDECLTYPE_FLOAT3,
+							D3DDECLMETHOD_DEFAULT,
+							D3DDECLUSAGE_POSITION,
+							0 },
+						{ 0,
+						offsetof(RageModelVertex, n),
+							D3DDECLTYPE_FLOAT3,
+							D3DDECLMETHOD_DEFAULT,
+							D3DDECLUSAGE_NORMAL,
+							0 },
+						{ 0,
+							offsetof(RageModelVertex, t),
+							D3DDECLTYPE_FLOAT2,
+							D3DDECLMETHOD_DEFAULT,
+							D3DDECLUSAGE_TEXCOORD,
+							0 },
+						D3DDECL_END() };
+
+void
+RageDisplay_D3D::SetShadersOrFVF(unsigned long fvfDefinition)
+{
+	if (usingVertexShader && usingPixelShader && vertexShader != NULL &&
+		pixelShader != NULL) {
+		usingVertexShader = false;
+		usingPixelShader = false;
+		const D3DVERTEXELEMENT9* decl;
+
+		if (fvfDefinition == D3DFVF_RageSpriteVertex) {
+			decl = spriteDecl;
+		} else {
+			decl = modelDecl;
+		}
+		IDirect3DVertexDeclaration9* vertexDecl = NULL;
+		if (FAILED(g_pd3dDevice->CreateVertexDeclaration(decl, &vertexDecl))) {
+			Locator::getLogger()->warn("wat");
+		}
+		if (FAILED(g_pd3dDevice->SetVertexDeclaration(vertexDecl))) {
+			Locator::getLogger()->warn("wat");
+		}
+		if (FAILED(g_pd3dDevice->SetVertexShader(vertexShader))) {
+			Locator::getLogger()->warn("wat");
+		}
+		if (FAILED(g_pd3dDevice->SetPixelShader(pixelShader))) {
+			Locator::getLogger()->warn("wat");
+		}
+	} else if (g_lastFVF != fvfDefinition) {
+		g_lastFVF = fvfDefinition;
+		g_pd3dDevice->SetFVF(fvfDefinition);
+	}
+}
+
 void
 RageDisplay_D3D::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 {
@@ -1290,53 +1366,7 @@ RageDisplay_D3D::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 		vIndices[i * 6 + 5] = i * 4 + 0;
 	}
 
-	if (usingVertexShader && vertexShader != NULL) {
-		usingVertexShader = false;
-		D3DVERTEXELEMENT9 decl[] = { { 0,
-									   offsetof(RageSpriteVertex, p),
-									   D3DDECLTYPE_FLOAT3,
-									   D3DDECLMETHOD_DEFAULT,
-									   D3DDECLUSAGE_POSITION,
-									   0 },
-									 { 0,
-									   offsetof(RageSpriteVertex, n),
-									   D3DDECLTYPE_FLOAT3,
-									   D3DDECLMETHOD_DEFAULT,
-									   D3DDECLUSAGE_NORMAL,
-									   0 },
-									 { 0,
-									   offsetof(RageSpriteVertex, c),
-									   D3DDECLTYPE_D3DCOLOR,
-									   D3DDECLMETHOD_DEFAULT,
-									   D3DDECLUSAGE_COLOR,
-									   0 },
-									 { 0,
-									   offsetof(RageSpriteVertex, t),
-									   D3DDECLTYPE_FLOAT2,
-									   D3DDECLMETHOD_DEFAULT,
-									   D3DDECLUSAGE_TEXCOORD,
-									   0 },
-        D3DDECL_END()
-				};
-
-		IDirect3DVertexDeclaration9* vertexDecl = NULL;
-		if (FAILED(g_pd3dDevice->CreateVertexDeclaration(decl, &vertexDecl))) {
-			Locator::getLogger()->warn("wat");
-		}
-		if (FAILED(g_pd3dDevice->SetVertexDeclaration(vertexDecl))) {
-			Locator::getLogger()->warn("wat");
-		}
-		if (FAILED(g_pd3dDevice->SetVertexShader(vertexShader))) {
-					Locator::getLogger()->warn("wat");
-				}
-		if (FAILED(g_pd3dDevice->SetPixelShader(pixelShader))) {
-					Locator::getLogger()->warn("wat");
-				}
-	}
-	else if (g_lastFVF != D3DFVF_RageSpriteVertex) {
-		g_lastFVF = D3DFVF_RageSpriteVertex;
-		g_pd3dDevice->SetFVF(D3DFVF_RageSpriteVertex);
-	}
+	SetShadersOrFVF(D3DFVF_RageSpriteVertex);
 
 	SendCurrentMatrices();
 	auto result = g_pd3dDevice->DrawIndexedPrimitiveUP(
@@ -1382,10 +1412,7 @@ RageDisplay_D3D::DrawQuadStripInternal(const RageSpriteVertex v[],
 		vIndices[i * 6 + 5] = i * 2 + 3;
 	}
 
-	if (g_lastFVF != D3DFVF_RageSpriteVertex) {
-		g_lastFVF = D3DFVF_RageSpriteVertex;
-		g_pd3dDevice->SetFVF(D3DFVF_RageSpriteVertex);
-	}
+	SetShadersOrFVF(D3DFVF_RageSpriteVertex);
 
 	SendCurrentMatrices();
 	g_pd3dDevice->DrawIndexedPrimitiveUP(
@@ -1436,10 +1463,7 @@ RageDisplay_D3D::DrawSymmetricQuadStripInternal(const RageSpriteVertex v[],
 		vIndices[i * 12 + 11] = i * 3 + 5;
 	}
 
-	if (g_lastFVF != D3DFVF_RageSpriteVertex) {
-		g_lastFVF = D3DFVF_RageSpriteVertex;
-		g_pd3dDevice->SetFVF(D3DFVF_RageSpriteVertex);
-	}
+	SetShadersOrFVF(D3DFVF_RageSpriteVertex);
 
 	SendCurrentMatrices();
 	g_pd3dDevice->DrawIndexedPrimitiveUP(
@@ -1464,10 +1488,7 @@ RageDisplay_D3D::DrawSymmetricQuadStripInternal(const RageSpriteVertex v[],
 void
 RageDisplay_D3D::DrawFanInternal(const RageSpriteVertex v[], int iNumVerts)
 {
-	if (g_lastFVF != D3DFVF_RageSpriteVertex) {
-		g_lastFVF = D3DFVF_RageSpriteVertex;
-		g_pd3dDevice->SetFVF(D3DFVF_RageSpriteVertex);
-	}
+	SetShadersOrFVF(D3DFVF_RageSpriteVertex);
 
 	SendCurrentMatrices();
 	g_pd3dDevice->DrawPrimitiveUP(D3DPT_TRIANGLEFAN,
@@ -1482,10 +1503,7 @@ RageDisplay_D3D::DrawFanInternal(const RageSpriteVertex v[], int iNumVerts)
 void
 RageDisplay_D3D::DrawStripInternal(const RageSpriteVertex v[], int iNumVerts)
 {
-	if (g_lastFVF != D3DFVF_RageSpriteVertex) {
-		g_lastFVF = D3DFVF_RageSpriteVertex;
-		g_pd3dDevice->SetFVF(D3DFVF_RageSpriteVertex);
-	}
+	SetShadersOrFVF(D3DFVF_RageSpriteVertex);
 
 	SendCurrentMatrices();
 	g_pd3dDevice->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP,
@@ -1501,10 +1519,7 @@ void
 RageDisplay_D3D::DrawTrianglesInternal(const RageSpriteVertex v[],
 									   int iNumVerts)
 {
-	if (g_lastFVF != D3DFVF_RageSpriteVertex) {
-		g_lastFVF = D3DFVF_RageSpriteVertex;
-		g_pd3dDevice->SetFVF(D3DFVF_RageSpriteVertex);
-	}
+	SetShadersOrFVF(D3DFVF_RageSpriteVertex);
 
 	SendCurrentMatrices();
 	g_pd3dDevice->DrawPrimitiveUP(D3DPT_TRIANGLELIST,

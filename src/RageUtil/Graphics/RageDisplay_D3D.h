@@ -89,6 +89,7 @@ class RageDisplay_D3D : public RageDisplay
 	void SetShaderFromPath(std::filesystem::path path,
 						   bool isVertexShader) override;
 	void UnsetCurrentShader(bool isVertexShader) override;
+	static void SetShadersOrFVF(unsigned long fvfDefinition);
 
   protected:
 	void DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts) override;
