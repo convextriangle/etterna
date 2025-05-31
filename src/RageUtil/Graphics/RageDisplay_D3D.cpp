@@ -1368,18 +1368,7 @@ RageDisplay_D3D::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 	SetShadersOrFVF(D3DFVF_RageSpriteVertex);
 
 	SendCurrentMatrices();
-	if (usingVertexShader) {
-		D3DXMATRIX world, view, proj;
-		g_pd3dDevice->GetTransform(D3DTS_PROJECTION, &proj);
-		g_pd3dDevice->GetTransform(D3DTS_VIEW, &view);
-		g_pd3dDevice->GetTransform(D3DTS_WORLD, &world);
-
-		// investigate if we can cache at least a part of this computation
-		D3DXMATRIX wvp = world * view * proj;
-		g_pd3dDevice->SetVertexShaderConstantF(0, wvp, 4);
-	}
-	usingVertexShader = false;
-	usingPixelShader = false;
+	SetWorldViewProjectionMatrix();
 	auto result = g_pd3dDevice->DrawIndexedPrimitiveUP(
 	  D3DPT_TRIANGLELIST,
 	  // PrimitiveType
@@ -1397,6 +1386,32 @@ RageDisplay_D3D::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 	  // pVertexStreamZeroData,
 	  sizeof(RageSpriteVertex) // VertexStreamZeroStride
 	);
+}
+
+void
+RageDisplay_D3D::SetWorldViewProjectionMatrix()
+{
+	static D3DXMATRIX World, View, Proj, WVP;
+	static D3DXMATRIX currentWorld, currentView, currentProj;
+	if (usingVertexShader) {
+		
+		g_pd3dDevice->GetTransform(D3DTS_PROJECTION, &currentProj);
+		g_pd3dDevice->GetTransform(D3DTS_VIEW, &currentView);
+		g_pd3dDevice->GetTransform(D3DTS_WORLD, &currentWorld);
+
+		if (currentWorld != World || currentView != View || currentProj != Proj) {
+			if (currentWorld != World)
+				World = currentWorld;
+			if (currentView != View)
+				View = currentView;
+			if (currentProj != Proj)
+				Proj = currentProj;
+			WVP = currentWorld * currentView * currentProj;
+		}
+		g_pd3dDevice->SetVertexShaderConstantF(0, WVP, 4);
+	}
+	usingVertexShader = false;
+	usingPixelShader = false;
 }
 
 void

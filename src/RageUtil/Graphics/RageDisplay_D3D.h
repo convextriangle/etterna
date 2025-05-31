@@ -93,6 +93,7 @@ class RageDisplay_D3D : public RageDisplay
 
   protected:
 	void DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts) override;
+	void SetWorldViewProjectionMatrix();
 	void DrawQuadStripInternal(const RageSpriteVertex v[],
 							   int iNumVerts) override;
 	void DrawFanInternal(const RageSpriteVertex v[], int iNumVerts) override;
