@@ -48,23 +48,23 @@ const WCHAR* WINAPI DXGetErrorStringW( _In_ HRESULT hr )
 {
 #define  CHK_ERRA(hrchk) \
 		case hrchk: \
-			 return L## #hrchk;
+		return L## #hrchk;
 
 #define HRESULT_FROM_WIN32b(x) ((HRESULT)(x) <= 0 ? ((HRESULT)(x)) : ((HRESULT) (((x) & 0x0000FFFF) | (FACILITY_WIN32 << 16) | 0x80000000)))
 
 #define  CHK_ERR_WIN32A(hrchk) \
 		case HRESULT_FROM_WIN32b(hrchk): \
 		case hrchk: \
-			 return L## #hrchk;
+		return L## #hrchk;
 
    switch(hr)
    {
-// Common Win32 error codes
+		// Common Win32 error codes
 		CHK_ERRA(S_OK)
 		CHK_ERRA(S_FALSE)
 
-// d3d9.h error codes
-//      CHK_ERRA(D3D_OK)
+		// d3d9.h error codes
+		//      CHK_ERRA(D3D_OK)
 		CHK_ERRA(D3DERR_WRONGTEXTUREFORMAT)
 		CHK_ERRA(D3DERR_UNSUPPORTEDCOLOROPERATION)
 		CHK_ERRA(D3DERR_UNSUPPORTEDCOLORARG)
@@ -104,7 +104,7 @@ const WCHAR* WINAPI DXGetErrorStringW( _In_ HRESULT hr )
 		CHK_ERRA(D3DERR_UNSUPPORTEDCRYPTO)
 		CHK_ERRA(D3DERR_PRESENT_STATISTICS_DISJOINT)
 
-// dxgi.h error codes
+		// dxgi.h error codes
 		CHK_ERRA(DXGI_STATUS_OCCLUDED)
 		CHK_ERRA(DXGI_STATUS_CLIPPED)
 		CHK_ERRA(DXGI_STATUS_NO_REDIRECTION)
@@ -472,9 +472,9 @@ FindBackBufferType(bool bWindowed, int iBPP) -> D3DFORMAT
 		}
 
 		Locator::getLogger()->debug("Testing format: display {}, back buffer {}, windowed {}...",
-				   fmtDisplay,
-				   fmtBackBuffer,
-				   static_cast<int>(bWindowed));
+		  fmtDisplay,
+		  fmtBackBuffer,
+		  static_cast<int>(bWindowed));
 
 		hr = g_pd3d->CheckDeviceType(D3DADAPTER_DEFAULT,
 									 D3DDEVTYPE_HAL,
@@ -692,12 +692,12 @@ RageDisplay_D3D::TryVideoMode(const VideoModeParams& _p, bool& bNewDeviceOut)
 {
 	auto p = _p;
 	Locator::getLogger()->warn("RageDisplay_D3D::TryVideoMode( {}, {}, {}, {}, {}, {} )",
-			  static_cast<int>(p.windowed),
-			  p.width,
-			  p.height,
-			  p.bpp,
-			  p.rate,
-			  static_cast<int>(p.vsync));
+	  static_cast<int>(p.windowed),
+	  p.width,
+	  p.height,
+	  p.bpp,
+	  p.rate,
+	  static_cast<int>(p.vsync));
 
 	if (FindBackBufferType(p.windowed, p.bpp) ==
 		D3DFMT_UNKNOWN) { // no possible back buffer formats
@@ -940,12 +940,14 @@ RageDisplay_D3D::GetActualVideoModeParams() const
 {
 	return static_cast<ActualVideoModeParams*>(GraphicsWindow::GetParams());
 }
-
+bool usingVertexShader = false;
+bool usingPixelShader = false;
 void
 RageDisplay_D3D::SendCurrentMatrices()
 {
 	static RageMatrix Centering;
 	static RageMatrix Projection;
+	static RageMatrix WorldViewProjection;
 
 	if (Centering != *GetCentering() || Projection != *GetProjectionTop()) {
 		Centering = *GetCentering();
@@ -1102,7 +1104,8 @@ class RageCompiledGeometrySWD3D : public RageCompiledGeometry
 									   reinterpret_cast<D3DMATRIX*>(&m));
 		}
 
-		RageDisplay_D3D::SetShadersOrFVF(D3DFVF_RageModelVertex);
+		// oh god
+		((RageDisplay_D3D*)DISPLAY)->SetShadersOrFVF(D3DFVF_RageModelVertex);
 
 		g_pd3dDevice->DrawIndexedPrimitiveUP(
 		  D3DPT_TRIANGLELIST,
@@ -1231,9 +1234,6 @@ GetVertexShader(const std::string& resolvedPath)
 IDirect3DPixelShader9* pixelShader = NULL;
 IDirect3DVertexShader9* vertexShader = NULL;
 
-bool usingVertexShader = false;
-bool usingPixelShader = false;
-
 void
 RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
 								   bool isVertexShader)
@@ -1244,9 +1244,9 @@ RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
 	auto resolvedPath = FILEMAN->ResolvePath(path.string()).substr(1);
 	if (isVertexShader) {
 		usingVertexShader = true;
-		vertexShader = vertexShader == NULL ? GetVertexShader(resolvedPath) : vertexShader;
-	}
-	else {
+		vertexShader =
+		  vertexShader == NULL ? GetVertexShader(resolvedPath) : vertexShader;
+	} else {
 		usingPixelShader = true;
 		pixelShader =
 		  pixelShader == NULL ? GetPixelShader(resolvedPath) : pixelShader;
@@ -1260,63 +1260,62 @@ RageDisplay_D3D::UnsetCurrentShader(bool isVertexShader)
 		g_pd3dDevice->SetVertexShader(nullptr);
 	} else {
 		auto result = g_pd3dDevice->SetPixelShader(nullptr);
-		if (result != D3D_OK){}
+		if (result != D3D_OK) {
+		}
 	}
 }
 
 constexpr D3DVERTEXELEMENT9 spriteDecl[] = { { 0,
-							offsetof(RageSpriteVertex, p),
-							D3DDECLTYPE_FLOAT3,
-							D3DDECLMETHOD_DEFAULT,
-							D3DDECLUSAGE_POSITION,
-							0 },
-						{ 0,
-							offsetof(RageSpriteVertex, n),
-							D3DDECLTYPE_FLOAT3,
-							D3DDECLMETHOD_DEFAULT,
-							D3DDECLUSAGE_NORMAL,
-							0 },
-						{ 0,
-							offsetof(RageSpriteVertex, c),
-							D3DDECLTYPE_D3DCOLOR,
-							D3DDECLMETHOD_DEFAULT,
-							D3DDECLUSAGE_COLOR,
-							0 },
-						{ 0,
-							offsetof(RageSpriteVertex, t),
-							D3DDECLTYPE_FLOAT2,
-							D3DDECLMETHOD_DEFAULT,
-							D3DDECLUSAGE_TEXCOORD,
-							0 },
-						D3DDECL_END() };
+											   offsetof(RageSpriteVertex, p),
+											   D3DDECLTYPE_FLOAT3,
+											   D3DDECLMETHOD_DEFAULT,
+											   D3DDECLUSAGE_POSITION,
+											   0 },
+											 { 0,
+											   offsetof(RageSpriteVertex, n),
+											   D3DDECLTYPE_FLOAT3,
+											   D3DDECLMETHOD_DEFAULT,
+											   D3DDECLUSAGE_NORMAL,
+											   0 },
+											 { 0,
+											   offsetof(RageSpriteVertex, c),
+											   D3DDECLTYPE_D3DCOLOR,
+											   D3DDECLMETHOD_DEFAULT,
+											   D3DDECLUSAGE_COLOR,
+											   0 },
+											 { 0,
+											   offsetof(RageSpriteVertex, t),
+											   D3DDECLTYPE_FLOAT2,
+											   D3DDECLMETHOD_DEFAULT,
+											   D3DDECLUSAGE_TEXCOORD,
+											   0 },
+											 D3DDECL_END() };
 
 constexpr D3DVERTEXELEMENT9 modelDecl[] = { { 0,
-							offsetof(RageModelVertex, p),
-							D3DDECLTYPE_FLOAT3,
-							D3DDECLMETHOD_DEFAULT,
-							D3DDECLUSAGE_POSITION,
-							0 },
-						{ 0,
-						offsetof(RageModelVertex, n),
-							D3DDECLTYPE_FLOAT3,
-							D3DDECLMETHOD_DEFAULT,
-							D3DDECLUSAGE_NORMAL,
-							0 },
-						{ 0,
-							offsetof(RageModelVertex, t),
-							D3DDECLTYPE_FLOAT2,
-							D3DDECLMETHOD_DEFAULT,
-							D3DDECLUSAGE_TEXCOORD,
-							0 },
-						D3DDECL_END() };
+											  offsetof(RageModelVertex, p),
+											  D3DDECLTYPE_FLOAT3,
+											  D3DDECLMETHOD_DEFAULT,
+											  D3DDECLUSAGE_POSITION,
+											  0 },
+											{ 0,
+											  offsetof(RageModelVertex, n),
+											  D3DDECLTYPE_FLOAT3,
+											  D3DDECLMETHOD_DEFAULT,
+											  D3DDECLUSAGE_NORMAL,
+											  0 },
+											{ 0,
+											  offsetof(RageModelVertex, t),
+											  D3DDECLTYPE_FLOAT2,
+											  D3DDECLMETHOD_DEFAULT,
+											  D3DDECLUSAGE_TEXCOORD,
+											  0 },
+											D3DDECL_END() };
 
 void
 RageDisplay_D3D::SetShadersOrFVF(unsigned long fvfDefinition)
 {
 	if (usingVertexShader && usingPixelShader && vertexShader != NULL &&
 		pixelShader != NULL) {
-		usingVertexShader = false;
-		usingPixelShader = false;
 		const D3DVERTEXELEMENT9* decl;
 
 		if (fvfDefinition == D3DFVF_RageSpriteVertex) {
@@ -1369,6 +1368,18 @@ RageDisplay_D3D::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 	SetShadersOrFVF(D3DFVF_RageSpriteVertex);
 
 	SendCurrentMatrices();
+	if (usingVertexShader) {
+		D3DXMATRIX world, view, proj;
+		g_pd3dDevice->GetTransform(D3DTS_PROJECTION, &proj);
+		g_pd3dDevice->GetTransform(D3DTS_VIEW, &view);
+		g_pd3dDevice->GetTransform(D3DTS_WORLD, &world);
+
+		// investigate if we can cache at least a part of this computation
+		D3DXMATRIX wvp = world * view * proj;
+		g_pd3dDevice->SetVertexShaderConstantF(0, wvp, 4);
+	}
+	usingVertexShader = false;
+	usingPixelShader = false;
 	auto result = g_pd3dDevice->DrawIndexedPrimitiveUP(
 	  D3DPT_TRIANGLELIST,
 	  // PrimitiveType
