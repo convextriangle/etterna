@@ -13,6 +13,8 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "archutils/Win32/GraphicsWindow.h"
 #include "RageUtil/File/RageFileManager.h"
+#include "Shaders/RagePixelShader_D3D.h"
+#include "Shaders/RageVertexShader_D3D.h"
 
 #include <algorithm>
 #include <map>
@@ -1244,12 +1246,12 @@ RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
 	auto resolvedPath = FILEMAN->ResolvePath(path.string()).substr(1);
 	if (isVertexShader) {
 		usingVertexShader = true;
-		vertexShader =
-		  vertexShader == NULL ? GetVertexShader(resolvedPath) : vertexShader;
+		vertexShader = /*vertexShader == NULL ?*/ GetVertexShader(resolvedPath)
+		  /*: vertexShader*/;
 	} else {
 		usingPixelShader = true;
 		pixelShader =
-		  pixelShader == NULL ? GetPixelShader(resolvedPath) : pixelShader;
+		  /*pixelShader == NULL ?*/ GetPixelShader(resolvedPath) /*: pixelShader*/;
 	}
 }
 

@@ -86,11 +86,16 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/RageTextureID.h"
   "Graphics/RageTextureManager.h"
   "Graphics/RageTextureRenderTarget.h"
+  "Graphics/Shaders/RageShader.h"
 )
 
 if(WIN32)
   list(APPEND SMDATA_RAGE_GRAPHICS_SRC "Graphics/RageDisplay_D3D.cpp")
   list(APPEND SMDATA_RAGE_GRAPHICS_HPP "Graphics/RageDisplay_D3D.h")
+  list(APPEND SMDATA_RAGE_GRAPHICS_SRC "Graphics/Shaders/RagePixelShader_D3D.cpp")
+  list(APPEND SMDATA_RAGE_GRAPHICS_HPP "Graphics/Shaders/RagePixelShader_D3D.h")
+  list(APPEND SMDATA_RAGE_GRAPHICS_SRC "Graphics/Shaders/RageVertexShader_D3D.cpp")
+  list(APPEND SMDATA_RAGE_GRAPHICS_HPP "Graphics/Shaders/RageVertexShader_D3D.h")
 elseif(LINUX)
   if (WITH_GLES2)
     list(APPEND SMDATA_RAGE_GRAPHICS_SRC "Graphics/RageDisplay_GLES2.cpp")
