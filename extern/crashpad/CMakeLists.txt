@@ -55,6 +55,8 @@ FetchContent_GetProperties(depot_tools SOURCE_DIR DEPOT_TOOLS_DIR)
 list(APPEND CMAKE_PROGRAM_PATH ${DEPOT_TOOLS_DIR})
 find_program(EXE_DEPOT_GN gn)
 find_program(EXE_DEPOT_NINJA ninja)
+find_program(EXE_DEPOT_UPDATE_DEPOT_TOOLS update_depot_tools)
+find_program(EXE_DEPOT_GIT git) # TODO: I'm not sure this grabs the "right" version of git; investigate here if shennanigans arise.
 
 # Crashpad source and build folders
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/crashpad)
@@ -129,6 +131,8 @@ ExternalProject_Add_Step(crashpad_init gn_configure
 	ALWAYS 1
 	USES_TERMINAL 1
 	WORKING_DIRECTORY ${SOURCE_DIR}
+	COMMAND ${EXE_DEPOT_GIT} config --global depot-tools.allowGlobalGitConfig true
+	COMMAND ${EXE_DEPOT_UPDATE_DEPOT_TOOLS}
 	COMMAND ${EXE_DEPOT_GN} gen ${BINARY_DIR} "--args=target_cpu=\"${GN_TARGET_CPU}\" is_debug=${GN_IS_DEBUG} extra_cflags=\"${GN_WIN_LINK_FLAG}\"" && ${EXE_DEPOT_NINJA} -C ${BINARY_DIR} crashpad_handler
 	BYPRODUCTS ${OUTPUT_LIBS})
 
