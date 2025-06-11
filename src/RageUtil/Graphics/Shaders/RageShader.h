@@ -5,12 +5,15 @@
 
 #include <string>
 
+// TODO: Lua bindings so it's easy to pass these thingies around
 class RageShader
 {
   public:
+	RageShader(const std::string& path)
+	  : m_Path(path) {}
 	virtual ~RageShader() {}
 
-  protected:
+  public:
 	const std::string m_Path;
 };
 

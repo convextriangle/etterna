@@ -4,6 +4,7 @@
 #include "Etterna/Models/Misc/LocalizedString.h"
 #include "RageDisplay.h"
 #include "RageDisplay_D3D.h"
+#include "RageDisplay_D3D_Helpers.h"
 #include "RageUtil/Misc/RageException.h"
 #include "Core/Services/Locator.hpp"
 #include "RageUtil/Misc/RageMath.h"
@@ -39,118 +40,6 @@
 #pragma comment(lib, "d3d9.lib")
 #pragma comment(lib, "d3dx9.lib")
 #endif
-
-
-// The DXGetErrorStringW function comes from the DirectX Error Library  (See https://walbourn.github.io/wheres-dxerr-lib/ )
-//--------------------------------------------------------------------------------------
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License.
-//--------------------------------------------------------------------------------------
-const WCHAR* WINAPI DXGetErrorStringW( _In_ HRESULT hr )
-{
-#define  CHK_ERRA(hrchk) \
-		case hrchk: \
-		return L## #hrchk;
-
-#define HRESULT_FROM_WIN32b(x) ((HRESULT)(x) <= 0 ? ((HRESULT)(x)) : ((HRESULT) (((x) & 0x0000FFFF) | (FACILITY_WIN32 << 16) | 0x80000000)))
-
-#define  CHK_ERR_WIN32A(hrchk) \
-		case HRESULT_FROM_WIN32b(hrchk): \
-		case hrchk: \
-		return L## #hrchk;
-
-   switch(hr)
-   {
-		// Common Win32 error codes
-		CHK_ERRA(S_OK)
-		CHK_ERRA(S_FALSE)
-
-		// d3d9.h error codes
-		//      CHK_ERRA(D3D_OK)
-		CHK_ERRA(D3DERR_WRONGTEXTUREFORMAT)
-		CHK_ERRA(D3DERR_UNSUPPORTEDCOLOROPERATION)
-		CHK_ERRA(D3DERR_UNSUPPORTEDCOLORARG)
-		CHK_ERRA(D3DERR_UNSUPPORTEDALPHAOPERATION)
-		CHK_ERRA(D3DERR_UNSUPPORTEDALPHAARG)
-		CHK_ERRA(D3DERR_TOOMANYOPERATIONS)
-		CHK_ERRA(D3DERR_CONFLICTINGTEXTUREFILTER)
-		CHK_ERRA(D3DERR_UNSUPPORTEDFACTORVALUE)
-		CHK_ERRA(D3DERR_CONFLICTINGRENDERSTATE)
-		CHK_ERRA(D3DERR_UNSUPPORTEDTEXTUREFILTER)
-		CHK_ERRA(D3DERR_CONFLICTINGTEXTUREPALETTE)
-		CHK_ERRA(D3DERR_DRIVERINTERNALERROR)
-		CHK_ERRA(D3DERR_NOTFOUND)
-		CHK_ERRA(D3DERR_MOREDATA)
-		CHK_ERRA(D3DERR_DEVICELOST)
-		CHK_ERRA(D3DERR_DEVICENOTRESET)
-		CHK_ERRA(D3DERR_NOTAVAILABLE)
-		CHK_ERRA(D3DERR_OUTOFVIDEOMEMORY)
-		CHK_ERRA(D3DERR_INVALIDDEVICE)
-		CHK_ERRA(D3DERR_INVALIDCALL)
-		CHK_ERRA(D3DERR_DRIVERINVALIDCALL)
-		//CHK_ERRA(D3DERR_WASSTILLDRAWING)
-		CHK_ERRA(D3DOK_NOAUTOGEN)
-
-		// Extended for Windows Vista
-		CHK_ERRA(D3DERR_DEVICEREMOVED)
-		CHK_ERRA(S_NOT_RESIDENT)
-		CHK_ERRA(S_RESIDENT_IN_SHARED_MEMORY)
-		CHK_ERRA(S_PRESENT_MODE_CHANGED)
-		CHK_ERRA(S_PRESENT_OCCLUDED)
-		CHK_ERRA(D3DERR_DEVICEHUNG)
-
-		// Extended for Windows 7
-		CHK_ERRA(D3DERR_UNSUPPORTEDOVERLAY)
-		CHK_ERRA(D3DERR_UNSUPPORTEDOVERLAYFORMAT)
-		CHK_ERRA(D3DERR_CANNOTPROTECTCONTENT)
-		CHK_ERRA(D3DERR_UNSUPPORTEDCRYPTO)
-		CHK_ERRA(D3DERR_PRESENT_STATISTICS_DISJOINT)
-
-		// dxgi.h error codes
-		CHK_ERRA(DXGI_STATUS_OCCLUDED)
-		CHK_ERRA(DXGI_STATUS_CLIPPED)
-		CHK_ERRA(DXGI_STATUS_NO_REDIRECTION)
-		CHK_ERRA(DXGI_STATUS_NO_DESKTOP_ACCESS)
-		CHK_ERRA(DXGI_STATUS_GRAPHICS_VIDPN_SOURCE_IN_USE)
-		CHK_ERRA(DXGI_STATUS_MODE_CHANGED)
-		CHK_ERRA(DXGI_STATUS_MODE_CHANGE_IN_PROGRESS)
-		CHK_ERRA(DXGI_ERROR_INVALID_CALL)
-		CHK_ERRA(DXGI_ERROR_NOT_FOUND)
-		CHK_ERRA(DXGI_ERROR_MORE_DATA)
-		CHK_ERRA(DXGI_ERROR_UNSUPPORTED)
-		CHK_ERRA(DXGI_ERROR_DEVICE_REMOVED)
-		CHK_ERRA(DXGI_ERROR_DEVICE_HUNG)
-		CHK_ERRA(DXGI_ERROR_DEVICE_RESET)
-		CHK_ERRA(DXGI_ERROR_WAS_STILL_DRAWING)
-		CHK_ERRA(DXGI_ERROR_FRAME_STATISTICS_DISJOINT)
-		CHK_ERRA(DXGI_ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE)
-		CHK_ERRA(DXGI_ERROR_DRIVER_INTERNAL_ERROR)
-		CHK_ERRA(DXGI_ERROR_NONEXCLUSIVE)
-		CHK_ERRA(DXGI_ERROR_NOT_CURRENTLY_AVAILABLE)
-		CHK_ERRA(DXGI_ERROR_REMOTE_CLIENT_DISCONNECTED)
-		CHK_ERRA(DXGI_ERROR_REMOTE_OUTOFMEMORY)
-
-		default: return L"Unknown error.";
-	}
-}
-
-auto GetErrorString(HRESULT hr) -> std::string
-{
-	Locator::getLogger()->warn("RageDisplay_D3D::GetErrorString() - HR {}",
-							   static_cast<long>(hr));
-	const wchar_t* msg = DXGetErrorStringW(hr);
-	if (msg) {
-		auto r = WStringToString(std::wstring(msg));
-		if (r.compare("Unknown error.") == 0) {
-			return fmt::format("Unknown error: HR {}", static_cast<long>(hr));
-		} else {
-			return r;
-		}
-	} else {
-		return fmt::format("Failed to read error: HR {}",
-						   static_cast<long>(hr));
-	}
-}
 
 // Globals
 HMODULE g_D3D9_Module = nullptr;
@@ -521,7 +410,7 @@ SetD3DParams(bool& bNewDeviceOut) -> std::string
 			// Likely D3D_ERR_INVALIDCALL.  The driver probably doesn't support
 			// this video mode.
 			return ssprintf("CreateDevice failed: '%s'",
-							GetErrorString(hr).c_str());
+			  RageDisplay_D3D_Helpers::GetErrorString(hr).c_str());
 		}
 	} else {
 		bNewDeviceOut = false;
@@ -531,7 +420,7 @@ SetD3DParams(bool& bNewDeviceOut) -> std::string
 			// Likely D3D_ERR_INVALIDCALL.  The driver probably doesn't support
 			// this video mode.
 			return ssprintf("g_pd3dDevice->Reset failed: '%s'",
-							GetErrorString(hr).c_str());
+							RageDisplay_D3D_Helpers::GetErrorString(hr).c_str());
 		}
 	}
 
@@ -1145,94 +1034,6 @@ RageDisplay_D3D::DeleteCompiledGeometry(RageCompiledGeometry* p)
 	delete p;
 }
 
-IDirect3DPixelShader9*
-GetPixelShader(const std::string& resolvedPath)
-{
-	LPCSTR profile = D3DXGetPixelShaderProfile(g_pd3dDevice);
-	LPD3DXBUFFER shaderBuffer = NULL;
-	LPD3DXBUFFER errorBuffer = NULL;
-	auto result = D3DXCompileShaderFromFile(resolvedPath.c_str(),
-											NULL,
-											NULL,
-											"main",
-											profile,
-											0,
-											&shaderBuffer,
-											&errorBuffer,
-											NULL);
-
-	// silent fail for testing
-	if (result != D3D_OK) {
-		Locator::getLogger()->warn("RageDisplay_D3D D3DXCompileShaderFromFile "
-								   "failed for {} - {}",
-								   resolvedPath,
-								   GetErrorString(result));
-		errorBuffer->Release();
-		return NULL;
-	}
-
-	IDirect3DPixelShader9* shader = NULL;
-	result = g_pd3dDevice->CreatePixelShader(
-	  (DWORD*)shaderBuffer->GetBufferPointer(), &shader);
-
-	if (result != D3D_OK) {
-		Locator::getLogger()->warn("RageDisplay_D3D "
-								   "CreatePixelShader failed for {} - {}",
-								   resolvedPath,
-								   GetErrorString(result));
-		shaderBuffer->Release();
-		return NULL;
-	}
-
-	shaderBuffer->Release();
-
-	return shader;
-}
-
-IDirect3DVertexShader9*
-GetVertexShader(const std::string& resolvedPath)
-{
-	LPCSTR profile = D3DXGetVertexShaderProfile(g_pd3dDevice);
-	LPD3DXBUFFER shaderBuffer = NULL;
-	LPD3DXBUFFER errorBuffer = NULL;
-	auto result = D3DXCompileShaderFromFile(resolvedPath.c_str(),
-											NULL,
-											NULL,
-											"main",
-											profile,
-											0,
-											&shaderBuffer,
-											&errorBuffer,
-											NULL);
-
-	// silent fail for testing
-	if (result != D3D_OK) {
-		Locator::getLogger()->warn("RageDisplay_D3D D3DXCompileShaderFromFile "
-								   "failed for {} - {}",
-								   resolvedPath,
-								   GetErrorString(result));
-		errorBuffer->Release();
-		return NULL;
-	}
-
-	IDirect3DVertexShader9* shader = NULL;
-	result = g_pd3dDevice->CreateVertexShader(
-	  (DWORD*)shaderBuffer->GetBufferPointer(), &shader);
-
-	if (result != D3D_OK) {
-		Locator::getLogger()->warn("RageDisplay_D3D "
-								   "CreateVertexShader failed for {} - {}",
-								   resolvedPath,
-								   GetErrorString(result));
-		shaderBuffer->Release();
-		return NULL;
-	}
-
-	shaderBuffer->Release();
-
-	return shader;
-}
-
 IDirect3DPixelShader9* pixelShader = NULL;
 IDirect3DVertexShader9* vertexShader = NULL;
 
@@ -1246,12 +1047,14 @@ RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
 	auto resolvedPath = FILEMAN->ResolvePath(path.string()).substr(1);
 	if (isVertexShader) {
 		usingVertexShader = true;
-		vertexShader = /*vertexShader == NULL ?*/ GetVertexShader(resolvedPath)
-		  /*: vertexShader*/;
+		RageVertexShader_D3D container(resolvedPath);
+		auto _ = container.Compile(D3DXGetVertexShaderProfile(g_pd3dDevice));
+		vertexShader = container.CreateForDevice(g_pd3dDevice);
 	} else {
 		usingPixelShader = true;
-		pixelShader =
-		  /*pixelShader == NULL ?*/ GetPixelShader(resolvedPath) /*: pixelShader*/;
+		RagePixelShader_D3D container(resolvedPath);
+		auto _ = container.Compile(D3DXGetPixelShaderProfile(g_pd3dDevice));
+		pixelShader = container.CreateForDevice(g_pd3dDevice);
 	}
 }
 
@@ -2024,7 +1827,7 @@ RageDisplay_D3D::CreateTexture(RagePixelFormat pixfmt,
 							 img->w,
 							 img->h,
 							 RagePixelFormatToString(pixfmt).c_str(),
-							 GetErrorString(hr).c_str());
+		  RageDisplay_D3D_Helpers::GetErrorString(hr).c_str());
 	}
 
 	const auto uTexHandle = reinterpret_cast<intptr_t>(pTex);
