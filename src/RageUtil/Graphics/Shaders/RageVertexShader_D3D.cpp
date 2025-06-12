@@ -9,15 +9,15 @@
 #pragma comment(lib, "d3dx9.lib")
 #endif
 
-HRESULT
-RageVertexShader_D3D::Compile(const std::string& pixelShaderProfile)
+[[nodiscard]] HRESULT
+RageVertexShader_D3D::Compile(const std::string& vertexShaderProfile)
 {
 	LPD3DXBUFFER errorBuffer = nullptr;
 	auto result = D3DXCompileShaderFromFile(m_Path.c_str(),
 											nullptr,
 											nullptr,
 	  RageDisplay_D3D_Helpers::ShaderEntryPoint.data(),
-											pixelShaderProfile.c_str(),
+											vertexShaderProfile.c_str(),
 											0,
 											&m_ShaderBuffer,
 											&errorBuffer,
@@ -26,9 +26,10 @@ RageVertexShader_D3D::Compile(const std::string& pixelShaderProfile)
 	if (result != D3D_OK) {
 		Locator::getLogger()->warn(
 		  "RageVertexShader_D3D D3DXCompileShaderFromFile "
-		  "failed for {} - {}",
+		  "failed for {} - {} (error buffer: {})",
 		  m_Path,
-		  RageDisplay_D3D_Helpers::GetErrorString(result));
+		  RageDisplay_D3D_Helpers::GetErrorString(result),
+		  (char*)errorBuffer->GetBufferPointer());
 		errorBuffer->Release();
 	}
 
@@ -36,8 +37,13 @@ RageVertexShader_D3D::Compile(const std::string& pixelShaderProfile)
 }
 
 IDirect3DVertexShader9*
-RageVertexShader_D3D::CreateForDevice(LPDIRECT3DDEVICE9 device) const
+RageVertexShader_D3D::CreateForDevice(LPDIRECT3DDEVICE9 device,
+									 bool forceRefresh)
 {
+	if (m_Shader != nullptr && !forceRefresh) {
+		return m_Shader;
+	}
+
 	IDirect3DVertexShader9* shader = nullptr;
 	auto result = device->CreateVertexShader(
 	  (const DWORD*)m_ShaderBuffer->GetBufferPointer(), &shader);
@@ -51,6 +57,12 @@ RageVertexShader_D3D::CreateForDevice(LPDIRECT3DDEVICE9 device) const
 		return nullptr;
 	}
 
+	if (m_Shader != nullptr) {
+		m_Shader->Release();
+	}
+
+	m_Shader = shader;
+
 	return shader;
 }
 
@@ -59,5 +71,9 @@ RageVertexShader_D3D::~RageVertexShader_D3D()
 	if (m_ShaderBuffer != nullptr) {
 		m_ShaderBuffer->Release();
 		m_ShaderBuffer = nullptr;
+	}
+	if (m_Shader != nullptr) {
+		m_Shader->Release();
+		m_Shader = nullptr;
 	}
 }

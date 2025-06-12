@@ -17,6 +17,7 @@
 #include "Shaders/RagePixelShader_D3D.h"
 #include "Shaders/RageVertexShader_D3D.h"
 
+#include <optional>
 #include <algorithm>
 #include <map>
 #include <list>
@@ -1034,8 +1035,10 @@ RageDisplay_D3D::DeleteCompiledGeometry(RageCompiledGeometry* p)
 	delete p;
 }
 
-IDirect3DPixelShader9* pixelShader = NULL;
-IDirect3DVertexShader9* vertexShader = NULL;
+IDirect3DPixelShader9* pixelShader = nullptr;
+IDirect3DVertexShader9* vertexShader = nullptr;
+std::optional<RagePixelShader_D3D> pixelContainer;
+std::optional<RageVertexShader_D3D> vertexContainer;
 
 void
 RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
@@ -1047,14 +1050,24 @@ RageDisplay_D3D::SetShaderFromPath(std::filesystem::path path,
 	auto resolvedPath = FILEMAN->ResolvePath(path.string()).substr(1);
 	if (isVertexShader) {
 		usingVertexShader = true;
-		RageVertexShader_D3D container(resolvedPath);
-		auto _ = container.Compile(D3DXGetVertexShaderProfile(g_pd3dDevice));
-		vertexShader = container.CreateForDevice(g_pd3dDevice);
+
+		//if (!vertexContainer.has_value()) {
+			vertexContainer.emplace(resolvedPath);
+			auto _ = vertexContainer->Compile(
+			  D3DXGetVertexShaderProfile(g_pd3dDevice));
+			vertexShader =
+			  vertexContainer->CreateForDevice(g_pd3dDevice, false);
+		//}
 	} else {
 		usingPixelShader = true;
-		RagePixelShader_D3D container(resolvedPath);
-		auto _ = container.Compile(D3DXGetPixelShaderProfile(g_pd3dDevice));
-		pixelShader = container.CreateForDevice(g_pd3dDevice);
+
+
+		//if (!pixelContainer.has_value()) {
+			pixelContainer.emplace(resolvedPath);
+			auto _ =
+			  pixelContainer->Compile(D3DXGetPixelShaderProfile(g_pd3dDevice));
+			pixelShader = pixelContainer->CreateForDevice(g_pd3dDevice, false);
+		//}
 	}
 }
 
