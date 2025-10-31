@@ -73,6 +73,11 @@ add_subdirectory(newogg)
 add_subdirectory(newvorbis)
 target_link_libraries(vorbis ogg)
 
+add_subdirectory(Vulkan-Headers)
+add_subdirectory(volk)
+add_subdirectory(VulkanMemoryAllocator)
+add_subdirectory(glm)
+
 # Only enable crashpad if the user wants it.
 if(WITH_CRASHPAD)
     add_subdirectory(crashpad)
@@ -82,14 +87,14 @@ if(MSVC) # Only required on Windows
     add_subdirectory(ffmpeg)
 endif()
 
-
 ## IDE Folder Organization
 list(APPEND EXT_TARGETS
     SQLiteCpp sqlite3
     discord-rpc muFFT
     zlib libmad pcre
     ogg vorbis glfw
-    fmt)
+    fmt 
+    Vulkan-Headers volk VulkanMemoryAllocator glm)
 
 list(APPEND LUA_TARGETS luajit libluajit minilua buildvm)
 
