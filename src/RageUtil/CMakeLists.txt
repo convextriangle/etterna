@@ -71,6 +71,7 @@ list(APPEND SMDATA_RAGE_GRAPHICS_SRC
   "Graphics/Display/CommandBatcher.cpp"
   "Graphics/Display/Display.cpp"
   "Graphics/Display/RenderState.cpp"
+  "Graphics/RendererVK/RendererVK.cpp"
 )
 list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/RageBitmapTexture.h"
@@ -108,16 +109,12 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/Display/Display.h"
   "Graphics/Display/Renderer.h"
   "Graphics/Display/DrawCommand.h"
+  "Graphics/RendererVK/RendererVK.h"
 )
 
 if(WIN32)
   list(APPEND SMDATA_RAGE_GRAPHICS_SRC "Graphics/RageDisplay_D3D.cpp")
   list(APPEND SMDATA_RAGE_GRAPHICS_HPP "Graphics/RageDisplay_D3D.h")
-  list(APPEND SMDATA_RAGE_GRAPHICS_SRC "Graphics/RendererDX12/RendererDX12.cpp")
-  list(APPEND SMDATA_RAGE_GRAPHICS_HPP "Graphics/RendererDX12/RendererDX12.h")
-  list(APPEND SMDATA_RAGE_GRAPHICS_HPP "Graphics/RendererDX12/BufferHelperDX12.h")
-  list(APPEND SMDATA_RAGE_GRAPHICS_SRC "Graphics/RendererDX12/UtilsDX12.cpp")
-  list(APPEND SMDATA_RAGE_GRAPHICS_HPP "Graphics/RendererDX12/UtilsDX12.h")
 endif()
 
 source_group("Rage\\\\Graphics" FILES ${SMDATA_RAGE_GRAPHICS_SRC} ${SMDATA_RAGE_GRAPHICS_HPP})

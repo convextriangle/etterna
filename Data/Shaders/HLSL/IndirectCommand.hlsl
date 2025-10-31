@@ -52,7 +52,7 @@ StructuredBuffer<RenderState> RenderStateBuffer : register(t2);
 Texture2D Textures[] : register(t3);
 StructuredBuffer<DrawCommandArgument> InputCommandArgBuffer : register(t4);
 
-// matches RendererDX12::ComputeShaderThreadCount
+// matches RendererVK::ComputeShaderThreadCount
 #define ThreadCount 64
 [numthreads(ThreadCount, 1, 1)]
 void CSMain(uint3 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)

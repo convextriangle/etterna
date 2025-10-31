@@ -29,6 +29,8 @@
 #include "RageUtil/Graphics/RageSurface_Load.h"
 #include "Etterna/Screen/Others/Screen.h"
 #include "Etterna/Globals/GameLoop.h"
+#include "RageUtil/Graphics/Display/Display.h"
+#include "RageUtil/Graphics/RendererVK/RendererVK.h"
 
 #if !defined(SUPPORT_OPENGL) && !defined(SUPPORT_D3D)
 #define SUPPORT_OPENGL
@@ -413,8 +415,6 @@ AdjustForChangedSystemCapabilities()
 
 #ifdef _WIN32
 #include "RageUtil/Graphics/RageDisplay_D3D.h"
-#include "RageUtil/Graphics/Display/Display.h"
-#include "RageUtil/Graphics/RendererDX12/RendererDX12.h"
 #include "archutils/Win32/VideoDriverInfo.h"
 #endif
 
@@ -813,9 +813,9 @@ CreateDisplay()
 #if defined(SUPPORT_D3D)
 				pRet = new RageDisplay_D3D;
 #endif
-			} else if (CompareNoCase(sRenderer, "unstable_d3d") == 0) {
+			} else if (CompareNoCase(sRenderer, "unstable_vk") == 0) {
 #if defined(SUPPORT_D3D)
-				pRet = new Display::Display(std::make_unique<RendererDX12>());
+				pRet = new Display::Display(std::make_unique<RendererVK>());
 #endif
 			} else if (CompareNoCase(sRenderer, "null") == 0) {
 				return new RageDisplay_Null;
