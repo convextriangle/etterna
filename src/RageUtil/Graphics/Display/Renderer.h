@@ -3,6 +3,7 @@
 
 #include <string>
 #include "RageUtil/Graphics/RageDisplay.h"
+#include "RageUtil/Graphics/Display/CommandBatcher.h"
 #include "TextureCommand.h"
 
 namespace Display {
