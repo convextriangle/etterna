@@ -8,7 +8,6 @@
 
 #define VOLK_IMPLEMENTATION
 #include <Volk/volk.h>
-#include <vulkan/vulkan_win32.h>
 
 std::string
 RendererVK::GetApiDescription() const

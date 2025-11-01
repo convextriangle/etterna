@@ -73,10 +73,7 @@ add_subdirectory(newogg)
 add_subdirectory(newvorbis)
 target_link_libraries(vorbis ogg)
 
-add_subdirectory(Vulkan-Headers)
-add_subdirectory(volk)
-add_subdirectory(VulkanMemoryAllocator)
-add_subdirectory(glm)
+add_subdirectory(Vulkan-Hpp)
 
 # Only enable crashpad if the user wants it.
 if(WITH_CRASHPAD)
@@ -94,7 +91,7 @@ list(APPEND EXT_TARGETS
     zlib libmad pcre
     ogg vorbis glfw
     fmt 
-    Vulkan-Headers volk VulkanMemoryAllocator glm)
+    Vulkan-Hpp)
 
 list(APPEND LUA_TARGETS luajit libluajit minilua buildvm)
 

@@ -115,10 +115,7 @@ target_link_libraries(Etterna PRIVATE plog::plog)
 target_link_libraries(Etterna PRIVATE nowide::nowide)
 target_link_libraries(Etterna PRIVATE ghc_filesystem)
 
-target_link_libraries(Etterna PRIVATE Vulkan-Headers)
-target_link_libraries(Etterna PRIVATE volk_headers)
-target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
-target_link_libraries(Etterna PRIVATE glm)
+target_link_libraries(Etterna PRIVATE Vulkan-Hpp)
 
 if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
   target_link_libraries(Etterna PRIVATE sse2neon)
