@@ -74,7 +74,6 @@ std::string Display::Display::TryVideoMode(const VideoModeParams &p, bool &bNewD
 #endif
 
     m_Renderer->FinishLoadingPipeline(p);
-    m_Renderer->LoadAssets(p);
 
     ResolutionChanged();
 

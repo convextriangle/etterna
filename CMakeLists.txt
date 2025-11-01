@@ -115,7 +115,9 @@ target_link_libraries(Etterna PRIVATE plog::plog)
 target_link_libraries(Etterna PRIVATE nowide::nowide)
 target_link_libraries(Etterna PRIVATE ghc_filesystem)
 
-target_link_libraries(Etterna PRIVATE Vulkan-Hpp)
+target_link_libraries(Etterna PRIVATE vk-bootstrap::vk-bootstrap)
+find_package(Vulkan)
+target_link_libraries(Etterna PRIVATE Vulkan::Vulkan)
 
 if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
   target_link_libraries(Etterna PRIVATE sse2neon)

@@ -23,7 +23,7 @@ void Display::CommandBatcher::InsertSpriteDrawCommand(DrawMode drawMode, MatrixS
     //	  and most of the ye olde draw modes aren't supported
     //    so just convert to a triangle list
     // -- unrolled loops look funny though
-    // -- maybe this can be done on the GPU via mesh shaders and/or work graphs but that's for unstable_d3d_mintyfresh
+    // -- maybe this can be done on the GPU via mesh shaders and/or work graphs but that's for unstable_vk_mintyfresh
     switch (drawMode)
     {
     case DrawMode::Triangles: {

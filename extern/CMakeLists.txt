@@ -73,7 +73,7 @@ add_subdirectory(newogg)
 add_subdirectory(newvorbis)
 target_link_libraries(vorbis ogg)
 
-add_subdirectory(Vulkan-Hpp)
+add_subdirectory(vk-bootstrap)
 
 # Only enable crashpad if the user wants it.
 if(WITH_CRASHPAD)
@@ -91,7 +91,7 @@ list(APPEND EXT_TARGETS
     zlib libmad pcre
     ogg vorbis glfw
     fmt 
-    Vulkan-Hpp)
+    vk-bootstrap)
 
 list(APPEND LUA_TARGETS luajit libluajit minilua buildvm)
 

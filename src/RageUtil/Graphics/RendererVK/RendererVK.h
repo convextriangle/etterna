@@ -4,12 +4,23 @@
 #include "RageUtil/Graphics/Display/Renderer.h"
 #include "RageUtil/Graphics/Display/TextureCommand.h"
 
-#define VK_NO_PROTOTYPES
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
 #endif
-#include "vulkan/vulkan.h"
-#include <optional>
+#include <VkBootstrap.h>
+#include <array>
+
+struct FrameData
+{
+	VkCommandPool CommandPool;
+	VkCommandBuffer MainCommandBuffer;
+
+	VkSemaphore SwapchainSemaphore;
+	VkSemaphore RenderSemaphore;
+	VkFence RenderFence;
+};
+
+constexpr size_t FRAME_OVERLAP = 2;
 
 class RendererVK : public Display::Renderer
 {
@@ -17,7 +28,6 @@ class RendererVK : public Display::Renderer
 	std::string GetApiDescription() const override;
 	void StartLoadingPipeline() override;
 	void FinishLoadingPipeline(const VideoModeParams& p) override;
-	void LoadAssets(const VideoModeParams& p) override;
 	void OnRender(const ActualVideoModeParams* p,
 				  const Display::CommandBatcher& batcher) override;
 	bool IsD3DInternal() override;
@@ -27,49 +37,32 @@ class RendererVK : public Display::Renderer
 	~RendererVK() override;
 
   private:
-	VkInstance m_Instance = VK_NULL_HANDLE;
-	void CreateVulkanInstance();
+	  VkInstance m_Instance;
+	  VkDebugUtilsMessengerEXT m_DebugMessenger;
+	  VkPhysicalDevice m_GPU;
+	  VkDevice m_Device;
+	  VkSurfaceKHR m_Surface;
 
-#ifndef NDEBUG
-	VkDebugUtilsMessengerEXT m_DebugMessenger;
-	void LoadDebugMessenger();
-#endif
+	  VkSwapchainKHR m_Swapchain;
+	  VkFormat m_SwapchainImageFormat;
+	  std::vector<VkImage> m_SwapchainImages;
+	  std::vector<VkImageView> m_SwapchainImageViews;
+	  VkExtent2D m_SwapchainExtent;
 
-	VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
-	bool IsDeviceSuitable(VkPhysicalDevice device);
-	void PickPhysicalDevice();
+	  void InitVulkan();
+	  void InitSwapchain(const VideoModeParams& p);
+	  void InitCommands();
+	  void InitSyncStructures();
 
-	VkDevice m_Device = VK_NULL_HANDLE;
-	void InitDevice();
+	  void CreateSwapchain(size_t width, size_t height);
+	  void DestroySwapchain();
 
-	struct VkQueueFamilyIndices
-	{
-		std::optional<uint32_t> graphicsFamily;
-		std::optional<uint32_t> presentFamily;
-	};
+	  std::array<FrameData, FRAME_OVERLAP> m_Frames;
+	  FrameData& GetCurrentFrame();
+	  size_t m_FrameNumber = 0;
 
-	VkQueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
-
-	VkQueue m_GraphicsQueue;
-	VkQueue m_PresentQueue;
-
-	VkSurfaceKHR m_Surface;
-	void CreateSurface();
-
-	struct SwapChainSupportInfo
-	{
-		VkSurfaceCapabilitiesKHR capabilities;
-		std::vector<VkSurfaceFormatKHR> formats;
-		std::vector<VkPresentModeKHR> presentModes;
-	};
-
-	SwapChainSupportInfo QuerySwapChainSupport(VkPhysicalDevice device);
-	VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
-	VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& formats);
-	VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-
-	VkSwapchainKHR m_SwapChain;
-	void CreateSwapChain();
+	  VkQueue m_GraphicsQueue;
+	  uint32_t m_GraphicsQueueFamily;
 };
 
 #endif
