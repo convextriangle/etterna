@@ -116,6 +116,7 @@ target_link_libraries(Etterna PRIVATE nowide::nowide)
 target_link_libraries(Etterna PRIVATE ghc_filesystem)
 
 target_link_libraries(Etterna PRIVATE vk-bootstrap::vk-bootstrap)
+target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
 find_package(Vulkan)
 target_link_libraries(Etterna PRIVATE Vulkan::Vulkan)
 

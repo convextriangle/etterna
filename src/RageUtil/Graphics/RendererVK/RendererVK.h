@@ -8,8 +8,10 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 #endif
 #include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
 #include <VkBootstrap.h>
 #include <array>
+#include "VkUtils.h"
 
 struct FrameData
 {
@@ -19,6 +21,7 @@ struct FrameData
 	VkSemaphore SwapchainSemaphore;
 	VkSemaphore RenderSemaphore;
 	VkFence RenderFence;
+	DeletionQueue InfoDeletion;
 };
 
 constexpr size_t FRAME_OVERLAP = 2;
@@ -63,6 +66,13 @@ class RendererVK : public Display::Renderer
 
 	  VkQueue m_GraphicsQueue;
 	  uint32_t m_GraphicsQueueFamily;
+
+	  DeletionQueue m_MainDeletionQueue;
+	  VmaAllocator m_Allocator;
+
+	  AllocatedImage m_DrawImage;
+	  VkExtent2D m_DrawExtent;
+	  void HandleDrawCommands(VkCommandBuffer buffer);
 };
 
 #endif

@@ -1,3 +1,4 @@
+#define VMA_IMPLEMENTATION
 #include "RendererVK.h"
 
 // no penguin (For Now (TM))
@@ -5,7 +6,6 @@
 #include "Core/Services/Locator.hpp"
 #include <source_location>
 #include <format>
-#include "VkUtils.h"
 #include <numbers>
 
 constexpr uint64_t Timeout = 1000'000'000;
@@ -62,6 +62,9 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 {
 	ThrowIfFail(vkWaitForFences(
 	  m_Device, 1, &GetCurrentFrame().RenderFence, true, Timeout));
+
+	GetCurrentFrame().InfoDeletion.FlushCallbacks();
+
 	ThrowIfFail(vkResetFences(m_Device, 1, &GetCurrentFrame().RenderFence));
 
 	uint32_t swapchainImageIndex = 0;
@@ -78,31 +81,38 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 	auto beginInfo =
 	  GetCommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
+	m_DrawExtent.width = p->width;
+	m_DrawExtent.height = p->height;
+
 	ThrowIfFail(vkBeginCommandBuffer(buffer, &beginInfo));
+
+	TransitionImage(buffer,
+					m_DrawImage.Image,
+					VK_IMAGE_LAYOUT_UNDEFINED,
+					VK_IMAGE_LAYOUT_GENERAL);
+
+	HandleDrawCommands(buffer);
+
+	TransitionImage(buffer,
+					m_DrawImage.Image,
+					VK_IMAGE_LAYOUT_GENERAL,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 	TransitionImage(buffer,
 					m_SwapchainImages[swapchainImageIndex],
 					VK_IMAGE_LAYOUT_UNDEFINED,
-					VK_IMAGE_LAYOUT_GENERAL);
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-	VkClearColorValue clearValue;
-	float flash = 0.5f + std::sin(m_FrameNumber / 1000.0f) * 0.5f;
-	clearValue = { { flash, 0.0f, 1.0f, 1.0f } };
-
-	VkImageSubresourceRange clearRange =
-	  GetImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-
-	vkCmdClearColorImage(buffer,
-						 m_SwapchainImages[swapchainImageIndex],
-						 VK_IMAGE_LAYOUT_GENERAL,
-						 &clearValue,
-						 1,
-						 &clearRange);
+	CopyImageToImage(buffer,
+					 m_DrawImage.Image,
+					 m_SwapchainImages[swapchainImageIndex],
+					 m_DrawExtent,
+					 m_SwapchainExtent);
 
 	TransitionImage(buffer,
-					m_SwapchainImages[swapchainImageIndex],
-					VK_IMAGE_LAYOUT_GENERAL,
-					VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+				m_SwapchainImages[swapchainImageIndex],
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	ThrowIfFail(vkEndCommandBuffer(buffer));
 
@@ -154,7 +164,11 @@ RendererVK::~RendererVK()
 		vkDestroyFence(m_Device, m_Frames[i].RenderFence, nullptr);
 		vkDestroySemaphore(m_Device, m_Frames[i].RenderSemaphore, nullptr);
 		vkDestroySemaphore(m_Device, m_Frames[i].SwapchainSemaphore, nullptr);
+
+		m_Frames[i].InfoDeletion.FlushCallbacks();
 	}
+
+	m_MainDeletionQueue.FlushCallbacks();
 
 	DestroySwapchain();
 	vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
@@ -222,12 +236,60 @@ RendererVK::InitVulkan()
 	m_GraphicsQueue = deviceResult->get_queue(vkb::QueueType::graphics).value();
 	m_GraphicsQueueFamily =
 	  deviceResult->get_queue_index(vkb::QueueType::graphics).value();
+
+	VmaAllocatorCreateInfo allocatorInfo = {};
+	allocatorInfo.physicalDevice = m_GPU;
+	allocatorInfo.device = m_Device;
+	allocatorInfo.instance = m_Instance;
+	allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+	ThrowIfFail(vmaCreateAllocator(&allocatorInfo, &m_Allocator));
+
+	m_MainDeletionQueue.PushDeletionCallback(
+	  [&]() { vmaDestroyAllocator(m_Allocator);
+		});
 }
 
 void
 RendererVK::InitSwapchain(const VideoModeParams& p)
 {
 	CreateSwapchain(p.width, p.height);
+
+	VkExtent3D extent = { p.width, p.height, 1 };
+
+	m_DrawImage.ImageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+	m_DrawImage.ImageExtent = extent;
+
+	VkImageUsageFlags drawImageUsages{};
+	drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+	drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	VkImageCreateInfo imageInfo = GetImageCreateInfo(
+	  m_DrawImage.ImageFormat, drawImageUsages, extent);
+
+	VmaAllocationCreateInfo imageAllocInfo = {};
+	imageAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+	imageAllocInfo.requiredFlags =
+	  VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	ThrowIfFail(vmaCreateImage(m_Allocator,
+							   &imageInfo,
+							   &imageAllocInfo,
+							   &m_DrawImage.Image,
+							   &m_DrawImage.Allocation,
+							   nullptr));
+
+	VkImageViewCreateInfo viewInfo = GetImageViewCreateInfo(
+		m_DrawImage.ImageFormat, m_DrawImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
+
+	ThrowIfFail(
+	  vkCreateImageView(m_Device, &viewInfo, nullptr, &m_DrawImage.ImageView));
+
+	m_MainDeletionQueue.PushDeletionCallback([=]() {
+		vkDestroyImageView(m_Device, m_DrawImage.ImageView, nullptr);
+		vmaDestroyImage(m_Allocator, m_DrawImage.Image, m_DrawImage.Allocation);
+	});
 }
 
 void
@@ -305,4 +367,22 @@ FrameData&
 RendererVK::GetCurrentFrame()
 {
 	return m_Frames[m_FrameNumber % FRAME_OVERLAP];
+}
+
+void
+RendererVK::HandleDrawCommands(VkCommandBuffer buffer)
+{
+	VkClearColorValue clearValue;
+	float flash = 0.5f + std::sin(m_FrameNumber / 1000.0f) * 0.5f;
+	clearValue = { { flash, 0.0f, 1.0f, 1.0f } };
+
+	VkImageSubresourceRange clearRange =
+	  GetImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+
+	vkCmdClearColorImage(buffer,
+						 m_DrawImage.Image,
+						 VK_IMAGE_LAYOUT_GENERAL,
+						 &clearValue,
+						 1,
+						 &clearRange);
 }
