@@ -299,9 +299,7 @@ DescriptorLayoutBuilder::Build(VkDevice device,
 }
 
 void
-ThrowIfFail(
-  VkResult result,
-  const std::source_location location)
+ThrowIfFail(VkResult result, const std::source_location location)
 {
 	if (result == VK_SUCCESS) {
 		return;

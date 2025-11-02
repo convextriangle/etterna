@@ -40,45 +40,45 @@ class RendererVK : public Display::Renderer
 	~RendererVK() override;
 
   private:
-	  VkInstance m_Instance;
-	  VkDebugUtilsMessengerEXT m_DebugMessenger;
-	  VkPhysicalDevice m_GPU;
-	  VkDevice m_Device;
-	  VkSurfaceKHR m_Surface;
+	VkInstance m_Instance;
+	VkDebugUtilsMessengerEXT m_DebugMessenger;
+	VkPhysicalDevice m_GPU;
+	VkDevice m_Device;
+	VkSurfaceKHR m_Surface;
 
-	  VkSwapchainKHR m_Swapchain;
-	  VkFormat m_SwapchainImageFormat;
-	  std::vector<VkImage> m_SwapchainImages;
-	  std::vector<VkImageView> m_SwapchainImageViews;
-	  VkExtent2D m_SwapchainExtent;
+	VkSwapchainKHR m_Swapchain;
+	VkFormat m_SwapchainImageFormat;
+	std::vector<VkImage> m_SwapchainImages;
+	std::vector<VkImageView> m_SwapchainImageViews;
+	VkExtent2D m_SwapchainExtent;
 
-	  void InitVulkan();
-	  void InitSwapchain(const VideoModeParams& p);
-	  void InitCommands();
-	  void InitSyncStructures();
+	void InitVulkan();
+	void InitSwapchain(const VideoModeParams& p);
+	void InitCommands();
+	void InitSyncStructures();
 
-	  void CreateSwapchain(size_t width, size_t height);
-	  void DestroySwapchain();
+	void CreateSwapchain(size_t width, size_t height);
+	void DestroySwapchain();
 
-	  std::array<FrameData, FRAME_OVERLAP> m_Frames;
-	  FrameData& GetCurrentFrame();
-	  size_t m_FrameNumber = 0;
+	std::array<FrameData, FRAME_OVERLAP> m_Frames;
+	FrameData& GetCurrentFrame();
+	size_t m_FrameNumber = 0;
 
-	  VkQueue m_GraphicsQueue;
-	  uint32_t m_GraphicsQueueFamily;
+	VkQueue m_GraphicsQueue;
+	uint32_t m_GraphicsQueueFamily;
 
-	  DeletionQueue m_MainDeletionQueue;
-	  VmaAllocator m_Allocator;
+	DeletionQueue m_MainDeletionQueue;
+	VmaAllocator m_Allocator;
 
-	  AllocatedImage m_DrawImage;
-	  VkExtent2D m_DrawExtent;
-	  void HandleDrawCommands(VkCommandBuffer buffer);
+	AllocatedImage m_DrawImage;
+	VkExtent2D m_DrawExtent;
+	void HandleDrawCommands(VkCommandBuffer buffer);
 
-	  DescriptorAllocator m_GlobalDescriptorAllocator;
-	  VkDescriptorSet m_DrawImageDescriptors;
-	  VkDescriptorSetLayout m_DrawImageDescriptorLayout;
+	DescriptorAllocator m_GlobalDescriptorAllocator;
+	VkDescriptorSet m_DrawImageDescriptors;
+	VkDescriptorSetLayout m_DrawImageDescriptorLayout;
 
-	  void InitDescriptors();
+	void InitDescriptors();
 };
 
 #endif

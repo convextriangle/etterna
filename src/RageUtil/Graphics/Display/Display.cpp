@@ -35,6 +35,11 @@ void Display::Display::ResolutionChanged()
 
 bool Display::Display::BeginFrame()
 {
+#ifdef _WIN32
+	GraphicsWindow::Update();
+#else
+#error todo
+#endif
     m_Batcher.Clear();
     m_RenderState.cullMode = CULL_NONE;
     m_RenderState.zTestMode = ZTEST_OFF;

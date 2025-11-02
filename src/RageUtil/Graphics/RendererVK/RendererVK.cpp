@@ -79,9 +79,9 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 					 m_SwapchainExtent);
 
 	TransitionImage(buffer,
-				m_SwapchainImages[swapchainImageIndex],
+					m_SwapchainImages[swapchainImageIndex],
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+					VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	ThrowIfFail(vkEndCommandBuffer(buffer));
 
@@ -152,11 +152,12 @@ RendererVK::InitVulkan()
 {
 	vkb::InstanceBuilder builder;
 
-	auto instanceResult = builder.request_validation_layers(true)
-							.use_default_debug_messenger()
-							.require_api_version(1, 3, 0)
-							.enable_extension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
-							.build();
+	auto instanceResult =
+	  builder.request_validation_layers(true)
+		.use_default_debug_messenger()
+		.require_api_version(1, 3, 0)
+		.enable_extension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
+		.build();
 	if (!instanceResult) {
 		Fail();
 	}
@@ -214,8 +215,7 @@ RendererVK::InitVulkan()
 	ThrowIfFail(vmaCreateAllocator(&allocatorInfo, &m_Allocator));
 
 	m_MainDeletionQueue.PushDeletionCallback(
-	  [&]() { vmaDestroyAllocator(m_Allocator);
-		});
+	  [&]() { vmaDestroyAllocator(m_Allocator); });
 }
 
 void
@@ -234,8 +234,8 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 	drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
 	drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-	VkImageCreateInfo imageInfo = GetImageCreateInfo(
-	  m_DrawImage.ImageFormat, drawImageUsages, extent);
+	VkImageCreateInfo imageInfo =
+	  GetImageCreateInfo(m_DrawImage.ImageFormat, drawImageUsages, extent);
 
 	VmaAllocationCreateInfo imageAllocInfo = {};
 	imageAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -250,7 +250,7 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 							   nullptr));
 
 	VkImageViewCreateInfo viewInfo = GetImageViewCreateInfo(
-		m_DrawImage.ImageFormat, m_DrawImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
+	  m_DrawImage.ImageFormat, m_DrawImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	ThrowIfFail(
 	  vkCreateImageView(m_Device, &viewInfo, nullptr, &m_DrawImage.ImageView));
@@ -372,8 +372,8 @@ RendererVK::InitDescriptors()
 		  builder.Build(m_Device, VK_SHADER_STAGE_COMPUTE_BIT);
 	}
 
-	m_DrawImageDescriptors =
-	  m_GlobalDescriptorAllocator.Allocate(m_Device, m_DrawImageDescriptorLayout);
+	m_DrawImageDescriptors = m_GlobalDescriptorAllocator.Allocate(
+	  m_Device, m_DrawImageDescriptorLayout);
 
 	VkDescriptorImageInfo imageInfo{};
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
