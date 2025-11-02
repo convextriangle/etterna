@@ -120,6 +120,13 @@ target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
 find_package(Vulkan)
 target_link_libraries(Etterna PRIVATE Vulkan::Vulkan)
 target_link_libraries(Etterna PRIVATE shaderc)
+add_custom_command(
+    TARGET Etterna
+    PRE_BUILD
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/extern/shaderc/utils/git-sync-deps
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Fetching shaderc dependencies using git-sync-deps"
+)
 
 if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
   target_link_libraries(Etterna PRIVATE sse2neon)

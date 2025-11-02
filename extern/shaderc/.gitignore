@@ -8,5 +8,6 @@ compile_commands.json
 cscope.*
 android_test/libs
 android_test/include
+third_party/
 .DS_Store
 .vscode/
