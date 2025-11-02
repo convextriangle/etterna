@@ -73,6 +73,12 @@ class RendererVK : public Display::Renderer
 	  AllocatedImage m_DrawImage;
 	  VkExtent2D m_DrawExtent;
 	  void HandleDrawCommands(VkCommandBuffer buffer);
+
+	  DescriptorAllocator m_GlobalDescriptorAllocator;
+	  VkDescriptorSet m_DrawImageDescriptors;
+	  VkDescriptorSetLayout m_DrawImageDescriptorLayout;
+
+	  void InitDescriptors();
 };
 
 #endif

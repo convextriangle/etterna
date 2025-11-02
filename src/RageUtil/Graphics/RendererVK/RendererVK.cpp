@@ -4,7 +4,6 @@
 // no penguin (For Now (TM))
 #include "archutils/Win32/GraphicsWindow.h"
 #include "Core/Services/Locator.hpp"
-#include <source_location>
 #include <format>
 #include <numbers>
 
@@ -16,37 +15,6 @@ RendererVK::GetApiDescription() const
 	return "Vulkan";
 }
 
-static void
-ThrowIfFail(
-  VkResult result,
-  const std::source_location location = std::source_location::current())
-{
-	if (result == VK_SUCCESS) {
-		return;
-	}
-
-	const std::string message =
-	  std::format("RendererVK failed: VkResult {} at {}:{} in function {}",
-				  static_cast<int>(result),
-				  location.file_name(),
-				  location.line(),
-				  location.function_name());
-	Locator::getLogger()->error(message);
-	throw std::runtime_error(message.c_str());
-}
-
-static void
-Fail(const std::source_location location = std::source_location::current())
-{
-	const std::string message =
-	  std::format("RendererVK failed at {}:{} in function {}",
-				  location.file_name(),
-				  location.line(),
-				  location.function_name());
-	Locator::getLogger()->error(message);
-	throw std::runtime_error(message.c_str());
-}
-
 void
 RendererVK::InitializeRenderer(const VideoModeParams& p)
 {
@@ -54,6 +22,7 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 	InitSwapchain(p);
 	InitCommands();
 	InitSyncStructures();
+	InitDescriptors();
 }
 
 void
@@ -385,4 +354,47 @@ RendererVK::HandleDrawCommands(VkCommandBuffer buffer)
 						 &clearValue,
 						 1,
 						 &clearRange);
+}
+
+void
+RendererVK::InitDescriptors()
+{
+	std::vector<DescriptorAllocator::PoolSizeRatio> sizes = {
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 }
+	};
+
+	m_GlobalDescriptorAllocator.InitPool(m_Device, 10, sizes);
+
+	{
+		DescriptorLayoutBuilder builder;
+		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+		m_DrawImageDescriptorLayout =
+		  builder.Build(m_Device, VK_SHADER_STAGE_COMPUTE_BIT);
+	}
+
+	m_DrawImageDescriptors =
+	  m_GlobalDescriptorAllocator.Allocate(m_Device, m_DrawImageDescriptorLayout);
+
+	VkDescriptorImageInfo imageInfo{};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imageInfo.imageView = m_DrawImage.ImageView;
+
+	VkWriteDescriptorSet drawImageWrite = {};
+	drawImageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	drawImageWrite.pNext = nullptr;
+
+	drawImageWrite.dstBinding = 0;
+	drawImageWrite.dstSet = m_DrawImageDescriptors;
+	drawImageWrite.descriptorCount = 1;
+	drawImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	drawImageWrite.pImageInfo = &imageInfo;
+
+	vkUpdateDescriptorSets(m_Device, 1, &drawImageWrite, 0, nullptr);
+
+	m_MainDeletionQueue.PushDeletionCallback([&]() {
+		m_GlobalDescriptorAllocator.DestroyPool(m_Device);
+
+		vkDestroyDescriptorSetLayout(
+		  m_Device, m_DrawImageDescriptorLayout, nullptr);
+	});
 }

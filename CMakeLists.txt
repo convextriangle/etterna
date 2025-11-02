@@ -119,6 +119,7 @@ target_link_libraries(Etterna PRIVATE vk-bootstrap::vk-bootstrap)
 target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
 find_package(Vulkan)
 target_link_libraries(Etterna PRIVATE Vulkan::Vulkan)
+target_link_libraries(Etterna PRIVATE shaderc)
 
 if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
   target_link_libraries(Etterna PRIVATE sse2neon)

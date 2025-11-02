@@ -1,10 +1,13 @@
 #ifndef VK_UTILS_H
 #define VK_UTILS_H
 
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.h>
 #include <deque>
 #include <functional>
 #include <vk_mem_alloc.h>
+#include <source_location>
+#include <span>
+#include <shaderc/shaderc.hpp>
 
 VkCommandPoolCreateInfo
 GetCommandPoolCreateInfo(uint32_t queueFamilyIndex,
@@ -68,5 +71,51 @@ CopyImageToImage(VkCommandBuffer buffer,
 				 VkImage dest,
 				 VkExtent2D sourceSize,
 				 VkExtent2D destSize);
+
+struct DescriptorLayoutBuilder
+{
+	std::vector<VkDescriptorSetLayoutBinding> Bindings;
+	void AddBinding(uint32_t binding, VkDescriptorType type);
+	void Clear();
+	VkDescriptorSetLayout Build(VkDevice device,
+								VkShaderStageFlags shaderStages,
+								void* pNext = nullptr,
+								VkDescriptorSetLayoutCreateFlags flags = 0);
+};
+
+void
+ThrowIfFail(
+  VkResult result,
+  const std::source_location location = std::source_location::current());
+
+void
+Fail(const std::source_location location = std::source_location::current());
+
+struct DescriptorAllocator
+{
+	struct PoolSizeRatio
+	{
+		VkDescriptorType type;
+		float ratio;
+	};
+
+	VkDescriptorPool Pool;
+	void InitPool(VkDevice device,
+				  uint32_t maxSets,
+				  std::span<PoolSizeRatio> poolRatios);
+	void DestroyPool(VkDevice device);
+	void ClearDescriptors(VkDevice device);
+	VkDescriptorSet Allocate(VkDevice device, VkDescriptorSetLayout layout);
+};
+
+std::vector<uint32_t>
+CompileShader(const std::string& sourceName,
+			  shaderc_shader_kind shaderKind,
+			  const std::string& source);
+
+VkShaderModule
+LoadShaderFromFile(const std::string& path,
+				   VkDevice device,
+				   shaderc_shader_kind shaderKind);
 
 #endif

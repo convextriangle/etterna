@@ -1,4 +1,8 @@
 #include "VkUtils.h"
+#include <format>
+#include <fstream>
+#include <sstream>
+#include "Core/Services/Locator.hpp"
 
 VkCommandPoolCreateInfo
 GetCommandPoolCreateInfo(uint32_t queueFamilyIndex,
@@ -251,4 +255,170 @@ DeletionQueue::FlushCallbacks()
 	}
 
 	Callbacks.clear();
+}
+
+void
+DescriptorLayoutBuilder::AddBinding(uint32_t binding, VkDescriptorType type)
+{
+	VkDescriptorSetLayoutBinding bind{};
+	bind.binding = binding;
+	bind.descriptorCount = 1;
+	bind.descriptorType = type;
+
+	Bindings.push_back(bind);
+}
+
+void
+DescriptorLayoutBuilder::Clear()
+{
+	Bindings.clear();
+}
+
+VkDescriptorSetLayout
+DescriptorLayoutBuilder::Build(VkDevice device,
+							   VkShaderStageFlags shaderStages,
+							   void* pNext,
+							   VkDescriptorSetLayoutCreateFlags flags)
+{
+	for (auto& binding : Bindings) {
+		binding.stageFlags |= shaderStages;
+	}
+
+	VkDescriptorSetLayoutCreateInfo info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
+	};
+	info.pNext = pNext;
+	info.pBindings = Bindings.data();
+	info.bindingCount = Bindings.size();
+	info.flags = flags;
+
+	VkDescriptorSetLayout set;
+	ThrowIfFail(vkCreateDescriptorSetLayout(device, &info, nullptr, &set));
+
+	return set;
+}
+
+void
+ThrowIfFail(
+  VkResult result,
+  const std::source_location location)
+{
+	if (result == VK_SUCCESS) {
+		return;
+	}
+
+	const std::string message =
+	  std::format("RendererVK failed: VkResult {} at {}:{} in function {}",
+				  static_cast<int>(result),
+				  location.file_name(),
+				  location.line(),
+				  location.function_name());
+	Locator::getLogger()->error(message);
+	throw std::runtime_error(message.c_str());
+}
+
+void
+Fail(const std::source_location location)
+{
+	const std::string message =
+	  std::format("RendererVK failed at {}:{} in function {}",
+				  location.file_name(),
+				  location.line(),
+				  location.function_name());
+	Locator::getLogger()->error(message);
+	throw std::runtime_error(message.c_str());
+}
+
+std::vector<uint32_t>
+CompileShader(const std::string& sourceName,
+			  shaderc_shader_kind shaderKind,
+			  const std::string& source)
+{
+	shaderc::Compiler compiler;
+	shaderc::CompileOptions options;
+
+	auto result = compiler.CompileGlslToSpv(
+	  source, shaderKind, sourceName.c_str(), options);
+
+	if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
+		auto message = std::format("Vulkan GLSL shader compilation failed: {}",
+								   result.GetErrorMessage());
+		throw std::runtime_error(message);
+	}
+
+	return { result.begin(), result.end() };
+}
+
+VkShaderModule
+LoadShaderFromFile(const std::string& path,
+				   VkDevice device,
+				   shaderc_shader_kind shaderKind)
+{
+	std::ifstream inputFile(path);
+	std::stringstream contents;
+	contents << inputFile.rdbuf();
+	auto shaderBlob = CompileShader("meow", shaderKind, contents.str());
+
+	VkShaderModuleCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.pNext = nullptr;
+	createInfo.codeSize = shaderBlob.size() * sizeof(uint32_t);
+	createInfo.pCode = shaderBlob.data();
+
+	VkShaderModule result = {};
+	ThrowIfFail(vkCreateShaderModule(device, &createInfo, nullptr, &result));
+
+	return result;
+}
+
+void
+DescriptorAllocator::InitPool(VkDevice device,
+							  uint32_t maxSets,
+							  std::span<PoolSizeRatio> poolRatios)
+{
+	std::vector<VkDescriptorPoolSize> poolSizes;
+	for (PoolSizeRatio ratio : poolRatios) {
+		poolSizes.push_back(VkDescriptorPoolSize{
+		  .type = ratio.type,
+		  .descriptorCount = uint32_t(ratio.ratio * maxSets) });
+	}
+
+	VkDescriptorPoolCreateInfo pool_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
+	};
+	pool_info.flags = 0;
+	pool_info.maxSets = maxSets;
+	pool_info.poolSizeCount = poolSizes.size();
+	pool_info.pPoolSizes = poolSizes.data();
+
+	ThrowIfFail(vkCreateDescriptorPool(device, &pool_info, nullptr, &Pool));
+}
+
+void
+DescriptorAllocator::DestroyPool(VkDevice device)
+{
+	ThrowIfFail(vkResetDescriptorPool(device, Pool, 0));
+}
+
+void
+DescriptorAllocator::ClearDescriptors(VkDevice device)
+{
+	vkDestroyDescriptorPool(device, Pool, nullptr);
+}
+
+VkDescriptorSet
+DescriptorAllocator::Allocate(VkDevice device, VkDescriptorSetLayout layout)
+{
+	VkDescriptorSetAllocateInfo allocInfo = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
+	};
+	allocInfo.pNext = nullptr;
+	allocInfo.descriptorPool = Pool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &layout;
+
+	VkDescriptorSet set;
+	ThrowIfFail(vkAllocateDescriptorSets(device, &allocInfo, &set));
+
+	return set;
 }
