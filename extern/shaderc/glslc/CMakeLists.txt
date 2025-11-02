@@ -75,4 +75,4 @@ if(SHADERC_ENABLE_INSTALL)
   endif(SHADERC_ENABLE_EXECUTABLES)
 endif(SHADERC_ENABLE_INSTALL)
 
-#add_subdirectory(test)
+add_subdirectory(test)
