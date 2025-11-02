@@ -350,10 +350,16 @@ CompileShader(const std::string& sourceName,
 }
 
 VkShaderModule
-LoadShaderFromFile(const std::string& path,
+LoadShaderFromFile(std::string path,
 				   VkDevice device,
 				   shaderc_shader_kind shaderKind)
 {
+#ifdef _WIN32
+	if (path[0] == '/') {
+		path = path.substr(1);
+	}
+#endif
+
 	std::ifstream inputFile(path);
 	std::stringstream contents;
 	contents << inputFile.rdbuf();

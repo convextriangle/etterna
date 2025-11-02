@@ -114,7 +114,7 @@ CompileShader(const std::string& sourceName,
 			  const std::string& source);
 
 VkShaderModule
-LoadShaderFromFile(const std::string& path,
+LoadShaderFromFile(std::string path,
 				   VkDevice device,
 				   shaderc_shader_kind shaderKind);
 
