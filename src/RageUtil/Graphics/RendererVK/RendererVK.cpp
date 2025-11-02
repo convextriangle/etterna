@@ -5,8 +5,8 @@
 #include "Core/Services/Locator.hpp"
 #include <source_location>
 #include <format>
-#include <vulkan/vulkan_win32.h>
 #include "VkUtils.h"
+#include <numbers>
 
 constexpr uint64_t Timeout = 1000'000'000;
 
@@ -48,15 +48,9 @@ Fail(const std::source_location location = std::source_location::current())
 }
 
 void
-RendererVK::StartLoadingPipeline()
+RendererVK::InitializeRenderer(const VideoModeParams& p)
 {
-	GraphicsWindow::Initialize(false);
 	InitVulkan();
-}
-
-void
-RendererVK::FinishLoadingPipeline(const VideoModeParams& p)
-{
 	InitSwapchain(p);
 	InitCommands();
 	InitSyncStructures();
@@ -92,8 +86,8 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 					VK_IMAGE_LAYOUT_GENERAL);
 
 	VkClearColorValue clearValue;
-	float flash = std::abs(std::sin(m_FrameNumber / 120.f));
-	clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
+	float flash = 0.5f + std::sin(m_FrameNumber / 1000.0f) * 0.5f;
+	clearValue = { { flash, 0.0f, 1.0f, 1.0f } };
 
 	VkImageSubresourceRange clearRange =
 	  GetImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
@@ -136,7 +130,8 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 
 	ThrowIfFail(vkQueuePresentKHR(m_GraphicsQueue, &presentInfo));
 
-	m_FrameNumber = (m_FrameNumber + 1) % FRAME_OVERLAP;
+	// overflow much?
+	m_FrameNumber++;
 }
 
 bool
@@ -177,6 +172,7 @@ RendererVK::InitVulkan()
 	auto instanceResult = builder.request_validation_layers(true)
 							.use_default_debug_messenger()
 							.require_api_version(1, 3, 0)
+							.enable_extension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
 							.build();
 	if (!instanceResult) {
 		Fail();

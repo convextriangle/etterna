@@ -12,8 +12,7 @@ class Renderer
   public:
 	virtual ~Renderer() {}
     virtual [[nodiscard]] std::string GetApiDescription() const = 0;
-    virtual void StartLoadingPipeline() = 0;
-	virtual void FinishLoadingPipeline(const VideoModeParams& p) = 0;
+	virtual void InitializeRenderer(const VideoModeParams& p) = 0;
 	virtual void OnRender(const ActualVideoModeParams* p, const CommandBatcher& batcher) = 0;
 	virtual bool IsD3DInternal() = 0;
 	virtual intptr_t PushTextureCommand(const TextureCommand& command) = 0;

@@ -7,6 +7,7 @@
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
 #endif
+#include <vulkan/vulkan.h>
 #include <VkBootstrap.h>
 #include <array>
 
@@ -26,8 +27,7 @@ class RendererVK : public Display::Renderer
 {
   public:
 	std::string GetApiDescription() const override;
-	void StartLoadingPipeline() override;
-	void FinishLoadingPipeline(const VideoModeParams& p) override;
+	void InitializeRenderer(const VideoModeParams& p) override;
 	void OnRender(const ActualVideoModeParams* p,
 				  const Display::CommandBatcher& batcher) override;
 	bool IsD3DInternal() override;

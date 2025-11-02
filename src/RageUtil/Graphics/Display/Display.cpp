@@ -18,7 +18,7 @@ std::string Display::Display::Init(VideoModeParams &&p, bool bAllowUnaccelerated
     Locator::getLogger()->info("Display::Display::Init()");
     Locator::getLogger()->info("Current renderer: UnstableDisplay - {}", m_Renderer->GetApiDescription());
 
-    m_Renderer->StartLoadingPipeline();
+	GraphicsWindow::Initialize(false);
 
     bool ignored = false;
     return SetVideoMode(std::move(p), ignored);
@@ -73,7 +73,7 @@ std::string Display::Display::TryVideoMode(const VideoModeParams &p, bool &bNewD
 #error Display::Display is unfinished for non-Windows platforms
 #endif
 
-    m_Renderer->FinishLoadingPipeline(p);
+    m_Renderer->InitializeRenderer(p);
 
     ResolutionChanged();
 
