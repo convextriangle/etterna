@@ -51,43 +51,6 @@ struct DeletionQueue
 	void FlushCallbacks();
 };
 
-struct AllocatedImage
-{
-	VkImage Image;
-	VkImageView ImageView;
-	VmaAllocation Allocation;
-	VkExtent3D ImageExtent;
-	VkFormat ImageFormat;
-};
-
-VkImageCreateInfo
-GetImageCreateInfo(VkFormat format,
-				   VkImageUsageFlags usageFlags,
-				   VkExtent3D extent);
-
-VkImageViewCreateInfo
-GetImageViewCreateInfo(VkFormat format,
-					   VkImage image,
-					   VkImageAspectFlags aspectFlags);
-
-void
-CopyImageToImage(VkCommandBuffer buffer,
-				 VkImage source,
-				 VkImage dest,
-				 VkExtent2D sourceSize,
-				 VkExtent2D destSize);
-
-struct DescriptorLayoutBuilder
-{
-	std::vector<VkDescriptorSetLayoutBinding> Bindings;
-	void AddBinding(uint32_t binding, VkDescriptorType type);
-	void Clear();
-	VkDescriptorSetLayout Build(VkDevice device,
-								VkShaderStageFlags shaderStages,
-								void* pNext = nullptr,
-								VkDescriptorSetLayoutCreateFlags flags = 0);
-};
-
 void
 ThrowIfFail(
   VkResult result,
@@ -95,23 +58,6 @@ ThrowIfFail(
 
 void
 Fail(const std::source_location location = std::source_location::current());
-
-struct DescriptorAllocator
-{
-	struct PoolSizeRatio
-	{
-		VkDescriptorType type;
-		float ratio;
-	};
-
-	VkDescriptorPool Pool;
-	void InitPool(VkDevice device,
-				  uint32_t maxSets,
-				  std::span<PoolSizeRatio> poolRatios);
-	void DestroyPool(VkDevice device);
-	void ClearDescriptors(VkDevice device);
-	VkDescriptorSet Allocate(VkDevice device, VkDescriptorSetLayout layout);
-};
 
 std::vector<uint32_t>
 CompileShader(const std::string& sourceName,
@@ -122,5 +68,28 @@ VkShaderModule
 LoadShaderFromFile(std::string path,
 				   VkDevice device,
 				   shaderc_shader_kind shaderKind);
+
+void
+CreateBuffer(VkDevice device,
+			 VkPhysicalDevice gpu,
+			 VkDeviceSize size,
+			 VkBufferUsageFlags usageFlags,
+			 VkMemoryPropertyFlags properties,
+			 VkBuffer& buffer,
+			 VkDeviceMemory& bufferMemory);
+
+void
+CreateDynamicBuffer(VkDevice device,
+					VkPhysicalDevice gpu,
+					VkBuffer& buffer,
+					VkDeviceMemory& bufferMemory, size_t neededSize);
+
+void
+UpdateDynamicBuffer(VkDevice device,
+					VkPhysicalDevice gpu,
+					VkBuffer& buffer,
+					VkDeviceMemory& bufferMemory,
+					const void* data,
+					size_t dataSize);
 
 #endif

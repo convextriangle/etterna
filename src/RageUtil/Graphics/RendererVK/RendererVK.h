@@ -70,15 +70,38 @@ class RendererVK : public Display::Renderer
 	DeletionQueue m_MainDeletionQueue;
 	VmaAllocator m_Allocator;
 
-	AllocatedImage m_DrawImage;
-	VkExtent2D m_DrawExtent;
-	void HandleDrawCommands(VkCommandBuffer buffer);
+	void HandleDrawCommands(VkCommandBuffer buffer, VkImage image, uint32_t drawCount);
 
-	DescriptorAllocator m_GlobalDescriptorAllocator;
-	VkDescriptorSet m_DrawImageDescriptors;
-	VkDescriptorSetLayout m_DrawImageDescriptorLayout;
+	VkBuffer m_IndirectCommands;
+	VkDeviceMemory m_IndirectCommandMemory;
 
-	void InitDescriptors();
+	VkBuffer m_IndirectCommandArguments;
+	VkDeviceMemory m_IndirectCommandArgumentMemory;
+
+	VkBuffer m_SpriteVertices;
+	VkDeviceMemory m_SpriteVertexMemory;
+
+	VkBuffer m_RenderStates;
+	VkDeviceMemory m_RenderStateMemory;
+
+	VkBuffer m_MatrixStates;
+	VkDeviceMemory m_MatrixStateMemory;
+
+	VkDescriptorSetLayout m_BufferDescriptorLayout;
+	VkDescriptorSet m_BufferDescriptorSet;
+	VkDescriptorPool m_DescriptorPool;
+	VkPipelineLayout m_PipelineLayout;
+	VkPipeline m_GraphicsPipeline;
+
+	void InitBufferLayout();
+	void InitPipelineLayout();
+	void CreateDescriptorPool();
+	void CreateDescriptorSet();
+	void InitGraphicsPipeline();
+	VkPipelineVertexInputStateCreateInfo GetSpriteVertexInfo();
+
+	void InitInternalBuffers();
+	void UpdateInternalBuffers(const Display::CommandBatcher& batcher);
 };
 
 #endif

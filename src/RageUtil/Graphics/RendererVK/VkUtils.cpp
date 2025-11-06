@@ -160,87 +160,6 @@ GetSubmitInfo(VkCommandBufferSubmitInfo* cmd,
 	return info;
 }
 
-VkImageCreateInfo
-GetImageCreateInfo(VkFormat format,
-				   VkImageUsageFlags usageFlags,
-				   VkExtent3D extent)
-{
-	VkImageCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	info.pNext = nullptr;
-	info.imageType = VK_IMAGE_TYPE_2D;
-	info.format = format;
-	info.extent = extent;
-	info.mipLevels = 1;
-	info.arrayLayers = 1;
-	info.samples = VK_SAMPLE_COUNT_1_BIT;
-	info.tiling = VK_IMAGE_TILING_OPTIMAL;
-	info.usage = usageFlags;
-
-	return info;
-}
-
-VkImageViewCreateInfo
-GetImageViewCreateInfo(VkFormat format,
-					   VkImage image,
-					   VkImageAspectFlags aspectFlags)
-{
-	VkImageViewCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	info.pNext = nullptr;
-	info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	info.image = image;
-	info.format = format;
-	info.subresourceRange.baseMipLevel = 0;
-	info.subresourceRange.levelCount = 1;
-	info.subresourceRange.baseArrayLayer = 0;
-	info.subresourceRange.layerCount = 1;
-	info.subresourceRange.aspectMask = aspectFlags;
-
-	return info;
-}
-
-void
-CopyImageToImage(VkCommandBuffer buffer,
-				 VkImage source,
-				 VkImage dest,
-				 VkExtent2D sourceSize,
-				 VkExtent2D destSize)
-{
-	VkImageBlit2 blitRegion{ .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
-							 .pNext = nullptr };
-
-	blitRegion.srcOffsets[1].x = sourceSize.width;
-	blitRegion.srcOffsets[1].y = sourceSize.height;
-	blitRegion.srcOffsets[1].z = 1;
-
-	blitRegion.dstOffsets[1].x = destSize.width;
-	blitRegion.dstOffsets[1].y = destSize.height;
-	blitRegion.dstOffsets[1].z = 1;
-
-	blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	blitRegion.srcSubresource.baseArrayLayer = 0;
-	blitRegion.srcSubresource.layerCount = 1;
-	blitRegion.srcSubresource.mipLevel = 0;
-
-	blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	blitRegion.dstSubresource.baseArrayLayer = 0;
-	blitRegion.dstSubresource.layerCount = 1;
-	blitRegion.dstSubresource.mipLevel = 0;
-
-	VkBlitImageInfo2 blitInfo{ .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
-							   .pNext = nullptr };
-	blitInfo.dstImage = dest;
-	blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	blitInfo.srcImage = source;
-	blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-	blitInfo.filter = VK_FILTER_LINEAR;
-	blitInfo.regionCount = 1;
-	blitInfo.pRegions = &blitRegion;
-
-	vkCmdBlitImage2(buffer, &blitInfo);
-}
-
 void
 DeletionQueue::PushDeletionCallback(std::function<void()>&& callback)
 {
@@ -255,47 +174,6 @@ DeletionQueue::FlushCallbacks()
 	}
 
 	Callbacks.clear();
-}
-
-void
-DescriptorLayoutBuilder::AddBinding(uint32_t binding, VkDescriptorType type)
-{
-	VkDescriptorSetLayoutBinding bind{};
-	bind.binding = binding;
-	bind.descriptorCount = 1;
-	bind.descriptorType = type;
-
-	Bindings.push_back(bind);
-}
-
-void
-DescriptorLayoutBuilder::Clear()
-{
-	Bindings.clear();
-}
-
-VkDescriptorSetLayout
-DescriptorLayoutBuilder::Build(VkDevice device,
-							   VkShaderStageFlags shaderStages,
-							   void* pNext,
-							   VkDescriptorSetLayoutCreateFlags flags)
-{
-	for (auto& binding : Bindings) {
-		binding.stageFlags |= shaderStages;
-	}
-
-	VkDescriptorSetLayoutCreateInfo info = {
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
-	};
-	info.pNext = pNext;
-	info.pBindings = Bindings.data();
-	info.bindingCount = Bindings.size();
-	info.flags = flags;
-
-	VkDescriptorSetLayout set;
-	ThrowIfFail(vkCreateDescriptorSetLayout(device, &info, nullptr, &set));
-
-	return set;
 }
 
 void
@@ -375,54 +253,85 @@ LoadShaderFromFile(std::string path,
 	return result;
 }
 
-void
-DescriptorAllocator::InitPool(VkDevice device,
-							  uint32_t maxSets,
-							  std::span<PoolSizeRatio> poolRatios)
+uint32_t
+FindMemoryType(VkPhysicalDevice physicalDevice,
+			   uint32_t typeFilter,
+			   VkMemoryPropertyFlags properties)
 {
-	std::vector<VkDescriptorPoolSize> poolSizes;
-	for (PoolSizeRatio ratio : poolRatios) {
-		poolSizes.push_back(VkDescriptorPoolSize{
-		  .type = ratio.type,
-		  .descriptorCount = uint32_t(ratio.ratio * maxSets) });
+	VkPhysicalDeviceMemoryProperties memoryProps = {};
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProps);
+
+	for (uint32_t i = 0; i < memoryProps.memoryTypeCount; i++) {
+		if ((typeFilter & (1 << i)) &&
+			(memoryProps.memoryTypes[i].propertyFlags & properties) ==
+			  properties) {
+			return i;
+		}
 	}
 
-	VkDescriptorPoolCreateInfo pool_info = {
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO
-	};
-	pool_info.flags = 0;
-	pool_info.maxSets = maxSets;
-	pool_info.poolSizeCount = poolSizes.size();
-	pool_info.pPoolSizes = poolSizes.data();
-
-	ThrowIfFail(vkCreateDescriptorPool(device, &pool_info, nullptr, &Pool));
+	Fail();
 }
 
 void
-DescriptorAllocator::DestroyPool(VkDevice device)
+CreateBuffer(VkDevice device,
+			 VkPhysicalDevice gpu,
+			 VkDeviceSize size,
+			 VkBufferUsageFlags usageFlags,
+			 VkMemoryPropertyFlags properties,
+			 VkBuffer& buffer,
+			 VkDeviceMemory& bufferMemory)
 {
-	ThrowIfFail(vkResetDescriptorPool(device, Pool, 0));
+	VkBufferCreateInfo bufferInfo = {};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = size;
+	bufferInfo.usage = usageFlags;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	ThrowIfFail(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
+
+	VkMemoryRequirements requirements;
+	vkGetBufferMemoryRequirements(device, buffer, &requirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = requirements.size;
+	allocInfo.memoryTypeIndex =
+	  FindMemoryType(gpu, requirements.memoryTypeBits, properties);
+
+	ThrowIfFail(vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory));
+
+	vkBindBufferMemory(device, buffer, bufferMemory, 0);
 }
 
 void
-DescriptorAllocator::ClearDescriptors(VkDevice device)
+CreateDynamicBuffer(VkDevice device,
+					VkPhysicalDevice gpu,
+					VkBuffer& buffer,
+					VkDeviceMemory& bufferMemory,
+					size_t neededSize)
 {
-	vkDestroyDescriptorPool(device, Pool, nullptr);
+	CreateBuffer(device,
+				 gpu,
+				 neededSize,
+				 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+				 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+				   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				 buffer,
+				 bufferMemory);
 }
 
-VkDescriptorSet
-DescriptorAllocator::Allocate(VkDevice device, VkDescriptorSetLayout layout)
+void
+UpdateDynamicBuffer(VkDevice device,
+					VkPhysicalDevice gpu,
+					VkBuffer& buffer,
+					VkDeviceMemory& bufferMemory,
+					const void* data,
+					size_t dataSize)
 {
-	VkDescriptorSetAllocateInfo allocInfo = {
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
-	};
-	allocInfo.pNext = nullptr;
-	allocInfo.descriptorPool = Pool;
-	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &layout;
+	void* mappedData = nullptr;
+	ThrowIfFail(vkMapMemory(device, bufferMemory, 0, dataSize, 0, &mappedData));
 
-	VkDescriptorSet set;
-	ThrowIfFail(vkAllocateDescriptorSets(device, &allocInfo, &set));
+	std::memcpy(mappedData, data, dataSize);
 
-	return set;
+	vkUnmapMemory(device, bufferMemory);
 }
