@@ -105,6 +105,11 @@ class RendererVK : public Display::Renderer
 
 	void InitInternalBuffers();
 	void UpdateInternalBuffers(const Display::CommandBatcher& batcher);
+
+	VkRenderPass m_RenderPass;
+	std::vector<VkFramebuffer> m_Framebuffers;
+	void InitRenderPass();
+	void InitFramebuffers();
 };
 
 #endif

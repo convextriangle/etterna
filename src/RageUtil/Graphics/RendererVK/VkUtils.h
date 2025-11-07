@@ -25,11 +25,6 @@ GetSemaphoreCreateInfo(VkSemaphoreCreateFlags flags);
 VkCommandBufferBeginInfo
 GetCommandBufferBeginInfo(VkCommandBufferUsageFlags flags);
 
-void
-TransitionImage(VkCommandBuffer buffer,
-				VkImage image,
-				VkImageLayout currentLayout,
-				VkImageLayout nextLayout);
 VkImageSubresourceRange
 GetImageSubresourceRange(VkImageAspectFlags aspectFlags);
 
@@ -83,7 +78,8 @@ CreateDynamicBuffer(VkDevice device,
 					VkPhysicalDevice gpu,
 					VkBuffer& buffer,
 					VkDeviceMemory& bufferMemory,
-					size_t neededSize);
+					size_t neededSize,
+					VkBufferUsageFlags usageFlags);
 
 void
 UpdateDynamicBuffer(VkDevice device,
@@ -114,7 +110,7 @@ class PipelineBuilder
 
 	PipelineBuilder() { Clear(); }
 	void Clear();
-	VkPipeline BuildPipeline(VkDevice device);
+	VkPipeline BuildPipeline(VkDevice device, VkRenderPass renderPass);
 	void SetShaders(VkShaderModule vertexShader, VkShaderModule fragmentShader);
 	void SetInputTopology(VkPrimitiveTopology topology);
 	void SetPolygonMode(VkPolygonMode mode);

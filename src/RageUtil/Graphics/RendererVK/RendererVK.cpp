@@ -23,10 +23,13 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 	InitSwapchain(p);
 	InitCommands();
 	InitSyncStructures();
+
 	InitInternalBuffers();
 	InitBufferLayout();
 	CreateDescriptorPool();
 	CreateDescriptorSet();
+	InitRenderPass();
+	InitFramebuffers();
 	InitGraphicsPipeline();
 }
 
@@ -54,28 +57,33 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 
 	ThrowIfFail(vkBeginCommandBuffer(buffer, &beginInfo));
 
-	TransitionImage(buffer,
-					m_SwapchainImages[swapchainImageIndex],
-					VK_IMAGE_LAYOUT_UNDEFINED,
-					VK_IMAGE_LAYOUT_GENERAL);
+	auto currentImage = m_SwapchainImages[swapchainImageIndex];
 
-	HandleDrawCommands(buffer,
-					   m_SwapchainImages[swapchainImageIndex],
-					   batcher.m_IndirectCommandBuffer.size(),
-					   p);
+	VkRenderPassBeginInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = m_RenderPass;
+	renderPassInfo.framebuffer = m_Framebuffers[swapchainImageIndex];
+	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.extent = m_SwapchainExtent;
 
-	TransitionImage(buffer,
-					m_SwapchainImages[swapchainImageIndex],
-					VK_IMAGE_LAYOUT_GENERAL,
-					VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+	std::array<VkClearValue, 1> clearValues;
+	clearValues[0].color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassInfo.pClearValues = clearValues.data();
 
+	vkCmdBeginRenderPass(buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	HandleDrawCommands(
+	  buffer, currentImage, batcher.m_IndirectCommandBuffer.size(), p);
+
+	vkCmdEndRenderPass(buffer);
 	ThrowIfFail(vkEndCommandBuffer(buffer));
 
 	auto bufferInfo = GetCommandBufferSubmitInfo(buffer);
 
-	auto waitInfo = GetSemaphoreSubmitInfo(
-	  VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
-	  GetCurrentFrame().SwapchainSemaphore);
+	auto waitInfo =
+	  GetSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+							 GetCurrentFrame().SwapchainSemaphore);
 	auto signalInfo = GetSemaphoreSubmitInfo(
 	  VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, GetCurrentFrame().RenderSemaphore);
 
@@ -95,8 +103,7 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 
 	ThrowIfFail(vkQueuePresentKHR(m_GraphicsQueue, &presentInfo));
 
-	// overflow much?
-	m_FrameNumber++;
+	m_FrameNumber = (m_FrameNumber + 1) % FRAME_OVERLAP;
 }
 
 bool
@@ -176,23 +183,27 @@ RendererVK::InitVulkan()
 	ThrowIfFail(
 	  vkCreateWin32SurfaceKHR(m_Instance, &createInfo, nullptr, &m_Surface));
 
-	VkPhysicalDeviceVulkan13Features vk13Features{
+	VkPhysicalDeviceVulkan13Features vk13Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES
 	};
 	vk13Features.dynamicRendering = true;
 	vk13Features.synchronization2 = true;
 
-	VkPhysicalDeviceVulkan12Features vk12Features{
+	VkPhysicalDeviceVulkan12Features vk12Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
 	};
 	vk12Features.bufferDeviceAddress = true;
 	vk12Features.descriptorIndexing = true;
 	vk12Features.runtimeDescriptorArray = true;
 
+	VkPhysicalDeviceFeatures vkFeatures = {};
+	vkFeatures.multiDrawIndirect = VK_TRUE;
+
 	vkb::PhysicalDeviceSelector selector(*instanceResult);
 	auto physicalDevice = selector.set_minimum_version(1, 3)
 							.set_required_features_13(vk13Features)
 							.set_required_features_12(vk12Features)
+							.set_required_features(vkFeatures)
 							.set_surface(m_Surface)
 							.select();
 	if (!physicalDevice) {
@@ -330,15 +341,6 @@ RendererVK::HandleDrawCommands(VkCommandBuffer buffer,
 
 	vkCmdSetScissor(buffer, 0, 1, &scissor);
 
-	VkClearColorValue clearValue;
-	clearValue = { { 0.0, 0.0f, 0.0f, 1.0f } };
-
-	VkImageSubresourceRange clearRange =
-	  GetImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-
-	vkCmdClearColorImage(
-	  buffer, image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
-
 	vkCmdBindPipeline(
 	  buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
 
@@ -355,8 +357,13 @@ RendererVK::HandleDrawCommands(VkCommandBuffer buffer,
 							0,
 							nullptr);
 
-	vkCmdDrawIndirect(
-	  buffer, m_IndirectCommands, 0, drawCount, sizeof(Display::DrawCommand));
+	if (drawCount > 0) {
+		vkCmdDrawIndirect(buffer,
+						  m_IndirectCommands,
+						  0,
+						  drawCount,
+						  sizeof(Display::DrawCommand));
+	}
 }
 
 void
@@ -502,7 +509,7 @@ RendererVK::InitGraphicsPipeline()
 
 	pipelineBuilder.m_VertexInfo = GetSpriteVertexInfo();
 
-	m_GraphicsPipeline = pipelineBuilder.BuildPipeline(m_Device);
+	m_GraphicsPipeline = pipelineBuilder.BuildPipeline(m_Device, m_RenderPass);
 
 	vkDestroyShaderModule(m_Device, fragmentShader, nullptr);
 	vkDestroyShaderModule(m_Device, vertexShader, nullptr);
@@ -561,27 +568,32 @@ RendererVK::InitInternalBuffers()
 						m_GPU,
 						m_IndirectCommands,
 						m_IndirectCommandMemory,
-						maxCommands * sizeof(Display::DrawCommand));
+						maxCommands * sizeof(Display::DrawCommand),
+						VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 	CreateDynamicBuffer(m_Device,
 						m_GPU,
 						m_IndirectCommandArguments,
 						m_IndirectCommandArgumentMemory,
-						maxCommands * sizeof(Display::DrawCommandArgument));
+						maxCommands * sizeof(Display::DrawCommandArgument),
+						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	CreateDynamicBuffer(m_Device,
 						m_GPU,
 						m_SpriteVertices,
 						m_SpriteVertexMemory,
-						maxCommands * sizeof(RageSpriteVertex));
+						maxCommands * sizeof(RageSpriteVertex),
+						VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	CreateDynamicBuffer(m_Device,
 						m_GPU,
 						m_MatrixStates,
 						m_MatrixStateMemory,
-						maxCommands * sizeof(Display::MatrixState));
+						maxCommands * sizeof(Display::MatrixState),
+						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	CreateDynamicBuffer(m_Device,
 						m_GPU,
 						m_RenderStates,
 						m_RenderStateMemory,
-						maxCommands * sizeof(Display::RenderState));
+						maxCommands * sizeof(Display::RenderState),
+						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
 	m_MainDeletionQueue.PushDeletionCallback([&]() {
 		vkDestroyBuffer(m_Device, m_IndirectCommands, nullptr);
@@ -636,4 +648,76 @@ RendererVK::UpdateInternalBuffers(const Display::CommandBatcher& batcher)
 						batcher.m_RenderStateBuffer.data(),
 						batcher.m_RenderStateBuffer.size() *
 						  sizeof(Display::DrawCommand));
+}
+
+void
+RendererVK::InitRenderPass()
+{
+	VkAttachmentDescription colorAttachment = {};
+	colorAttachment.format = m_SwapchainImageFormat;
+	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkAttachmentReference attachmentRef = {};
+	attachmentRef.attachment = 0;
+	attachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDependency dependency = {};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &attachmentRef;
+
+	VkRenderPassCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	info.attachmentCount = 1;
+	info.pAttachments = &colorAttachment;
+	info.subpassCount = 1;
+	info.pSubpasses = &subpass;
+	info.pDependencies = &dependency;
+	info.dependencyCount = 1;
+
+	ThrowIfFail(vkCreateRenderPass(m_Device, &info, nullptr, &m_RenderPass));
+}
+
+void
+RendererVK::InitFramebuffers()
+{
+	VkFramebufferCreateInfo framebufferInfo = {};
+	framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	framebufferInfo.pNext = nullptr;
+	framebufferInfo.renderPass = m_RenderPass;
+	framebufferInfo.attachmentCount = 1;
+	framebufferInfo.width = m_SwapchainExtent.width;
+	framebufferInfo.height = m_SwapchainExtent.height;
+	framebufferInfo.layers = 1;
+
+	const uint32_t imageCount = m_SwapchainImages.size();
+	m_Framebuffers = std::vector<VkFramebuffer>(imageCount);
+
+	for (int i = 0; i < imageCount; i++) {
+
+		framebufferInfo.pAttachments = &m_SwapchainImageViews[i];
+		ThrowIfFail(vkCreateFramebuffer(
+		  m_Device, &framebufferInfo, nullptr, &m_Framebuffers[i]));
+	}
+
+	m_MainDeletionQueue.PushDeletionCallback([&]() {
+		vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);
+		for (int i = 0; i < imageCount; i++) {
+			vkDestroyFramebuffer(m_Device, m_Framebuffers[i], nullptr);
+		}
+	});
 }
