@@ -20,7 +20,7 @@ struct RenderState
     bool textureWrapping[NUM_TextureUnit];
     bool textureFiltering[NUM_TextureUnit];
     uint8_t textureMode[NUM_TextureUnit];
-    intptr_t textures[NUM_TextureUnit];
+    //intptr_t textures[NUM_TextureUnit];
 
 	bool operator==(RenderState& rhs);
 };

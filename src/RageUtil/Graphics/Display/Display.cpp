@@ -148,7 +148,7 @@ int Display::Display::GetMaxTextureSize() const
 
 void Display::Display::SetTexture(TextureUnit tu, intptr_t iTexture)
 {
-    m_RenderState.textures[tu] = iTexture;
+    //m_RenderState.textures[tu] = iTexture;
 }
 
 void Display::Display::SetTextureMode(TextureUnit tu, TextureMode tm)

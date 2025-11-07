@@ -82,7 +82,8 @@ void
 CreateDynamicBuffer(VkDevice device,
 					VkPhysicalDevice gpu,
 					VkBuffer& buffer,
-					VkDeviceMemory& bufferMemory, size_t neededSize);
+					VkDeviceMemory& bufferMemory,
+					size_t neededSize);
 
 void
 UpdateDynamicBuffer(VkDevice device,
@@ -91,5 +92,38 @@ UpdateDynamicBuffer(VkDevice device,
 					VkDeviceMemory& bufferMemory,
 					const void* data,
 					size_t dataSize);
+
+VkPipelineShaderStageCreateInfo
+GetShaderStageCreateInfo(VkShaderStageFlagBits stage,
+						 VkShaderModule shaderModule);
+
+class PipelineBuilder
+{
+  public:
+	std::vector<VkPipelineShaderStageCreateInfo> m_ShaderStages;
+
+	VkPipelineInputAssemblyStateCreateInfo m_InputAssembly;
+	VkPipelineRasterizationStateCreateInfo m_Rasterizer;
+	VkPipelineColorBlendAttachmentState m_ColorBlendAttachment;
+	VkPipelineMultisampleStateCreateInfo m_Multisampling;
+	VkPipelineLayout m_PipelineLayout;
+	VkPipelineDepthStencilStateCreateInfo m_DepthStencil;
+	VkPipelineRenderingCreateInfo m_RenderInfo;
+	VkFormat m_ColorAttachmentFormat;
+	VkPipelineVertexInputStateCreateInfo m_VertexInfo;
+
+	PipelineBuilder() { Clear(); }
+	void Clear();
+	VkPipeline BuildPipeline(VkDevice device);
+	void SetShaders(VkShaderModule vertexShader, VkShaderModule fragmentShader);
+	void SetInputTopology(VkPrimitiveTopology topology);
+	void SetPolygonMode(VkPolygonMode mode);
+	void SetCullMode(VkCullModeFlags cullMode, VkFrontFace frontFace);
+	void DisableMultisampling();
+	void DisableBlending();
+	void SetColorAttachmentFormat(VkFormat format);
+	void SetDepthFormat(VkFormat format);
+	void DisableDepthTest();
+};
 
 #endif

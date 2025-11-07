@@ -6,6 +6,7 @@
 #include "Core/Services/Locator.hpp"
 #include <format>
 #include <numbers>
+#include <RageUtil/File/RageFileManager.h>
 
 constexpr uint64_t Timeout = 1000'000'000;
 
@@ -24,7 +25,6 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 	InitSyncStructures();
 	InitInternalBuffers();
 	InitBufferLayout();
-	InitPipelineLayout();
 	CreateDescriptorPool();
 	CreateDescriptorSet();
 	InitGraphicsPipeline();
@@ -61,7 +61,8 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 
 	HandleDrawCommands(buffer,
 					   m_SwapchainImages[swapchainImageIndex],
-					   batcher.m_IndirectCommandBuffer.size());
+					   batcher.m_IndirectCommandBuffer.size(),
+					   p);
 
 	TransitionImage(buffer,
 					m_SwapchainImages[swapchainImageIndex],
@@ -132,6 +133,17 @@ RendererVK::~RendererVK()
 	vkDestroyInstance(m_Instance, nullptr);
 }
 
+VkBool32
+VulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+					VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+					const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+					void* pUserData)
+{
+	Locator::getLogger()->warn("RendererVK debug callback: {}",
+							   pCallbackData->pMessage);
+	return VK_FALSE;
+}
+
 void
 RendererVK::InitVulkan()
 {
@@ -140,6 +152,13 @@ RendererVK::InitVulkan()
 	auto instanceResult =
 	  builder.request_validation_layers(true)
 		.use_default_debug_messenger()
+		.add_validation_feature_enable(
+		  VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT)
+		.add_validation_feature_enable(
+		  VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT)
+		.add_validation_feature_enable(
+		  VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT)
+		.set_debug_callback(VulkanDebugCallback)
 		.require_api_version(1, 3, 0)
 		.enable_extension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
 		.build();
@@ -168,6 +187,7 @@ RendererVK::InitVulkan()
 	};
 	vk12Features.bufferDeviceAddress = true;
 	vk12Features.descriptorIndexing = true;
+	vk12Features.runtimeDescriptorArray = true;
 
 	vkb::PhysicalDeviceSelector selector(*instanceResult);
 	auto physicalDevice = selector.set_minimum_version(1, 3)
@@ -289,8 +309,27 @@ RendererVK::GetCurrentFrame()
 void
 RendererVK::HandleDrawCommands(VkCommandBuffer buffer,
 							   VkImage image,
-							   uint32_t drawCount)
+							   uint32_t drawCount,
+							   const ActualVideoModeParams* p)
 {
+	VkViewport viewport = {};
+	viewport.x = 0;
+	viewport.y = 0;
+	viewport.width = p->width;
+	viewport.height = p->height;
+	viewport.minDepth = 0.f;
+	viewport.maxDepth = 1.f;
+
+	vkCmdSetViewport(buffer, 0, 1, &viewport);
+
+	VkRect2D scissor = {};
+	scissor.offset.x = 0;
+	scissor.offset.y = 0;
+	scissor.extent.width = p->width;
+	scissor.extent.height = p->height;
+
+	vkCmdSetScissor(buffer, 0, 1, &scissor);
+
 	VkClearColorValue clearValue;
 	clearValue = { { 0.0, 0.0f, 0.0f, 1.0f } };
 
@@ -300,24 +339,24 @@ RendererVK::HandleDrawCommands(VkCommandBuffer buffer,
 	vkCmdClearColorImage(
 	  buffer, image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 
-	//vkCmdBindPipeline(
-	//  buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
+	vkCmdBindPipeline(
+	  buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
 
-	//VkBuffer vertexBuffers[] = { m_SpriteVertices };
-	//VkDeviceSize offsets[] = { 0 };
-	//vkCmdBindVertexBuffers(buffer, 0, 1, vertexBuffers, offsets);
+	VkBuffer vertexBuffers[] = { m_SpriteVertices };
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers(buffer, 0, 1, vertexBuffers, offsets);
 
-	//vkCmdBindDescriptorSets(buffer,
-	//						VK_PIPELINE_BIND_POINT_GRAPHICS,
-	//						m_PipelineLayout,
-	//						0,
-	//						1,
-	//						&m_BufferDescriptorSet,
-	//						0,
-	//						nullptr);
+	vkCmdBindDescriptorSets(buffer,
+							VK_PIPELINE_BIND_POINT_GRAPHICS,
+							m_PipelineLayout,
+							0,
+							1,
+							&m_BufferDescriptorSet,
+							0,
+							nullptr);
 
-	//vkCmdDrawIndirect(
-	//  buffer, m_IndirectCommands, 0, drawCount, sizeof(Display::DrawCommand));
+	vkCmdDrawIndirect(
+	  buffer, m_IndirectCommands, 0, drawCount, sizeof(Display::DrawCommand));
 }
 
 void
@@ -373,7 +412,7 @@ RendererVK::CreateDescriptorPool()
 	VkDescriptorPoolCreateInfo poolInfo = {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 		.maxSets = 1,
-		.poolSizeCount = poolSizes.size(),
+		.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
 		.pPoolSizes = poolSizes.data()
 	};
 
@@ -394,45 +433,37 @@ RendererVK::CreateDescriptorSet()
 	ThrowIfFail(
 	  vkAllocateDescriptorSets(m_Device, &allocInfo, &m_BufferDescriptorSet));
 
-	std::vector<VkWriteDescriptorSet> descriptorWrites;
-	std::vector<VkDescriptorBufferInfo> bufferInfos;
+	std::vector<VkDescriptorBufferInfo> bufferInfos = {
+		{ .buffer = m_IndirectCommandArguments,
+		  .offset = 0,
+		  .range = VK_WHOLE_SIZE },
+		{ .buffer = m_MatrixStates, .offset = 0, .range = VK_WHOLE_SIZE },
+		{ .buffer = m_RenderStates, .offset = 0, .range = VK_WHOLE_SIZE }
+	};
 
-	bufferInfos.push_back({ .buffer = m_IndirectCommandArguments,
-							.offset = 0,
-							.range = VK_WHOLE_SIZE });
-
-	descriptorWrites.push_back(
-	  { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		.dstSet = m_BufferDescriptorSet,
-		.dstBinding = 0,
-		.dstArrayElement = 0,
-		.descriptorCount = 1,
-		.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-		.pBufferInfo = &bufferInfos.back() });
-
-	bufferInfos.push_back(
-	  { .buffer = m_MatrixStates, .offset = 0, .range = VK_WHOLE_SIZE });
-
-	descriptorWrites.push_back(
-	  { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		.dstSet = m_BufferDescriptorSet,
-		.dstBinding = 1,
-		.dstArrayElement = 0,
-		.descriptorCount = 1,
-		.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-		.pBufferInfo = &bufferInfos.back() });
-
-	bufferInfos.push_back(
-	  { .buffer = m_RenderStates, .offset = 0, .range = VK_WHOLE_SIZE });
-
-	descriptorWrites.push_back(
-	  { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		.dstSet = m_BufferDescriptorSet,
-		.dstBinding = 2,
-		.dstArrayElement = 0,
-		.descriptorCount = 1,
-		.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-		.pBufferInfo = &bufferInfos.back() });
+	std::vector<VkWriteDescriptorSet> descriptorWrites = {
+		{ .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		  .dstSet = m_BufferDescriptorSet,
+		  .dstBinding = 0,
+		  .dstArrayElement = 0,
+		  .descriptorCount = 1,
+		  .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+		  .pBufferInfo = &bufferInfos[0] },
+		{ .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		  .dstSet = m_BufferDescriptorSet,
+		  .dstBinding = 1,
+		  .dstArrayElement = 0,
+		  .descriptorCount = 1,
+		  .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+		  .pBufferInfo = &bufferInfos[1] },
+		{ .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		  .dstSet = m_BufferDescriptorSet,
+		  .dstBinding = 2,
+		  .dstArrayElement = 0,
+		  .descriptorCount = 1,
+		  .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+		  .pBufferInfo = &bufferInfos[2] }
+	};
 
 	vkUpdateDescriptorSets(m_Device,
 						   static_cast<uint32_t>(descriptorWrites.size()),
@@ -441,21 +472,56 @@ RendererVK::CreateDescriptorSet()
 						   nullptr);
 }
 
-void RendererVK::InitGraphicsPipeline()
+void
+RendererVK::InitGraphicsPipeline()
 {
-	// todo :3
+	PipelineBuilder pipelineBuilder;
+
+	InitPipelineLayout();
+	pipelineBuilder.m_PipelineLayout = m_PipelineLayout;
+
+	auto fragmentShader = LoadShaderFromFile(
+	  FILEMAN->ResolvePath("Data/Shaders/Vulkan/fragment.glsl"),
+	  m_Device,
+	  shaderc_glsl_fragment_shader);
+	auto vertexShader = LoadShaderFromFile(
+	  FILEMAN->ResolvePath("Data/Shaders/Vulkan/vertex.glsl"),
+	  m_Device,
+	  shaderc_glsl_vertex_shader);
+
+	pipelineBuilder.SetShaders(vertexShader, fragmentShader);
+	pipelineBuilder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	pipelineBuilder.SetPolygonMode(VK_POLYGON_MODE_FILL);
+	pipelineBuilder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+	pipelineBuilder.DisableMultisampling();
+	pipelineBuilder.DisableBlending();
+	pipelineBuilder.DisableDepthTest();
+
+	pipelineBuilder.SetColorAttachmentFormat(m_SwapchainImageFormat);
+	pipelineBuilder.SetDepthFormat(VK_FORMAT_UNDEFINED);
+
+	pipelineBuilder.m_VertexInfo = GetSpriteVertexInfo();
+
+	m_GraphicsPipeline = pipelineBuilder.BuildPipeline(m_Device);
+
+	vkDestroyShaderModule(m_Device, fragmentShader, nullptr);
+	vkDestroyShaderModule(m_Device, vertexShader, nullptr);
+
+	m_MainDeletionQueue.PushDeletionCallback([&]() {
+		vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
+		vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
+	});
 }
 
 VkPipelineVertexInputStateCreateInfo
 RendererVK::GetSpriteVertexInfo()
 {
-	const std::vector<VkVertexInputBindingDescription> bindingDescriptions = {
-		{ .binding = 0,
-		  .stride = sizeof(RageSpriteVertex),
-		  .inputRate = VK_VERTEX_INPUT_RATE_VERTEX }
-	};
+	static const std::vector<VkVertexInputBindingDescription>
+	  bindingDescriptions = { { .binding = 0,
+								.stride = sizeof(RageSpriteVertex),
+								.inputRate = VK_VERTEX_INPUT_RATE_VERTEX } };
 
-	const std::vector<VkVertexInputAttributeDescription>
+	static const std::vector<VkVertexInputAttributeDescription>
 	  attributeDescriptions = { { .location = 0,
 								  .binding = 0,
 								  .format = VK_FORMAT_R32G32B32_SFLOAT,

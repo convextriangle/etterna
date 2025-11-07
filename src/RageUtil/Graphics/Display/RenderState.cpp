@@ -14,7 +14,7 @@ bool Display::RenderState::operator==(RenderState &rhs)
 		this->alphaTest == rhs.alphaTest &&
 		std::ranges::equal(this->textureWrapping, rhs.textureWrapping) &&
         std::ranges::equal(this->textureFiltering, rhs.textureFiltering) &&
-        std::ranges::equal(this->textureMode, rhs.textureMode) &&
-		std::ranges::equal(this->textures, rhs.textures);
+        std::ranges::equal(this->textureMode, rhs.textureMode) /*&&
+		std::ranges::equal(this->textures, rhs.textures)*/;
     // clang-format on
 }

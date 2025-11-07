@@ -70,22 +70,25 @@ class RendererVK : public Display::Renderer
 	DeletionQueue m_MainDeletionQueue;
 	VmaAllocator m_Allocator;
 
-	void HandleDrawCommands(VkCommandBuffer buffer, VkImage image, uint32_t drawCount);
+	void HandleDrawCommands(VkCommandBuffer buffer,
+							VkImage image,
+							uint32_t drawCount,
+							const ActualVideoModeParams* p);
 
-	VkBuffer m_IndirectCommands;
-	VkDeviceMemory m_IndirectCommandMemory;
+	VkBuffer m_IndirectCommands = VK_NULL_HANDLE;
+	VkDeviceMemory m_IndirectCommandMemory = VK_NULL_HANDLE;
 
-	VkBuffer m_IndirectCommandArguments;
-	VkDeviceMemory m_IndirectCommandArgumentMemory;
+	VkBuffer m_IndirectCommandArguments = VK_NULL_HANDLE;
+	VkDeviceMemory m_IndirectCommandArgumentMemory = VK_NULL_HANDLE;
 
-	VkBuffer m_SpriteVertices;
-	VkDeviceMemory m_SpriteVertexMemory;
+	VkBuffer m_SpriteVertices = VK_NULL_HANDLE;
+	VkDeviceMemory m_SpriteVertexMemory = VK_NULL_HANDLE;
 
-	VkBuffer m_RenderStates;
-	VkDeviceMemory m_RenderStateMemory;
+	VkBuffer m_RenderStates = VK_NULL_HANDLE;
+	VkDeviceMemory m_RenderStateMemory = VK_NULL_HANDLE;
 
-	VkBuffer m_MatrixStates;
-	VkDeviceMemory m_MatrixStateMemory;
+	VkBuffer m_MatrixStates = VK_NULL_HANDLE;
+	VkDeviceMemory m_MatrixStateMemory = VK_NULL_HANDLE;
 
 	VkDescriptorSetLayout m_BufferDescriptorLayout;
 	VkDescriptorSet m_BufferDescriptorSet;
