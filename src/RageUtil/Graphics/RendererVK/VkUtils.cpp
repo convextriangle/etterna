@@ -292,6 +292,9 @@ UpdateDynamicBuffer(VkDevice device,
 					const void* data,
 					size_t dataSize)
 {
+	if (!dataSize) {
+		return;
+	}
 	void* mappedData = nullptr;
 	ThrowIfFail(vkMapMemory(device, bufferMemory, 0, dataSize, 0, &mappedData));
 
@@ -414,12 +417,19 @@ PipelineBuilder::DisableMultisampling()
 }
 
 void
-PipelineBuilder::DisableBlending()
+PipelineBuilder::EnableBlending()
 {
+	m_ColorBlendAttachment.blendEnable = VK_TRUE;
+	m_ColorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	m_ColorBlendAttachment.dstColorBlendFactor =
+	  VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	m_ColorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+	m_ColorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	m_ColorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	m_ColorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 	m_ColorBlendAttachment.colorWriteMask =
 	  VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
 	  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	m_ColorBlendAttachment.blendEnable = VK_FALSE;
 }
 
 void

@@ -37,19 +37,23 @@ void
 RendererVK::OnRender(const ActualVideoModeParams* p,
 					 const Display::CommandBatcher& batcher)
 {
+	auto& frame = m_Frames[m_FrameNumber % FRAME_OVERLAP];
+
 	ThrowIfFail(vkWaitForFences(
-	  m_Device, 1, &GetCurrentFrame().RenderFence, true, Timeout));
-	ThrowIfFail(vkResetFences(m_Device, 1, &GetCurrentFrame().RenderFence));
+	  m_Device, 1, &frame.RenderFence, true, Timeout));
+	ThrowIfFail(vkResetFences(m_Device, 1, &frame.RenderFence));
 
 	uint32_t swapchainImageIndex = 0;
 	ThrowIfFail(vkAcquireNextImageKHR(m_Device,
 									  m_Swapchain,
 									  Timeout,
-									  GetCurrentFrame().SwapchainSemaphore,
+									  frame.SwapchainSemaphore,
 									  nullptr,
 									  &swapchainImageIndex));
 
-	auto buffer = GetCurrentFrame().MainCommandBuffer;
+	auto buffer = frame.MainCommandBuffer;
+
+	UpdateInternalBuffers(batcher);
 
 	ThrowIfFail(vkResetCommandBuffer(buffer, 0));
 	auto beginInfo =
@@ -83,21 +87,21 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 
 	auto waitInfo =
 	  GetSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-							 GetCurrentFrame().SwapchainSemaphore);
+							 frame.SwapchainSemaphore);
 	auto signalInfo = GetSemaphoreSubmitInfo(
-	  VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, GetCurrentFrame().RenderSemaphore);
+	  VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, frame.RenderSemaphore);
 
 	auto submitInfo = GetSubmitInfo(&bufferInfo, &signalInfo, &waitInfo);
 
 	ThrowIfFail(vkQueueSubmit2(
-	  m_GraphicsQueue, 1, &submitInfo, GetCurrentFrame().RenderFence));
+	  m_GraphicsQueue, 1, &submitInfo, frame.RenderFence));
 
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.pNext = nullptr;
 	presentInfo.pSwapchains = &m_Swapchain;
 	presentInfo.swapchainCount = 1;
-	presentInfo.pWaitSemaphores = &GetCurrentFrame().RenderSemaphore;
+	presentInfo.pWaitSemaphores = &frame.RenderSemaphore;
 	presentInfo.waitSemaphoreCount = 1;
 	presentInfo.pImageIndices = &swapchainImageIndex;
 
@@ -311,12 +315,6 @@ RendererVK::DestroySwapchain()
 	}
 }
 
-FrameData&
-RendererVK::GetCurrentFrame()
-{
-	return m_Frames[m_FrameNumber % FRAME_OVERLAP];
-}
-
 void
 RendererVK::HandleDrawCommands(VkCommandBuffer buffer,
 							   VkImage image,
@@ -325,9 +323,9 @@ RendererVK::HandleDrawCommands(VkCommandBuffer buffer,
 {
 	VkViewport viewport = {};
 	viewport.x = 0;
-	viewport.y = 0;
+	viewport.y = p->height;
 	viewport.width = p->width;
-	viewport.height = p->height;
+	viewport.height = -p->height;
 	viewport.minDepth = 0.f;
 	viewport.maxDepth = 1.f;
 
@@ -335,7 +333,7 @@ RendererVK::HandleDrawCommands(VkCommandBuffer buffer,
 
 	VkRect2D scissor = {};
 	scissor.offset.x = 0;
-	scissor.offset.y = 0;
+	scissor.offset.y = 1;
 	scissor.extent.width = p->width;
 	scissor.extent.height = p->height;
 
@@ -356,7 +354,6 @@ RendererVK::HandleDrawCommands(VkCommandBuffer buffer,
 							&m_BufferDescriptorSet,
 							0,
 							nullptr);
-
 	if (drawCount > 0) {
 		vkCmdDrawIndirect(buffer,
 						  m_IndirectCommands,
@@ -499,9 +496,9 @@ RendererVK::InitGraphicsPipeline()
 	pipelineBuilder.SetShaders(vertexShader, fragmentShader);
 	pipelineBuilder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	pipelineBuilder.SetPolygonMode(VK_POLYGON_MODE_FILL);
-	pipelineBuilder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+	pipelineBuilder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
 	pipelineBuilder.DisableMultisampling();
-	pipelineBuilder.DisableBlending();
+	pipelineBuilder.EnableBlending();
 	pipelineBuilder.DisableDepthTest();
 
 	pipelineBuilder.SetColorAttachmentFormat(m_SwapchainImageFormat);
@@ -539,7 +536,7 @@ RendererVK::GetSpriteVertexInfo()
 								  .offset = offsetof(RageSpriteVertex, n) },
 								{ .location = 2,
 								  .binding = 0,
-								  .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+								  .format = VK_FORMAT_B8G8R8A8_UNORM,
 								  .offset = offsetof(RageSpriteVertex, c) },
 								{ .location = 3,
 								  .binding = 0,
@@ -562,7 +559,7 @@ RendererVK::GetSpriteVertexInfo()
 void
 RendererVK::InitInternalBuffers()
 {
-	constexpr size_t maxCommands = 20'000;
+	constexpr size_t maxCommands = 50'000;
 
 	CreateDynamicBuffer(m_Device,
 						m_GPU,
@@ -704,7 +701,7 @@ RendererVK::InitFramebuffers()
 	framebufferInfo.height = m_SwapchainExtent.height;
 	framebufferInfo.layers = 1;
 
-	const uint32_t imageCount = m_SwapchainImages.size();
+	const auto imageCount = m_SwapchainImages.size();
 	m_Framebuffers = std::vector<VkFramebuffer>(imageCount);
 
 	for (int i = 0; i < imageCount; i++) {
@@ -716,7 +713,7 @@ RendererVK::InitFramebuffers()
 
 	m_MainDeletionQueue.PushDeletionCallback([&]() {
 		vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);
-		for (int i = 0; i < imageCount; i++) {
+		for (int i = 0; i < m_SwapchainImages.size(); i++) {
 			vkDestroyFramebuffer(m_Device, m_Framebuffers[i], nullptr);
 		}
 	});

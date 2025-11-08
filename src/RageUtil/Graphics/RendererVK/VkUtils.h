@@ -116,7 +116,7 @@ class PipelineBuilder
 	void SetPolygonMode(VkPolygonMode mode);
 	void SetCullMode(VkCullModeFlags cullMode, VkFrontFace frontFace);
 	void DisableMultisampling();
-	void DisableBlending();
+	void EnableBlending();
 	void SetColorAttachmentFormat(VkFormat format);
 	void SetDepthFormat(VkFormat format);
 	void DisableDepthTest();

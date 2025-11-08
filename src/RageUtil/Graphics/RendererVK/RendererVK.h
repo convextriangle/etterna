@@ -61,7 +61,6 @@ class RendererVK : public Display::Renderer
 	void DestroySwapchain();
 
 	std::array<FrameData, FRAME_OVERLAP> m_Frames;
-	FrameData& GetCurrentFrame();
 	size_t m_FrameNumber = 0;
 
 	VkQueue m_GraphicsQueue;

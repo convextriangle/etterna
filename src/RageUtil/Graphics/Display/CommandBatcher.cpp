@@ -162,6 +162,7 @@ void Display::CommandBatcher::InsertCompiledGeometryDrawCommand(DrawMode drawMod
 void Display::CommandBatcher::Clear()
 {
     m_IndirectCommandBuffer.clear();
+    m_IndirectCommandArgumentBuffer.clear();
     m_SpriteVertexBuffer.clear();
     m_ModelVertexBuffer.clear();
     m_RenderStateBuffer.clear();

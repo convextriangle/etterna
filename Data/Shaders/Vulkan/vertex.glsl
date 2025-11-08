@@ -48,7 +48,6 @@ void main() {
     vec4 projPos = projMatrix * viewPos;
     
     gl_Position = projPos;
-    gl_Position.y *= -1.0;
-    
+
     outColor = inColor;
 }
