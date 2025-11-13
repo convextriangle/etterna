@@ -7,24 +7,11 @@
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
 #endif
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_raii.hpp>
 #include <vk_mem_alloc.h>
 #include <VkBootstrap.h>
 #include <array>
 #include "VkUtils.h"
-
-struct FrameData
-{
-	VkCommandPool CommandPool;
-	VkCommandBuffer MainCommandBuffer;
-
-	VkSemaphore SwapchainSemaphore;
-	VkSemaphore RenderSemaphore;
-	VkFence RenderFence;
-	DeletionQueue InfoDeletion;
-};
-
-constexpr size_t FRAME_OVERLAP = 2;
 
 class RendererVK : public Display::Renderer
 {
@@ -40,75 +27,55 @@ class RendererVK : public Display::Renderer
 	~RendererVK() override;
 
   private:
-	VkInstance m_Instance;
-	VkDebugUtilsMessengerEXT m_DebugMessenger;
-	VkPhysicalDevice m_GPU;
-	VkDevice m_Device;
-	VkSurfaceKHR m_Surface;
-
-	VkSwapchainKHR m_Swapchain;
-	VkFormat m_SwapchainImageFormat;
-	std::vector<VkImage> m_SwapchainImages;
-	std::vector<VkImageView> m_SwapchainImageViews;
-	VkExtent2D m_SwapchainExtent;
-
-	void InitVulkan();
-	void InitSwapchain(const VideoModeParams& p);
-	void InitCommands();
-	void InitSyncStructures();
-
-	void CreateSwapchain(size_t width, size_t height);
-	void DestroySwapchain();
-
-	std::array<FrameData, FRAME_OVERLAP> m_Frames;
-	size_t m_FrameNumber = 0;
-
-	VkQueue m_GraphicsQueue;
+	vk::raii::Context m_Context;
+	vk::raii::Instance m_Instance = nullptr;
+	vk::raii::DebugUtilsMessengerEXT m_DebugMessenger = nullptr;
+	vk::raii::PhysicalDevice m_PhysicalDevice = nullptr;
+	vk::raii::Device m_Device = nullptr;
+	vk::raii::SurfaceKHR m_Surface = nullptr;
+	vk::raii::Queue m_GraphicsQueue = nullptr;
 	uint32_t m_GraphicsQueueFamily;
+	vk::raii::Queue m_PresentQueue = nullptr;
+	uint32_t m_PresentQueueFamily;
+	VmaAllocator m_Allocator = nullptr;
+	void InitVulkanState();
 
-	DeletionQueue m_MainDeletionQueue;
-	VmaAllocator m_Allocator;
+	vk::raii::SwapchainKHR m_Swapchain = nullptr;
+	vk::Extent2D m_SwapchainExtent;
+	std::vector<vk::Image> m_SwapchainImages;
 
-	void HandleDrawCommands(VkCommandBuffer buffer,
-							VkImage image,
-							uint32_t drawCount,
-							const ActualVideoModeParams* p);
+	constexpr static vk::Format ImageFormat = vk::Format::eB8G8R8A8Unorm;
 
-	VkBuffer m_IndirectCommands = VK_NULL_HANDLE;
-	VkDeviceMemory m_IndirectCommandMemory = VK_NULL_HANDLE;
+	void InitSwapchain(const VideoModeParams& p);
 
-	VkBuffer m_IndirectCommandArguments = VK_NULL_HANDLE;
-	VkDeviceMemory m_IndirectCommandArgumentMemory = VK_NULL_HANDLE;
+	std::vector<vk::raii::ImageView> m_SwapchainImageViews;
+	void InitImageViews();
 
-	VkBuffer m_SpriteVertices = VK_NULL_HANDLE;
-	VkDeviceMemory m_SpriteVertexMemory = VK_NULL_HANDLE;
-
-	VkBuffer m_RenderStates = VK_NULL_HANDLE;
-	VkDeviceMemory m_RenderStateMemory = VK_NULL_HANDLE;
-
-	VkBuffer m_MatrixStates = VK_NULL_HANDLE;
-	VkDeviceMemory m_MatrixStateMemory = VK_NULL_HANDLE;
-
-	VkDescriptorSetLayout m_BufferDescriptorLayout;
-	VkDescriptorSet m_BufferDescriptorSet;
-	VkDescriptorPool m_DescriptorPool;
-	VkPipelineLayout m_PipelineLayout;
-	VkPipeline m_GraphicsPipeline;
-
-	void InitBufferLayout();
-	void InitPipelineLayout();
-	void CreateDescriptorPool();
-	void CreateDescriptorSet();
+	vk::raii::PipelineLayout m_PipelineLayout = nullptr;
+	vk::raii::Pipeline m_GraphicsPipeline = nullptr;
 	void InitGraphicsPipeline();
-	VkPipelineVertexInputStateCreateInfo GetSpriteVertexInfo();
 
-	void InitInternalBuffers();
-	void UpdateInternalBuffers(const Display::CommandBatcher& batcher);
+	vk::PipelineVertexInputStateCreateInfo GetSpriteVertexInfo();
 
-	VkRenderPass m_RenderPass;
-	std::vector<VkFramebuffer> m_Framebuffers;
-	void InitRenderPass();
-	void InitFramebuffers();
+	vk::raii::CommandPool m_CommandPool = nullptr;
+	void InitCommandPool();
+
+	vk::raii::CommandBuffer m_CommandBuffer = nullptr;
+	void InitCommandBuffer();
+
+	void TransitionImageLayout(uint32_t imageIndex,
+							   vk::ImageLayout oldLayout,
+							   vk::ImageLayout newLayout,
+							   vk::AccessFlags2 srcAccessMask,
+							   vk::AccessFlags2 dstAccessMask,
+							   vk::PipelineStageFlags2 srcStageMask,
+							   vk::PipelineStageFlags2 dstStageMask);
+
+	vk::raii::Semaphore m_PresentCompleteSemaphore = nullptr;
+	vk::raii::Semaphore m_RenderFinishedSemaphore = nullptr;
+	vk::raii::Fence m_DrawFence = nullptr;
+	void InitSyncStructures();
+	void RecordCommands(uint32_t imageIndex);
 };
 
 #endif

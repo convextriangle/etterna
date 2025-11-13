@@ -4,125 +4,6 @@
 #include <sstream>
 #include "Core/Services/Locator.hpp"
 
-VkCommandPoolCreateInfo
-GetCommandPoolCreateInfo(uint32_t queueFamilyIndex,
-						 VkCommandPoolCreateFlags flags)
-{
-	VkCommandPoolCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	info.pNext = nullptr;
-	info.queueFamilyIndex = queueFamilyIndex;
-	info.flags = flags;
-	return info;
-}
-
-VkCommandBufferAllocateInfo
-GetCommandBufferAllocateInfo(VkCommandPool pool, uint32_t count)
-{
-	VkCommandBufferAllocateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	info.pNext = nullptr;
-
-	info.commandPool = pool;
-	info.commandBufferCount = count;
-	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	return info;
-}
-
-VkFenceCreateInfo
-GetFenceCreateInfo(VkFenceCreateFlags flags)
-{
-	VkFenceCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	info.pNext = nullptr;
-
-	info.flags = flags;
-
-	return info;
-}
-
-VkSemaphoreCreateInfo
-GetSemaphoreCreateInfo(VkSemaphoreCreateFlags flags)
-{
-	VkSemaphoreCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	info.pNext = nullptr;
-	info.flags = flags;
-	return info;
-}
-
-VkCommandBufferBeginInfo
-GetCommandBufferBeginInfo(VkCommandBufferUsageFlags flags)
-{
-	VkCommandBufferBeginInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	info.pNext = nullptr;
-
-	info.pInheritanceInfo = nullptr;
-	info.flags = flags;
-	return info;
-}
-
-VkImageSubresourceRange
-GetImageSubresourceRange(VkImageAspectFlags aspectFlags)
-{
-	VkImageSubresourceRange subImage = {};
-	subImage.aspectMask = aspectFlags;
-	subImage.baseMipLevel = 0;
-	subImage.levelCount = VK_REMAINING_MIP_LEVELS;
-	subImage.baseArrayLayer = 0;
-	subImage.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-	return subImage;
-}
-
-VkSemaphoreSubmitInfo
-GetSemaphoreSubmitInfo(VkPipelineStageFlags2 stageMask, VkSemaphore semaphore)
-{
-	VkSemaphoreSubmitInfo submitInfo = {};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-	submitInfo.pNext = nullptr;
-	submitInfo.semaphore = semaphore;
-	submitInfo.stageMask = stageMask;
-	submitInfo.deviceIndex = 0;
-	submitInfo.value = 1;
-
-	return submitInfo;
-}
-
-VkCommandBufferSubmitInfo
-GetCommandBufferSubmitInfo(VkCommandBuffer cmd)
-{
-	VkCommandBufferSubmitInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-	info.pNext = nullptr;
-	info.commandBuffer = cmd;
-	info.deviceMask = 0;
-
-	return info;
-}
-
-VkSubmitInfo2
-GetSubmitInfo(VkCommandBufferSubmitInfo* cmd,
-			  VkSemaphoreSubmitInfo* signalSemaphoreInfo,
-			  VkSemaphoreSubmitInfo* waitSemaphoreInfo)
-{
-	VkSubmitInfo2 info = {};
-	info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-	info.pNext = nullptr;
-
-	info.waitSemaphoreInfoCount = waitSemaphoreInfo == nullptr ? 0 : 1;
-	info.pWaitSemaphoreInfos = waitSemaphoreInfo;
-
-	info.signalSemaphoreInfoCount = signalSemaphoreInfo == nullptr ? 0 : 1;
-	info.pSignalSemaphoreInfos = signalSemaphoreInfo;
-
-	info.commandBufferInfoCount = 1;
-	info.pCommandBufferInfos = cmd;
-
-	return info;
-}
-
 void
 DeletionQueue::PushDeletionCallback(std::function<void()>&& callback)
 {
@@ -154,6 +35,11 @@ ThrowIfFail(VkResult result, const std::source_location location)
 				  location.function_name());
 	Locator::getLogger()->error(message);
 	throw std::runtime_error(message.c_str());
+}
+
+void ThrowIfFail(vk::Result result, const std::source_location location)
+{
+	ThrowIfFail(static_cast<VkResult>(result), location);
 }
 
 void
@@ -188,9 +74,9 @@ CompileShader(const std::string& sourceName,
 	return { result.begin(), result.end() };
 }
 
-VkShaderModule
+vk::raii::ShaderModule
 LoadShaderFromFile(std::string path,
-				   VkDevice device,
+				   vk::raii::Device& device,
 				   shaderc_shader_kind shaderKind)
 {
 #ifdef _WIN32
@@ -210,10 +96,7 @@ LoadShaderFromFile(std::string path,
 	createInfo.codeSize = shaderBlob.size() * sizeof(uint32_t);
 	createInfo.pCode = shaderBlob.data();
 
-	VkShaderModule result = {};
-	ThrowIfFail(vkCreateShaderModule(device, &createInfo, nullptr, &result));
-
-	return result;
+	return vk::raii::ShaderModule(device, createInfo);
 }
 
 uint32_t
@@ -295,196 +178,29 @@ UpdateDynamicBuffer(VkDevice device,
 	if (!dataSize) {
 		return;
 	}
+	VkPhysicalDeviceProperties props;
+	vkGetPhysicalDeviceProperties(gpu, &props);
+	VkDeviceSize nonCoherentAtomSize = props.limits.nonCoherentAtomSize;
+
+	VkDeviceSize alignedSize =
+	  (dataSize + nonCoherentAtomSize - 1) & ~(nonCoherentAtomSize - 1);
+
+	VkMemoryRequirements memReqs;
+	vkGetBufferMemoryRequirements(device, buffer, &memReqs);
+	alignedSize = std::min(alignedSize, memReqs.size);
+
 	void* mappedData = nullptr;
-	ThrowIfFail(vkMapMemory(device, bufferMemory, 0, dataSize, 0, &mappedData));
+	ThrowIfFail(
+	  vkMapMemory(device, bufferMemory, 0, alignedSize, 0, &mappedData));
 
 	std::memcpy(mappedData, data, dataSize);
 
+	VkMappedMemoryRange memoryRange = { .sType =
+										  VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+										.memory = bufferMemory,
+										.offset = 0,
+										.size = alignedSize };
+	vkFlushMappedMemoryRanges(device, 1, &memoryRange);
+
 	vkUnmapMemory(device, bufferMemory);
-}
-
-VkPipelineShaderStageCreateInfo
-GetShaderStageCreateInfo(VkShaderStageFlagBits stage,
-						 VkShaderModule shaderModule)
-{
-	VkPipelineShaderStageCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	info.pNext = nullptr;
-
-	info.stage = stage;
-	info.module = shaderModule;
-	info.pName = "main";
-	return info;
-}
-
-VkPipeline
-PipelineBuilder::BuildPipeline(VkDevice device, VkRenderPass renderPass)
-{
-	VkPipelineViewportStateCreateInfo viewportState = {};
-	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportState.pNext = nullptr;
-
-	viewportState.viewportCount = 1;
-	viewportState.scissorCount = 1;
-
-	std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT,
-												  VK_DYNAMIC_STATE_SCISSOR };
-
-	VkPipelineDynamicStateCreateInfo dynamicState = {};
-	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicState.dynamicStateCount =
-	  static_cast<uint32_t>(dynamicStates.size());
-	dynamicState.pDynamicStates = dynamicStates.data();
-
-	VkPipelineColorBlendStateCreateInfo colorBlending = {};
-	colorBlending.sType =
-	  VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlending.pNext = nullptr;
-
-	colorBlending.logicOpEnable = VK_FALSE;
-	colorBlending.logicOp = VK_LOGIC_OP_COPY;
-	colorBlending.attachmentCount = 1;
-	colorBlending.pAttachments = &m_ColorBlendAttachment;
-
-	VkGraphicsPipelineCreateInfo pipelineInfo = {
-		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO
-	};
-	pipelineInfo.pNext = &m_RenderInfo;
-
-	pipelineInfo.stageCount = (uint32_t)m_ShaderStages.size();
-	pipelineInfo.pStages = m_ShaderStages.data();
-	pipelineInfo.pVertexInputState = &m_VertexInfo;
-	pipelineInfo.pInputAssemblyState = &m_InputAssembly;
-	pipelineInfo.pViewportState = &viewportState;
-	pipelineInfo.pDynamicState = &dynamicState;
-	pipelineInfo.pRasterizationState = &m_Rasterizer;
-	pipelineInfo.pMultisampleState = &m_Multisampling;
-	pipelineInfo.pColorBlendState = &colorBlending;
-	pipelineInfo.pDepthStencilState = &m_DepthStencil;
-	pipelineInfo.layout = m_PipelineLayout;
-	pipelineInfo.renderPass = renderPass;
-	pipelineInfo.subpass = 0;
-
-	VkPipeline newPipeline = VK_NULL_HANDLE;
-	ThrowIfFail(vkCreateGraphicsPipelines(
-	  device, nullptr, 1, &pipelineInfo, nullptr, &newPipeline));
-
-	return newPipeline;
-}
-
-void
-PipelineBuilder::SetShaders(VkShaderModule vertexShader,
-							VkShaderModule fragmentShader)
-{
-	m_ShaderStages.clear();
-
-	m_ShaderStages.push_back(
-	  GetShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader));
-	m_ShaderStages.push_back(
-	  GetShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
-}
-
-void
-PipelineBuilder::SetInputTopology(VkPrimitiveTopology topology)
-{
-	m_InputAssembly.topology = topology;
-	m_InputAssembly.primitiveRestartEnable = VK_FALSE;
-}
-
-void
-PipelineBuilder::SetPolygonMode(VkPolygonMode mode)
-{
-	m_Rasterizer.polygonMode = mode;
-	m_Rasterizer.lineWidth = 1.f;
-}
-
-void
-PipelineBuilder::SetCullMode(VkCullModeFlags cullMode, VkFrontFace frontFace)
-{
-	m_Rasterizer.frontFace = frontFace;
-	m_Rasterizer.cullMode = cullMode;
-}
-
-void
-PipelineBuilder::DisableMultisampling()
-{
-	m_Multisampling.sampleShadingEnable = VK_FALSE;
-	m_Multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	m_Multisampling.minSampleShading = 1.0f;
-	m_Multisampling.pSampleMask = nullptr;
-	m_Multisampling.alphaToCoverageEnable = VK_FALSE;
-	m_Multisampling.alphaToOneEnable = VK_FALSE;
-}
-
-void
-PipelineBuilder::EnableBlending()
-{
-	m_ColorBlendAttachment.blendEnable = VK_TRUE;
-	m_ColorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	m_ColorBlendAttachment.dstColorBlendFactor =
-	  VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	m_ColorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-	m_ColorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	m_ColorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	m_ColorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-	m_ColorBlendAttachment.colorWriteMask =
-	  VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-	  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-}
-
-void
-PipelineBuilder::SetColorAttachmentFormat(VkFormat format)
-{
-	m_ColorAttachmentFormat = format;
-	m_RenderInfo.colorAttachmentCount = 1;
-	m_RenderInfo.pColorAttachmentFormats = &m_ColorAttachmentFormat;
-}
-
-void
-PipelineBuilder::SetDepthFormat(VkFormat format)
-{
-	m_RenderInfo.depthAttachmentFormat = format;
-}
-
-void
-PipelineBuilder::DisableDepthTest()
-{
-	m_DepthStencil.depthTestEnable = VK_FALSE;
-	m_DepthStencil.depthWriteEnable = VK_FALSE;
-	m_DepthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
-	m_DepthStencil.depthBoundsTestEnable = VK_FALSE;
-	m_DepthStencil.stencilTestEnable = VK_FALSE;
-	m_DepthStencil.front = {};
-	m_DepthStencil.back = {};
-	m_DepthStencil.minDepthBounds = 0.f;
-	m_DepthStencil.maxDepthBounds = 1.f;
-}
-
-void
-PipelineBuilder::Clear()
-{
-	m_InputAssembly = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO
-	};
-
-	m_Rasterizer = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO
-	};
-
-	m_ColorBlendAttachment = {};
-
-	m_Multisampling = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO
-	};
-
-	m_PipelineLayout = {};
-
-	m_DepthStencil = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO
-	};
-
-	m_RenderInfo = { .sType =
-					   VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
-
-	m_ShaderStages.clear();
 }
