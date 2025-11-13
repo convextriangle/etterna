@@ -20,10 +20,12 @@ void Display::CommandBatcher::InsertSpriteDrawCommand(DrawMode drawMode, MatrixS
     command.StartInstanceLocation = 0;
 
     // -- changing draw mode in the middle of the queue would likely require switching pipeline state objects
+	//	  (pipeline objects are chonky)
     //	  and most of the ye olde draw modes aren't supported
     //    so just convert to a triangle list
     // -- unrolled loops look funny though
     // -- maybe this can be done on the GPU via mesh shaders and/or work graphs but that's for unstable_vk_mintyfresh
+	// -- and like two people have GPUs that support stuff like this so no thank you
     switch (drawMode)
     {
     case DrawMode::Triangles: {
@@ -31,39 +33,27 @@ void Display::CommandBatcher::InsertSpriteDrawCommand(DrawMode drawMode, MatrixS
         break;
     }
     case DrawMode::Quads: {
-        const size_t quadCount = vertexCount / 4;
-        const size_t triangleCount = quadCount * 2;
-        const size_t expandedVertexCount = triangleCount * 3;
-
-        m_SpriteVertexBuffer.resize(m_SpriteVertexBuffer.size() + expandedVertexCount);
-
-        for (size_t i = 0; i < quadCount; i++)
+        for (size_t i = 0; i < vertexCount / 4; i++)
         {
-            m_SpriteVertexBuffer[i * 6 + 0] = vertexData[i * 4 + 0];
-            m_SpriteVertexBuffer[i * 6 + 1] = vertexData[i * 4 + 1];
-            m_SpriteVertexBuffer[i * 6 + 2] = vertexData[i * 4 + 2];
-            m_SpriteVertexBuffer[i * 6 + 3] = vertexData[i * 4 + 2];
-            m_SpriteVertexBuffer[i * 6 + 4] = vertexData[i * 4 + 3];
-            m_SpriteVertexBuffer[i * 6 + 5] = vertexData[i * 4 + 0];
+            m_SpriteVertexBuffer.push_back(vertexData[i * 4 + 0]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 4 + 1]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 4 + 2]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 4 + 2]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 4 + 3]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 4 + 0]);
         }
 
         break;
     }
     case DrawMode::QuadStrip: {
-        const size_t quadCount = (vertexCount - 2) / 2;
-        const size_t triangleCount = quadCount * 2;
-        const size_t expandedVertexCount = triangleCount * 3;
-
-        m_SpriteVertexBuffer.resize(m_SpriteVertexBuffer.size() + expandedVertexCount);
-
-        for (size_t i = 0; i < quadCount; i++)
+        for (size_t i = 0; i < (vertexCount - 2) / 2; i++)
         {
-            m_SpriteVertexBuffer[i * 6 + 0] = vertexData[i * 2 + 0];
-            m_SpriteVertexBuffer[i * 6 + 1] = vertexData[i * 2 + 1];
-            m_SpriteVertexBuffer[i * 6 + 2] = vertexData[i * 2 + 2];
-            m_SpriteVertexBuffer[i * 6 + 3] = vertexData[i * 2 + 1];
-            m_SpriteVertexBuffer[i * 6 + 4] = vertexData[i * 2 + 2];
-            m_SpriteVertexBuffer[i * 6 + 5] = vertexData[i * 2 + 3];
+            m_SpriteVertexBuffer.push_back(vertexData[i * 2 + 0]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 2 + 1]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 2 + 2]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 2 + 1]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 2 + 2]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 2 + 3]);
         }
 
         break;
@@ -102,27 +92,22 @@ void Display::CommandBatcher::InsertSpriteDrawCommand(DrawMode drawMode, MatrixS
         break;
     }
     case DrawMode::SymmetricQuadStrip: {
-        const size_t quadCount = (vertexCount - 3) / 3;
-        const size_t triangleCount = quadCount * 2;
-        const size_t expandedVertexCount = triangleCount * 3;
 
-        m_SpriteVertexBuffer.resize(m_SpriteVertexBuffer.size() + expandedVertexCount);
-
-        for (size_t i = 0; i < quadCount; i++)
+        for (size_t i = 0; i < (vertexCount - 3) / 3; i++)
         {
             // { 1, 3, 0 } { 1, 4, 3 } { 1, 5, 4 } { 1, 2, 5 }
-            m_SpriteVertexBuffer[i * 12 + 0] = vertexData[i * 3 + 1];
-            m_SpriteVertexBuffer[i * 12 + 1] = vertexData[i * 3 + 3];
-            m_SpriteVertexBuffer[i * 12 + 2] = vertexData[i * 3 + 0];
-            m_SpriteVertexBuffer[i * 12 + 3] = vertexData[i * 3 + 1];
-            m_SpriteVertexBuffer[i * 12 + 4] = vertexData[i * 3 + 4];
-            m_SpriteVertexBuffer[i * 12 + 5] = vertexData[i * 3 + 3];
-            m_SpriteVertexBuffer[i * 12 + 6] = vertexData[i * 3 + 1];
-            m_SpriteVertexBuffer[i * 12 + 7] = vertexData[i * 3 + 5];
-            m_SpriteVertexBuffer[i * 12 + 8] = vertexData[i * 3 + 4];
-            m_SpriteVertexBuffer[i * 12 + 9] = vertexData[i * 3 + 1];
-            m_SpriteVertexBuffer[i * 12 + 10] = vertexData[i * 3 + 2];
-            m_SpriteVertexBuffer[i * 12 + 11] = vertexData[i * 3 + 5];
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 1]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 3]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 0]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 1]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 4]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 3]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 1]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 5]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 4]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 1]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 2]);
+            m_SpriteVertexBuffer.push_back(vertexData[i * 3 + 5]);
         }
 
         break;
