@@ -452,7 +452,7 @@ RendererVK::RecordCommands(uint32_t imageIndex)
 						  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 						  vk::PipelineStageFlagBits2::eColorAttachmentOutput);
 
-	vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 1.0f, 0.0f, 1.0f);
+	vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.1f, 0.1f, 1.0f);
 	vk::RenderingAttachmentInfo attachmentInfo{};
 	attachmentInfo.imageView = m_SwapchainImageViews[imageIndex];
 	attachmentInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
