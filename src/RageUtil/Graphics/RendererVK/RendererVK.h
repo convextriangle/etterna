@@ -60,8 +60,8 @@ class RendererVK : public Display::Renderer
 	vk::raii::CommandPool m_CommandPool = nullptr;
 	void InitCommandPool();
 
-	vk::raii::CommandBuffer m_CommandBuffer = nullptr;
-	void InitCommandBuffer();
+	std::vector<vk::raii::CommandBuffer> m_CommandBuffers;
+	void InitCommandBuffers();
 
 	void TransitionImageLayout(uint32_t imageIndex,
 							   vk::ImageLayout oldLayout,
@@ -71,11 +71,15 @@ class RendererVK : public Display::Renderer
 							   vk::PipelineStageFlags2 srcStageMask,
 							   vk::PipelineStageFlags2 dstStageMask);
 
-	vk::raii::Semaphore m_PresentCompleteSemaphore = nullptr;
-	vk::raii::Semaphore m_RenderFinishedSemaphore = nullptr;
-	vk::raii::Fence m_DrawFence = nullptr;
+	std::vector<vk::raii::Semaphore> m_PresentCompleteSemaphore;
+	std::vector<vk::raii::Semaphore> m_RenderFinishedSemaphore;
+	std::vector<vk::raii::Fence> m_InFlightFence;
+	uint32_t semaphoreIndex = 0;
+	uint32_t currentFrame = 0;
 	void InitSyncStructures();
 	void RecordCommands(uint32_t imageIndex);
+
+	constexpr static size_t FramesInFlight = 2;
 };
 
 #endif
