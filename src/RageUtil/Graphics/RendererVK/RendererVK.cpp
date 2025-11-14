@@ -25,6 +25,7 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 	InitImageViews();
 	InitGraphicsPipeline();
 	InitCommandPool();
+	InitBatchBuffers();
 	InitCommandBuffers();
 	InitSyncStructures();
 }
@@ -36,16 +37,23 @@ void
 RendererVK::OnRender(const ActualVideoModeParams* p,
 					 const Display::CommandBatcher& batcher)
 {
-	while (vk::Result::eTimeout ==
-		   m_Device.waitForFences(
-			 *m_InFlightFence[currentFrame], vk::True, Timeout))
-		;
+	ThrowIfFail(m_Device.waitForFences(
+	  *m_InFlightFence[currentFrame], vk::True, Timeout));
+
+	UpdateBatchBuffers(batcher);
+
 	auto [result, imageIndex] = m_Swapchain.acquireNextImage(
 	  Timeout, *m_PresentCompleteSemaphore[semaphoreIndex], nullptr);
 
+	if (result == vk::Result::eErrorOutOfDateKHR) {
+		RecreateSwapchain(*p);
+		return;
+	}
+	ThrowIfFail(result);
+
 	m_Device.resetFences(*m_InFlightFence[currentFrame]);
 	m_CommandBuffers[currentFrame].reset();
-	RecordCommands(imageIndex);
+	RecordCommands(imageIndex, batcher.m_IndirectCommandBuffer.size());
 
 	vk::PipelineStageFlags waitDestinationStageMask(
 	  vk::PipelineStageFlagBits::eColorAttachmentOutput);
@@ -66,7 +74,14 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 	presentInfoKHR.swapchainCount = 1;
 	presentInfoKHR.pSwapchains = &*m_Swapchain;
 	presentInfoKHR.pImageIndices = &imageIndex;
-	result = m_GraphicsQueue.presentKHR(presentInfoKHR);
+
+	result = m_PresentQueue.presentKHR(presentInfoKHR);
+	if (result == vk::Result::eErrorOutOfDateKHR ||
+		result == vk::Result::eSuboptimalKHR) {
+		RecreateSwapchain(*p);
+		return;
+	}
+	ThrowIfFail(result);
 
 	semaphoreIndex = (semaphoreIndex + 1) % m_PresentCompleteSemaphore.size();
 	currentFrame = (currentFrame + 1) % FramesInFlight;
@@ -88,10 +103,6 @@ RendererVK::~RendererVK()
 {
 	// WHAT
 	vkDeviceWaitIdle(static_cast<VkDevice>(static_cast<vk::Device>(m_Device)));
-
-	if (m_Allocator != nullptr) {
-		vmaDestroyAllocator(m_Allocator);
-	}
 }
 
 VkBool32
@@ -192,8 +203,7 @@ RendererVK::InitVulkanState()
 	allocatorInfo.instance = static_cast<vk::Instance>(m_Instance);
 	allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
-	VmaAllocator allocator = {};
-	ThrowIfFail(vmaCreateAllocator(&allocatorInfo, &allocator));
+	ThrowIfFail(vmaCreateAllocator(&allocatorInfo, &m_Allocator));
 }
 
 void
@@ -205,7 +215,7 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 
 	vk::SwapchainCreateInfoKHR swapChainCreateInfo{};
 	swapChainCreateInfo.surface = *m_Surface;
-	swapChainCreateInfo.minImageCount = 3;
+	swapChainCreateInfo.minImageCount = 2;
 	swapChainCreateInfo.imageFormat = ImageFormat;
 	swapChainCreateInfo.imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
 	swapChainCreateInfo.imageExtent = m_SwapchainExtent;
@@ -219,6 +229,23 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 
 	m_Swapchain = vk::raii::SwapchainKHR(m_Device, swapChainCreateInfo);
 	m_SwapchainImages = m_Swapchain.getImages();
+}
+
+void
+RendererVK::RecreateSwapchain(const VideoModeParams& p)
+{
+	m_Device.waitIdle();
+
+	CleanupSwapchain();
+	InitSwapchain(p);
+	InitImageViews();
+}
+
+void
+RendererVK::CleanupSwapchain()
+{
+	m_SwapchainImageViews.clear();
+	m_Swapchain = nullptr;
 }
 
 void
@@ -315,8 +342,23 @@ RendererVK::InitGraphicsPipeline()
 	colorBlending.attachmentCount = 1;
 	colorBlending.pAttachments = &colorBlendAttachment;
 
+	std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+		vk::DescriptorSetLayoutBinding(0,
+									   vk::DescriptorType::eStorageBuffer,
+									   1,
+									   vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(1,
+									   vk::DescriptorType::eStorageBuffer,
+									   1,
+									   vk::ShaderStageFlagBits::eVertex)
+	};
+
+	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
+	m_DescriptorSetLayout = vk::raii::DescriptorSetLayout(m_Device, layoutInfo);
+
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {};
-	pipelineLayoutInfo.setLayoutCount = 0;
+	pipelineLayoutInfo.setLayoutCount = 1;
+	pipelineLayoutInfo.pSetLayouts = &*m_DescriptorSetLayout;
 	pipelineLayoutInfo.pushConstantRangeCount = 0;
 
 	m_PipelineLayout = vk::raii::PipelineLayout(m_Device, pipelineLayoutInfo);
@@ -325,8 +367,7 @@ RendererVK::InitGraphicsPipeline()
 	pipelineRenderingCreateInfo.colorAttachmentCount = 1;
 	pipelineRenderingCreateInfo.pColorAttachmentFormats = &ImageFormat;
 
-	// auto vertexInputInfo = GetSpriteVertexInfo();
-	vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+	auto vertexInputInfo = GetSpriteVertexInfo();
 	vk::GraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.pNext = &pipelineRenderingCreateInfo;
 	pipelineInfo.stageCount = 2;
@@ -447,7 +488,7 @@ RendererVK::InitSyncStructures()
 }
 
 void
-RendererVK::RecordCommands(uint32_t imageIndex)
+RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 {
 	m_CommandBuffers[currentFrame].begin({});
 	TransitionImageLayout(imageIndex,
@@ -474,8 +515,21 @@ RendererVK::RecordCommands(uint32_t imageIndex)
 	renderingInfo.pColorAttachments = &attachmentInfo;
 
 	m_CommandBuffers[currentFrame].beginRendering(renderingInfo);
+
 	m_CommandBuffers[currentFrame].bindPipeline(
 	  vk::PipelineBindPoint::eGraphics, *m_GraphicsPipeline);
+
+	m_CommandBuffers[currentFrame].bindDescriptorSets(
+	  vk::PipelineBindPoint::eGraphics,
+	  *m_PipelineLayout,
+	  0,
+	  { *m_DescriptorSets[0] },
+	  nullptr);
+
+	vk::Buffer vertexBuffers[] = { m_SpriteVertexBuffer.get() };
+	vk::DeviceSize offsets[] = { 0 };
+	m_CommandBuffers[currentFrame].bindVertexBuffers(0, vertexBuffers, offsets);
+
 	m_CommandBuffers[currentFrame].setViewport(
 	  0,
 	  vk::Viewport(0.0f,
@@ -486,7 +540,10 @@ RendererVK::RecordCommands(uint32_t imageIndex)
 				   1.0f));
 	m_CommandBuffers[currentFrame].setScissor(
 	  0, vk::Rect2D(vk::Offset2D(0, 0), m_SwapchainExtent));
-	m_CommandBuffers[currentFrame].draw(3, 1, 0, 0);
+
+	m_CommandBuffers[currentFrame].drawIndirect(
+	  m_DrawCommandBuffer.get(), 0, drawCount, sizeof(Display::DrawCommand));
+
 	m_CommandBuffers[currentFrame].endRendering();
 
 	TransitionImageLayout(imageIndex,
@@ -497,4 +554,128 @@ RendererVK::RecordCommands(uint32_t imageIndex)
 						  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 						  vk::PipelineStageFlagBits2::eBottomOfPipe);
 	m_CommandBuffers[currentFrame].end();
+}
+
+void
+RendererVK::InitBatchBuffers()
+{
+	std::vector<vk::DescriptorPoolSize> poolSizes = { vk::DescriptorPoolSize(
+	  vk::DescriptorType::eStorageBuffer, 2) };
+
+	vk::DescriptorPoolCreateInfo poolInfo(
+	  vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1, poolSizes);
+	m_DescriptorPool = vk::raii::DescriptorPool(m_Device, poolInfo);
+
+	std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+		vk::DescriptorSetLayoutBinding(0,
+									   vk::DescriptorType::eStorageBuffer,
+									   1,
+									   vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(1,
+									   vk::DescriptorType::eStorageBuffer,
+									   1,
+									   vk::ShaderStageFlagBits::eVertex)
+	};
+
+	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
+	m_DescriptorSetLayout = vk::raii::DescriptorSetLayout(m_Device, layoutInfo);
+
+	vk::DescriptorSetAllocateInfo allocInfo(
+	  *m_DescriptorPool, 1, &*m_DescriptorSetLayout);
+	m_DescriptorSets = m_Device.allocateDescriptorSets(allocInfo);
+
+	vk::BufferCreateInfo drawArgBufferInfo{};
+	drawArgBufferInfo.size =
+	  sizeof(Display::DrawCommandArgument) * MaxDrawCount;
+	drawArgBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
+	VmaAllocationCreateInfo drawArgAllocInfo = {};
+	drawArgAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+	drawArgAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	m_DrawArgumentBuffer.Init(m_Allocator, drawArgBufferInfo, drawArgAllocInfo);
+
+	vk::BufferCreateInfo matrixBufferInfo{};
+	matrixBufferInfo.size = sizeof(Display::MatrixState) * MaxDrawCount;
+	matrixBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
+
+	VmaAllocationCreateInfo matrixAllocInfo = {};
+	matrixAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+	matrixAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	m_MatrixStateBuffer.Init(m_Allocator, matrixBufferInfo, matrixAllocInfo);
+
+	vk::BufferCreateInfo vertexBufferInfo{};
+	vertexBufferInfo.size = sizeof(RageSpriteVertex) * MaxDrawCount * 10;
+	vertexBufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+
+	VmaAllocationCreateInfo vertexAllocInfo = {};
+	vertexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+	vertexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	m_SpriteVertexBuffer.Init(m_Allocator, vertexBufferInfo, vertexAllocInfo);
+
+	vk::BufferCreateInfo indirectBufferInfo{};
+	indirectBufferInfo.size = sizeof(Display::DrawCommand) * MaxDrawCount;
+	indirectBufferInfo.usage = vk::BufferUsageFlagBits::eIndirectBuffer;
+
+	VmaAllocationCreateInfo indirectAllocInfo = {};
+	indirectAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+	indirectAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	m_DrawCommandBuffer.Init(
+	  m_Allocator, indirectBufferInfo, indirectAllocInfo);
+
+	vk::DescriptorBufferInfo drawArgInfo(
+	  m_DrawArgumentBuffer.get(), 0, VK_WHOLE_SIZE);
+	vk::DescriptorBufferInfo matrixInfo(
+	  m_MatrixStateBuffer.get(), 0, VK_WHOLE_SIZE);
+
+	std::vector<vk::WriteDescriptorSet> writes = {
+		vk::WriteDescriptorSet(*m_DescriptorSets[0],
+							   0,
+							   0,
+							   1,
+							   vk::DescriptorType::eStorageBuffer,
+							   nullptr,
+							   &drawArgInfo,
+							   nullptr),
+		vk::WriteDescriptorSet(*m_DescriptorSets[0],
+							   1,
+							   0,
+							   1,
+							   vk::DescriptorType::eStorageBuffer,
+							   nullptr,
+							   &matrixInfo,
+							   nullptr)
+	};
+
+	m_Device.updateDescriptorSets(writes, nullptr);
+}
+
+void
+RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
+{
+	if (!batcher.m_IndirectCommandBuffer.empty()) {
+		std::memcpy(m_DrawCommandBuffer.getMappedData(),
+					batcher.m_IndirectCommandBuffer.data(),
+					sizeof(Display::DrawCommand) *
+					  batcher.m_IndirectCommandBuffer.size());
+	}
+
+	if (!batcher.m_IndirectCommandArgumentBuffer.empty()) {
+		std::memcpy(m_DrawArgumentBuffer.getMappedData(),
+					batcher.m_IndirectCommandArgumentBuffer.data(),
+					sizeof(Display::DrawCommandArgument) *
+					  batcher.m_IndirectCommandArgumentBuffer.size());
+	}
+
+	if (!batcher.m_SpriteVertexBuffer.empty()) {
+		std::memcpy(m_SpriteVertexBuffer.getMappedData(),
+					batcher.m_SpriteVertexBuffer.data(),
+					sizeof(RageSpriteVertex) *
+					  batcher.m_SpriteVertexBuffer.size());
+	}
+
+	if (!batcher.m_MatrixStateBuffer.empty()) {
+		std::memcpy(m_MatrixStateBuffer.getMappedData(),
+					batcher.m_MatrixStateBuffer.data(),
+					sizeof(Display::MatrixState) *
+					  batcher.m_MatrixStateBuffer.size());
+	}
 }

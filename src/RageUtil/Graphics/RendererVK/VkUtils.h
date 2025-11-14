@@ -38,30 +38,5 @@ LoadShaderFromFile(std::string path,
 				   vk::raii::Device& device,
 				   shaderc_shader_kind shaderKind);
 
-// TODO: revise these because they're wacky leftovers from older prototypes
-void
-CreateBuffer(VkDevice device,
-			 VkPhysicalDevice gpu,
-			 VkDeviceSize size,
-			 VkBufferUsageFlags usageFlags,
-			 VkMemoryPropertyFlags properties,
-			 VkBuffer& buffer,
-			 VkDeviceMemory& bufferMemory);
-
-void
-CreateDynamicBuffer(VkDevice device,
-					VkPhysicalDevice gpu,
-					VkBuffer& buffer,
-					VkDeviceMemory& bufferMemory,
-					size_t neededSize,
-					VkBufferUsageFlags usageFlags);
-
-void
-UpdateDynamicBuffer(VkDevice device,
-					VkPhysicalDevice gpu,
-					VkBuffer& buffer,
-					VkDeviceMemory& bufferMemory,
-					const void* data,
-					size_t dataSize);
 
 #endif

@@ -13,6 +13,39 @@
 #include <array>
 #include "VkUtils.h"
 
+struct BufferHelper
+{
+	VkBuffer buffer = VK_NULL_HANDLE;
+	VmaAllocation allocation = VK_NULL_HANDLE;
+	VmaAllocationInfo allocInfo = {};
+	VmaAllocator allocator;
+
+	void Init(VmaAllocator allocator,
+			  const vk::BufferCreateInfo& createInfo,
+			  const VmaAllocationCreateInfo& allocInfo)
+	{
+		this->allocator = allocator;
+		ThrowIfFail(
+		  vmaCreateBuffer(allocator,
+						  &static_cast<const VkBufferCreateInfo&>(createInfo),
+						  &allocInfo,
+						  &this->buffer,
+						  &this->allocation,
+						  &this->allocInfo));
+	}
+
+	vk::Buffer get() const { return vk::Buffer(buffer); }
+
+	void* getMappedData() const { return allocInfo.pMappedData; }
+
+	~BufferHelper()
+	{
+		if (buffer != VK_NULL_HANDLE && allocation != VK_NULL_HANDLE) {
+			vmaDestroyBuffer(allocator, buffer, allocation);
+		}
+	}
+};
+
 class RendererVK : public Display::Renderer
 {
   public:
@@ -47,12 +80,15 @@ class RendererVK : public Display::Renderer
 	constexpr static vk::Format ImageFormat = vk::Format::eB8G8R8A8Unorm;
 
 	void InitSwapchain(const VideoModeParams& p);
+	void RecreateSwapchain(const VideoModeParams& p);
+	void CleanupSwapchain();
 
 	std::vector<vk::raii::ImageView> m_SwapchainImageViews;
 	void InitImageViews();
 
 	vk::raii::PipelineLayout m_PipelineLayout = nullptr;
 	vk::raii::Pipeline m_GraphicsPipeline = nullptr;
+	vk::raii::DescriptorSetLayout m_DescriptorSetLayout = nullptr;
 	void InitGraphicsPipeline();
 
 	vk::PipelineVertexInputStateCreateInfo GetSpriteVertexInfo();
@@ -77,9 +113,21 @@ class RendererVK : public Display::Renderer
 	uint32_t semaphoreIndex = 0;
 	uint32_t currentFrame = 0;
 	void InitSyncStructures();
-	void RecordCommands(uint32_t imageIndex);
+	void RecordCommands(uint32_t imageIndex, uint32_t drawCount);
 
 	constexpr static size_t FramesInFlight = 2;
+	constexpr static size_t MaxDrawCount = 50'000;
+
+	BufferHelper m_SpriteVertexBuffer;
+	BufferHelper m_DrawCommandBuffer;
+	BufferHelper m_DrawArgumentBuffer;
+	BufferHelper m_MatrixStateBuffer;
+
+	std::vector<vk::raii::DescriptorSet> m_DescriptorSets;
+	vk::raii::DescriptorPool m_DescriptorPool = nullptr;
+
+	void InitBatchBuffers();
+	void UpdateBatchBuffers(const Display::CommandBatcher& batcher);
 };
 
 #endif

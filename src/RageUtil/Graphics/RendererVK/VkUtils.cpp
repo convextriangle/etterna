@@ -68,6 +68,7 @@ CompileShader(const std::string& sourceName,
 	if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
 		auto message = std::format("Vulkan GLSL shader compilation failed: {}",
 								   result.GetErrorMessage());
+		Locator::getLogger()->error(message);
 		throw std::runtime_error(message);
 	}
 
@@ -116,91 +117,4 @@ FindMemoryType(VkPhysicalDevice physicalDevice,
 	}
 
 	Fail();
-}
-
-void
-CreateBuffer(VkDevice device,
-			 VkPhysicalDevice gpu,
-			 VkDeviceSize size,
-			 VkBufferUsageFlags usageFlags,
-			 VkMemoryPropertyFlags properties,
-			 VkBuffer& buffer,
-			 VkDeviceMemory& bufferMemory)
-{
-	VkBufferCreateInfo bufferInfo = {};
-	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = size;
-	bufferInfo.usage = usageFlags;
-	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	ThrowIfFail(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
-
-	VkMemoryRequirements requirements;
-	vkGetBufferMemoryRequirements(device, buffer, &requirements);
-
-	VkMemoryAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = requirements.size;
-	allocInfo.memoryTypeIndex =
-	  FindMemoryType(gpu, requirements.memoryTypeBits, properties);
-
-	ThrowIfFail(vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory));
-
-	ThrowIfFail(vkBindBufferMemory(device, buffer, bufferMemory, 0));
-}
-
-void
-CreateDynamicBuffer(VkDevice device,
-					VkPhysicalDevice gpu,
-					VkBuffer& buffer,
-					VkDeviceMemory& bufferMemory,
-					size_t neededSize,
-					VkBufferUsageFlags usageFlags)
-{
-	CreateBuffer(device,
-				 gpu,
-				 neededSize,
-				 usageFlags,
-				 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-				   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-				 buffer,
-				 bufferMemory);
-}
-
-void
-UpdateDynamicBuffer(VkDevice device,
-					VkPhysicalDevice gpu,
-					VkBuffer& buffer,
-					VkDeviceMemory& bufferMemory,
-					const void* data,
-					size_t dataSize)
-{
-	if (!dataSize) {
-		return;
-	}
-	VkPhysicalDeviceProperties props;
-	vkGetPhysicalDeviceProperties(gpu, &props);
-	VkDeviceSize nonCoherentAtomSize = props.limits.nonCoherentAtomSize;
-
-	VkDeviceSize alignedSize =
-	  (dataSize + nonCoherentAtomSize - 1) & ~(nonCoherentAtomSize - 1);
-
-	VkMemoryRequirements memReqs;
-	vkGetBufferMemoryRequirements(device, buffer, &memReqs);
-	alignedSize = std::min(alignedSize, memReqs.size);
-
-	void* mappedData = nullptr;
-	ThrowIfFail(
-	  vkMapMemory(device, bufferMemory, 0, alignedSize, 0, &mappedData));
-
-	std::memcpy(mappedData, data, dataSize);
-
-	VkMappedMemoryRange memoryRange = { .sType =
-										  VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
-										.memory = bufferMemory,
-										.offset = 0,
-										.size = alignedSize };
-	vkFlushMappedMemoryRanges(device, 1, &memoryRange);
-
-	vkUnmapMemory(device, bufferMemory);
 }

@@ -6,7 +6,6 @@
 #include <queue>
 #include <string>
 
-// TODO: put commands for an actor into a blob and then make blob queue!
 namespace Display
 {
 
