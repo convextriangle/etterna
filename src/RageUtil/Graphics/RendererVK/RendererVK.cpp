@@ -533,13 +533,13 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 	m_CommandBuffers[currentFrame].setViewport(
 	  0,
 	  vk::Viewport(0.0f,
-				   0.0f,
-				   static_cast<float>(m_SwapchainExtent.width),
 				   static_cast<float>(m_SwapchainExtent.height),
+				   static_cast<float>(m_SwapchainExtent.width),
+				   -static_cast<float>(m_SwapchainExtent.height),
 				   0.0f,
 				   1.0f));
 	m_CommandBuffers[currentFrame].setScissor(
-	  0, vk::Rect2D(vk::Offset2D(0, 0), m_SwapchainExtent));
+	  0, vk::Rect2D(vk::Offset2D(0, 1), m_SwapchainExtent));
 
 	if (drawCount > 0) {
 		m_CommandBuffers[currentFrame].drawIndirect(
