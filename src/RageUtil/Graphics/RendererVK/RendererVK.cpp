@@ -159,16 +159,24 @@ RendererVK::InitVulkanState()
 	vk12Features.bufferDeviceAddress = true;
 	vk12Features.descriptorIndexing = true;
 	vk12Features.runtimeDescriptorArray = true;
+	vk12Features.drawIndirectCount = true;
+
+	VkPhysicalDeviceVulkan11Features vk11Features = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES
+	};
+	vk11Features.shaderDrawParameters = true;
 
 	VkPhysicalDeviceFeatures vkFeatures = {};
 	vkFeatures.multiDrawIndirect = vk::True;
 	vkFeatures.logicOp = vk::True;
+	vkFeatures.drawIndirectFirstInstance = vk::True;
 
 	vkb::PhysicalDeviceSelector selector(*instanceResult);
 	auto physicalDeviceResult =
 	  selector.set_minimum_version(1, 3)
 		.set_required_features_13(vk13Features)
 		.set_required_features_12(vk12Features)
+		.set_required_features_11(vk11Features)
 		.set_required_features(vkFeatures)
 		.set_surface(static_cast<vk::SurfaceKHR>(m_Surface))
 		.select();
@@ -533,13 +541,13 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 	m_CommandBuffers[currentFrame].setViewport(
 	  0,
 	  vk::Viewport(0.0f,
-				   static_cast<float>(m_SwapchainExtent.height),
+				   0.0f,
 				   static_cast<float>(m_SwapchainExtent.width),
-				   -static_cast<float>(m_SwapchainExtent.height),
+				   static_cast<float>(m_SwapchainExtent.height),
 				   0.0f,
 				   1.0f));
 	m_CommandBuffers[currentFrame].setScissor(
-	  0, vk::Rect2D(vk::Offset2D(0, 1), m_SwapchainExtent));
+	  0, vk::Rect2D(vk::Offset2D(0, 0), m_SwapchainExtent));
 
 	if (drawCount > 0) {
 		m_CommandBuffers[currentFrame].drawIndirect(
@@ -629,7 +637,7 @@ RendererVK::InitBatchBuffers()
 	  m_MatrixStateBuffer.get(), 0, VK_WHOLE_SIZE);
 
 	std::vector<vk::WriteDescriptorSet> writes = {
-		vk::WriteDescriptorSet(*m_DescriptorSets[0],
+		vk::WriteDescriptorSet(m_DescriptorSets[0],
 							   0,
 							   0,
 							   1,
@@ -637,7 +645,7 @@ RendererVK::InitBatchBuffers()
 							   nullptr,
 							   &drawArgInfo,
 							   nullptr),
-		vk::WriteDescriptorSet(*m_DescriptorSets[0],
+		vk::WriteDescriptorSet(m_DescriptorSets[0],
 							   1,
 							   0,
 							   1,
