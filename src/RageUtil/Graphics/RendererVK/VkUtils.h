@@ -8,13 +8,6 @@
 #include <span>
 #include <shaderc/shaderc.hpp>
 
-struct DeletionQueue
-{
-	std::deque<std::function<void()>> Callbacks;
-	void PushDeletionCallback(std::function<void()>&& callback);
-	void FlushCallbacks();
-};
-
 void
 ThrowIfFail(
   VkResult result,

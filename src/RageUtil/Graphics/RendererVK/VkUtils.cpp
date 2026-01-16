@@ -5,22 +5,6 @@
 #include "Core/Services/Locator.hpp"
 
 void
-DeletionQueue::PushDeletionCallback(std::function<void()>&& callback)
-{
-	Callbacks.push_back(callback);
-}
-
-void
-DeletionQueue::FlushCallbacks()
-{
-	for (auto it = Callbacks.rbegin(); it != Callbacks.rend(); it++) {
-		(*it)();
-	}
-
-	Callbacks.clear();
-}
-
-void
 ThrowIfFail(VkResult result, const std::source_location location)
 {
 	if (result == VK_SUCCESS) {
@@ -98,23 +82,4 @@ LoadShaderFromFile(std::string path,
 	createInfo.pCode = shaderBlob.data();
 
 	return vk::raii::ShaderModule(device, createInfo);
-}
-
-uint32_t
-FindMemoryType(VkPhysicalDevice physicalDevice,
-			   uint32_t typeFilter,
-			   VkMemoryPropertyFlags properties)
-{
-	VkPhysicalDeviceMemoryProperties memoryProps = {};
-	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProps);
-
-	for (uint32_t i = 0; i < memoryProps.memoryTypeCount; i++) {
-		if ((typeFilter & (1 << i)) &&
-			(memoryProps.memoryTypes[i].propertyFlags & properties) ==
-			  properties) {
-			return i;
-		}
-	}
-
-	Fail();
 }
