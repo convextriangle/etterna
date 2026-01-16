@@ -1,3 +1,6 @@
+#ifndef RENDERER_VK_TEXTURE_H
+#define RENDERER_VK_TEXTURE_H
+
 #include <vulkan/vulkan_raii.hpp>
 #include <vk_mem_alloc.h>
 #include <RageUtil/Graphics/RageSurface.h>
@@ -27,3 +30,5 @@ struct Texture
 			vk::raii::Device& device);
 	~Texture();
 };
+
+#endif

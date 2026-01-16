@@ -12,39 +12,7 @@
 #include <array>
 #include "VkUtils.h"
 #include "Texture.h"
-
-struct BufferHelper
-{
-	VkBuffer buffer = VK_NULL_HANDLE;
-	VmaAllocation allocation = VK_NULL_HANDLE;
-	VmaAllocationInfo allocInfo = {};
-	VmaAllocator allocator = nullptr;
-
-	void Init(VmaAllocator allocator,
-			  const vk::BufferCreateInfo& createInfo,
-			  const VmaAllocationCreateInfo& allocInfo)
-	{
-		this->allocator = allocator;
-		ThrowIfFail(
-		  vmaCreateBuffer(allocator,
-						  &static_cast<const VkBufferCreateInfo&>(createInfo),
-						  &allocInfo,
-						  &this->buffer,
-						  &this->allocation,
-						  &this->allocInfo));
-	}
-
-	vk::Buffer get() const { return vk::Buffer(buffer); }
-
-	void* getMappedData() const { return allocInfo.pMappedData; }
-
-	~BufferHelper()
-	{
-		if (buffer != VK_NULL_HANDLE && allocation != VK_NULL_HANDLE) {
-			vmaDestroyBuffer(allocator, buffer, allocation);
-		}
-	}
-};
+#include "BufferHelper.h"
 
 class RendererVK : public Display::Renderer
 {

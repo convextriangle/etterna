@@ -136,7 +136,7 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	copyBuffer.begin(beginInfo);
 
 	auto& texture = m_Textures[textureHandle];
-	std::memcpy(m_TextureBuffer.getMappedData(),
+	std::memcpy(m_TextureBuffer.GetMappedData(),
 				img->pixels,
 				static_cast<size_t>(img->h) * img->w * sizeof(uint32_t));
 
@@ -638,7 +638,7 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 	  { *m_DescriptorSets[0] },
 	  nullptr);
 
-	vk::Buffer vertexBuffers[] = { m_SpriteVertexBuffer.get() };
+	vk::Buffer vertexBuffers[] = { m_SpriteVertexBuffer.Get() };
 	vk::DeviceSize offsets[] = { 0 };
 	m_CommandBuffers[currentFrame].bindVertexBuffers(0, vertexBuffers, offsets);
 
@@ -655,7 +655,7 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 
 	if (drawCount > 0) {
 		m_CommandBuffers[currentFrame].drawIndirect(
-		  m_DrawCommandBuffer.get(),
+		  m_DrawCommandBuffer.Get(),
 		  0,
 		  drawCount,
 		  sizeof(Display::DrawCommand));
@@ -752,9 +752,9 @@ RendererVK::InitBatchBuffers()
 	  m_Allocator, indirectBufferInfo, indirectAllocInfo);
 
 	vk::DescriptorBufferInfo drawArgInfo(
-	  m_DrawArgumentBuffer.get(), 0, VK_WHOLE_SIZE);
+	  m_DrawArgumentBuffer.Get(), 0, VK_WHOLE_SIZE);
 	vk::DescriptorBufferInfo matrixInfo(
-	  m_MatrixStateBuffer.get(), 0, VK_WHOLE_SIZE);
+	  m_MatrixStateBuffer.Get(), 0, VK_WHOLE_SIZE);
 
 	std::vector<vk::WriteDescriptorSet> writes = {
 		vk::WriteDescriptorSet(m_DescriptorSets[0],
@@ -782,28 +782,28 @@ void
 RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
 {
 	if (!batcher.m_IndirectCommandBuffer.empty()) {
-		std::memcpy(m_DrawCommandBuffer.getMappedData(),
+		std::memcpy(m_DrawCommandBuffer.GetMappedData(),
 					batcher.m_IndirectCommandBuffer.data(),
 					sizeof(Display::DrawCommand) *
 					  batcher.m_IndirectCommandBuffer.size());
 	}
 
 	if (!batcher.m_IndirectCommandArgumentBuffer.empty()) {
-		std::memcpy(m_DrawArgumentBuffer.getMappedData(),
+		std::memcpy(m_DrawArgumentBuffer.GetMappedData(),
 					batcher.m_IndirectCommandArgumentBuffer.data(),
 					sizeof(Display::DrawCommandArgument) *
 					  batcher.m_IndirectCommandArgumentBuffer.size());
 	}
 
 	if (!batcher.m_SpriteVertexBuffer.empty()) {
-		std::memcpy(m_SpriteVertexBuffer.getMappedData(),
+		std::memcpy(m_SpriteVertexBuffer.GetMappedData(),
 					batcher.m_SpriteVertexBuffer.data(),
 					sizeof(RageSpriteVertex) *
 					  batcher.m_SpriteVertexBuffer.size());
 	}
 
 	if (!batcher.m_MatrixStateBuffer.empty()) {
-		std::memcpy(m_MatrixStateBuffer.getMappedData(),
+		std::memcpy(m_MatrixStateBuffer.GetMappedData(),
 					batcher.m_MatrixStateBuffer.data(),
 					sizeof(Display::MatrixState) *
 					  batcher.m_MatrixStateBuffer.size());
