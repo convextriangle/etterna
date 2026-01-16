@@ -2,7 +2,6 @@
 #define RENDERER_VULKAN_H
 
 #include "RageUtil/Graphics/Display/Renderer.h"
-#include "RageUtil/Graphics/Display/TextureCommand.h"
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -12,13 +11,14 @@
 #include <VkBootstrap.h>
 #include <array>
 #include "VkUtils.h"
+#include "Texture.h"
 
 struct BufferHelper
 {
 	VkBuffer buffer = VK_NULL_HANDLE;
 	VmaAllocation allocation = VK_NULL_HANDLE;
 	VmaAllocationInfo allocInfo = {};
-	VmaAllocator allocator;
+	VmaAllocator allocator = nullptr;
 
 	void Init(VmaAllocator allocator,
 			  const vk::BufferCreateInfo& createInfo,
@@ -54,8 +54,15 @@ class RendererVK : public Display::Renderer
 	void OnRender(const ActualVideoModeParams* p,
 				  const Display::CommandBatcher& batcher) override;
 	bool IsD3DInternal() override;
-	intptr_t PushTextureCommand(
-	  const Display::TextureCommand& command) override;
+	intptr_t CreateTexture(RageSurface* img) override;
+	void UpdateTexture(intptr_t textureHandle,
+					   RageSurface* img,
+					   int xOffset,
+					   int yOffset,
+					   int width,
+					   int height) override;
+	void DeleteTexture(intptr_t handle) override;
+	void ClearAllTextures() override;
 
 	~RendererVK() override;
 
@@ -122,12 +129,17 @@ class RendererVK : public Display::Renderer
 	BufferHelper m_DrawCommandBuffer;
 	BufferHelper m_DrawArgumentBuffer;
 	BufferHelper m_MatrixStateBuffer;
+	BufferHelper m_TextureBuffer;
 
 	std::vector<vk::raii::DescriptorSet> m_DescriptorSets;
 	vk::raii::DescriptorPool m_DescriptorPool = nullptr;
 
 	void InitBatchBuffers();
 	void UpdateBatchBuffers(const Display::CommandBatcher& batcher);
+
+	intptr_t m_TextureCounter = 0;
+	std::unordered_map<intptr_t, Texture> m_Textures;
+	int GetMaxTextureSize();
 };
 
 #endif

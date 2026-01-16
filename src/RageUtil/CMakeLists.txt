@@ -73,6 +73,7 @@ list(APPEND SMDATA_RAGE_GRAPHICS_SRC
   "Graphics/Display/RenderState.cpp"
   "Graphics/RendererVK/RendererVK.cpp"
   "Graphics/RendererVK/VkUtils.cpp"
+  "Graphics/RendererVK/Texture.cpp"
 )
 list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/RageBitmapTexture.h"
@@ -106,12 +107,12 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/Display/DrawMode.h"
   "Graphics/Display/MatrixState.h"
   "Graphics/Display/RenderState.h"
-  "Graphics/Display/TextureCommand.h"
   "Graphics/Display/Display.h"
   "Graphics/Display/Renderer.h"
   "Graphics/Display/DrawCommand.h"
   "Graphics/RendererVK/RendererVK.h"
   "Graphics/RendererVK/VkUtils.h"
+  "Graphics/RendererVK/Texture.h"
 )
 
 if(WIN32)

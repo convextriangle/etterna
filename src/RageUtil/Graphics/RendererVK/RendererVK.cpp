@@ -94,9 +94,113 @@ RendererVK::IsD3DInternal()
 }
 
 intptr_t
-RendererVK::PushTextureCommand(const Display::TextureCommand& command)
+RendererVK::CreateTexture(RageSurface* img)
 {
-	return intptr_t();
+	intptr_t currentHandle = m_TextureCounter++;
+
+	Texture texture{
+		img, (uint32_t)img->w, (uint32_t)img->h, m_Allocator, m_Device
+	};
+	m_Textures.insert({ currentHandle, texture });
+
+	UpdateTexture(currentHandle, img, 0, 0, img->w, img->h);
+	return currentHandle;
+}
+
+void
+RendererVK::UpdateTexture(intptr_t textureHandle,
+						  RageSurface* img,
+						  int xOffset,
+						  int yOffset,
+						  int width,
+						  int height)
+{
+	assert(xOffset == 0);
+	assert(yOffset == 0);
+	assert(width == img->w);
+	assert(height == img->h);
+	assert(img->pitch == width * sizeof(uint32_t));
+	assert(m_Textures.contains(textureHandle));
+
+	vk::CommandBufferAllocateInfo bufferInfo = {};
+	bufferInfo.level = vk::CommandBufferLevel::ePrimary;
+	bufferInfo.commandPool = m_CommandPool;
+	bufferInfo.commandBufferCount = 1;
+
+	auto buffers = m_Device.allocateCommandBuffers(bufferInfo);
+	assert(buffers.size() == 1);
+	auto& copyBuffer = buffers[0];
+
+	vk::CommandBufferBeginInfo beginInfo = {};
+	beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+	copyBuffer.begin(beginInfo);
+
+	auto& texture = m_Textures[textureHandle];
+	std::memcpy(m_TextureBuffer.getMappedData(),
+				img->pixels,
+				static_cast<size_t>(img->h) * img->w * sizeof(uint32_t));
+
+	vk::ImageMemoryBarrier barrier = {};
+	barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+	barrier.oldLayout = vk::ImageLayout::eUndefined;
+	barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = texture.image;
+	barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.layerCount = 1;
+	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eHost,
+							   vk::PipelineStageFlagBits::eTransfer,
+							   {},
+							   {},
+							   {},
+							   { barrier });
+
+	vk::BufferImageCopy imageCopy = {};
+	imageCopy.imageExtent = vk::Extent3D{ texture.width, texture.height, 1 };
+	imageCopy.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+	imageCopy.imageSubresource.mipLevel = 0;
+	imageCopy.imageSubresource.baseArrayLayer = 0;
+	imageCopy.imageSubresource.layerCount = 1;
+	copyBuffer.copyBufferToImage(m_TextureBuffer.buffer,
+								 texture.image,
+								 vk::ImageLayout::eTransferDstOptimal,
+								 { imageCopy });
+
+	barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+	barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+	barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+	barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+							   vk::PipelineStageFlagBits::eFragmentShader,
+							   {},
+							   {},
+							   {},
+							   { barrier });
+
+	copyBuffer.end();
+
+	vk::SubmitInfo submitInfo = {};
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &(*copyBuffer);
+	m_GraphicsQueue.submit({ submitInfo });
+	m_GraphicsQueue.waitIdle();
+}
+
+void
+RendererVK::DeleteTexture(intptr_t handle)
+{
+	m_GraphicsQueue.waitIdle();
+	m_Textures.erase(handle);
+}
+
+void
+RendererVK::ClearAllTextures()
+{
+	m_GraphicsQueue.waitIdle();
+	m_Textures.clear();
 }
 
 RendererVK::~RendererVK()
@@ -223,7 +327,7 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 
 	vk::SwapchainCreateInfoKHR swapChainCreateInfo{};
 	swapChainCreateInfo.surface = *m_Surface;
-	swapChainCreateInfo.minImageCount = 2;
+	swapChainCreateInfo.minImageCount = FramesInFlight;
 	swapChainCreateInfo.imageFormat = ImageFormat;
 	swapChainCreateInfo.imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
 	swapChainCreateInfo.imageExtent = m_SwapchainExtent;
@@ -572,6 +676,19 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 void
 RendererVK::InitBatchBuffers()
 {
+	uint32_t textureDims = GetMaxTextureSize();
+
+	VmaAllocationCreateInfo textureAllocInfo = {};
+	textureAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	textureAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+	textureAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+	vk::BufferCreateInfo textureInfo = {};
+	textureInfo.size =
+	  (vk::DeviceSize)textureDims * textureDims * sizeof(uint32_t);
+	textureInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
+	m_TextureBuffer.Init(m_Allocator, textureInfo, textureAllocInfo);
+
 	std::vector<vk::DescriptorPoolSize> poolSizes = { vk::DescriptorPoolSize(
 	  vk::DescriptorType::eStorageBuffer, 2) };
 
@@ -691,4 +808,10 @@ RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
 					sizeof(Display::MatrixState) *
 					  batcher.m_MatrixStateBuffer.size());
 	}
+}
+
+int
+RendererVK::GetMaxTextureSize()
+{
+	return 4096; // TODO: account for maxImageDimension2D
 }

@@ -9,248 +9,289 @@
 #error Display::Display is unfinished for non-Windows platforms
 #endif
 
-Display::Display::Display(std::unique_ptr<Renderer> renderer) : m_Renderer(std::move(renderer)), m_RenderState()
+Display::Display::Display(std::unique_ptr<Renderer> renderer)
+  : m_Renderer(std::move(renderer))
+  , m_RenderState()
 {
 }
 
-std::string Display::Display::Init(VideoModeParams &&p, bool bAllowUnacceleratedRenderer)
+std::string
+Display::Display::Init(VideoModeParams&& p, bool bAllowUnacceleratedRenderer)
 {
-    Locator::getLogger()->info("Display::Display::Init()");
-    Locator::getLogger()->info("Current renderer: UnstableDisplay - {}", m_Renderer->GetApiDescription());
+	Locator::getLogger()->info("Display::Display::Init()");
+	Locator::getLogger()->info("Current renderer: UnstableDisplay - {}",
+							   m_Renderer->GetApiDescription());
 
 	GraphicsWindow::Initialize(false);
 
-    bool ignored = false;
-    return SetVideoMode(std::move(p), ignored);
+	bool ignored = false;
+	return SetVideoMode(std::move(p), ignored);
 }
 
-void Display::Display::GetDisplaySpecs(DisplaySpecs &out) const
+void
+Display::Display::GetDisplaySpecs(DisplaySpecs& out) const
 {
 }
 
-void Display::Display::ResolutionChanged()
+void
+Display::Display::ResolutionChanged()
 {
-    RageDisplay::ResolutionChanged();
+	RageDisplay::ResolutionChanged();
 }
 
-bool Display::Display::BeginFrame()
+bool
+Display::Display::BeginFrame()
 {
 #ifdef _WIN32
 	GraphicsWindow::Update();
 #else
 #error todo
 #endif
-    m_Batcher.Clear();
-    m_RenderState.cullMode = CULL_NONE;
-    m_RenderState.zTestMode = ZTEST_OFF;
-    m_RenderState.blendMode = BLEND_NORMAL;
-    m_RenderState.zBias = 0.0f;
-    m_RenderState.zWrite = false;
-    m_RenderState.alphaTest = true;
-    m_RenderState.textureFiltering[0] = true;
-    m_RenderState.textureMode[0] = TextureMode_Invalid;
-    m_RenderState.textureWrapping[0] = false;
+	m_Batcher.Clear();
+	m_RenderState.cullMode = CULL_NONE;
+	m_RenderState.zTestMode = ZTEST_OFF;
+	m_RenderState.blendMode = BLEND_NORMAL;
+	m_RenderState.zBias = 0.0f;
+	m_RenderState.zWrite = false;
+	m_RenderState.alphaTest = true;
+	m_RenderState.textureFiltering[0] = true;
+	m_RenderState.textureMode[0] = TextureMode_Invalid;
+	m_RenderState.textureWrapping[0] = false;
 
-    PushCurrentRenderState();
+	PushCurrentRenderState();
 
-    return m_IsInitDone;
+	return m_IsInitDone;
 }
 
-void Display::Display::EndFrame()
+void
+Display::Display::EndFrame()
 {
-    m_Renderer->OnRender(GetActualVideoModeParams(), m_Batcher);
+	m_Renderer->OnRender(GetActualVideoModeParams(), m_Batcher);
 }
 
-const ActualVideoModeParams *Display::Display::GetActualVideoModeParams() const
+const ActualVideoModeParams*
+Display::Display::GetActualVideoModeParams() const
 {
 #ifdef _WIN32
-    return GraphicsWindow::GetParams();
+	return GraphicsWindow::GetParams();
 #else
 #error Display::Display is unfinished for non-Windows platforms
 #endif
 }
 
-std::string Display::Display::TryVideoMode(const VideoModeParams &p, bool &bNewDeviceOut)
+std::string
+Display::Display::TryVideoMode(const VideoModeParams& p, bool& bNewDeviceOut)
 {
 #ifdef _WIN32
-    GraphicsWindow::CreateGraphicsWindow(p);
+	GraphicsWindow::CreateGraphicsWindow(p);
 #else
 #error Display::Display is unfinished for non-Windows platforms
 #endif
 
-    m_Renderer->InitializeRenderer(p);
+	m_Renderer->InitializeRenderer(p);
 
-    ResolutionChanged();
+	ResolutionChanged();
 
-    // OnRender() with a black clearing to not whiteblast people?
-    m_Renderer->OnRender(GetActualVideoModeParams(), m_Batcher);
+	// OnRender() with a black clearing to not whiteblast people?
+	m_Renderer->OnRender(GetActualVideoModeParams(), m_Batcher);
 
-    m_IsInitDone = true;
-    return std::string();
+	m_IsInitDone = true;
+	return std::string();
 }
 
 #pragma region Texture handling
 
-const RageDisplay::RagePixelFormatDesc *Display::Display::GetPixelFormatDesc(RagePixelFormat pf) const
+const RageDisplay::RagePixelFormatDesc*
+Display::Display::GetPixelFormatDesc(RagePixelFormat pf) const
 {
-    assert(pf == RagePixelFormat_RGBA8);
-    static auto desc = RagePixelFormatDesc{32, {0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF}};
-    return &desc;
+	assert(pf == RagePixelFormat_RGBA8);
+	static auto desc =
+	  RagePixelFormatDesc{ 32,
+						   { 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF } };
+	return &desc;
 }
 
-bool Display::Display::SupportsTextureFormat(RagePixelFormat pixfmt, bool realtime)
+bool
+Display::Display::SupportsTextureFormat(RagePixelFormat pixfmt, bool realtime)
 {
-    return pixfmt == RagePixelFormat_RGBA8;
+	return pixfmt == RagePixelFormat_RGBA8;
 }
 
-intptr_t Display::Display::CreateTexture(RagePixelFormat pixfmt, RageSurface *img, bool bGenerateMipMaps)
+intptr_t
+Display::Display::CreateTexture(RagePixelFormat pixfmt,
+								RageSurface* img,
+								bool bGenerateMipMaps)
 {
-    assert(pixfmt == RagePixelFormat_RGBA8);
+	assert(pixfmt == RagePixelFormat_RGBA8);
 
-    return m_Renderer->PushTextureCommand(
-        TextureCreationCommand{.pixfmt = pixfmt, .img = img, .bGenerateMipMaps = bGenerateMipMaps});
+	return m_Renderer->CreateTexture(img);
 }
 
-void Display::Display::UpdateTexture(intptr_t uTexHandle, RageSurface *img, int xoffset, int yoffset, int width,
-                                     int height)
+void
+Display::Display::UpdateTexture(intptr_t uTexHandle,
+								RageSurface* img,
+								int xoffset,
+								int yoffset,
+								int width,
+								int height)
 {
-    m_Renderer->PushTextureCommand(TextureUpdateCommand{.uTexHandle = uTexHandle,
-                                                        .img = img,
-                                                        .xoffset = xoffset,
-                                                        .yoffset = yoffset,
-                                                        .width = width,
-                                                        .height = height});
+	m_Renderer->UpdateTexture(uTexHandle, img, xoffset, yoffset, width, height);
 }
 
-void Display::Display::DeleteTexture(intptr_t iTexHandle)
+void
+Display::Display::DeleteTexture(intptr_t iTexHandle)
 {
-    m_Renderer->PushTextureCommand(TextureDeletionCommand{.textureHandle = iTexHandle});
+	m_Renderer->DeleteTexture(iTexHandle);
 }
 
-void Display::Display::ClearAllTextures()
+void
+Display::Display::ClearAllTextures()
 {
-    m_Renderer->PushTextureCommand(TextureClearAllCommand{});
+	m_Renderer->ClearAllTextures();
 }
 
-int Display::Display::GetNumTextureUnits()
+int
+Display::Display::GetNumTextureUnits()
 {
-    return TextureUnit::NUM_TextureUnit;
+	return TextureUnit::NUM_TextureUnit;
 }
 
-int Display::Display::GetMaxTextureSize() const
+int
+Display::Display::GetMaxTextureSize() const
 {
-    return Display::Display::MaxTextureSize;
+	return Display::Display::MaxTextureSize;
 }
 
 #pragma endregion
 
 #pragma region RenderState handling
 
-void Display::Display::SetTexture(TextureUnit tu, intptr_t iTexture)
+void
+Display::Display::SetTexture(TextureUnit tu, intptr_t iTexture)
 {
-    //m_RenderState.textures[tu] = iTexture;
+	// m_RenderState.textures[tu] = iTexture;
 }
 
-void Display::Display::SetTextureMode(TextureUnit tu, TextureMode tm)
+void
+Display::Display::SetTextureMode(TextureUnit tu, TextureMode tm)
 {
-    m_RenderState.textureMode[tu] = tm;
+	m_RenderState.textureMode[tu] = tm;
 }
 
-void Display::Display::SetTextureWrapping(TextureUnit tu, bool b)
+void
+Display::Display::SetTextureWrapping(TextureUnit tu, bool b)
 {
-    m_RenderState.textureWrapping[tu] = b;
+	m_RenderState.textureWrapping[tu] = b;
 }
 
-void Display::Display::SetTextureFiltering(TextureUnit tu, bool b)
+void
+Display::Display::SetTextureFiltering(TextureUnit tu, bool b)
 {
-    m_RenderState.textureFiltering[tu] = b;
+	m_RenderState.textureFiltering[tu] = b;
 }
 
-void Display::Display::SetBlendMode(BlendMode mode)
+void
+Display::Display::SetBlendMode(BlendMode mode)
 {
-    m_RenderState.blendMode = mode;
+	m_RenderState.blendMode = mode;
 }
 
-void Display::Display::SetZWrite(bool b)
+void
+Display::Display::SetZWrite(bool b)
 {
-    m_RenderState.zWrite = b;
+	m_RenderState.zWrite = b;
 }
 
-void Display::Display::SetZBias(float f)
+void
+Display::Display::SetZBias(float f)
 {
-    m_RenderState.zBias = f;
+	m_RenderState.zBias = f;
 }
 
-void Display::Display::SetZTestMode(ZTestMode mode)
+void
+Display::Display::SetZTestMode(ZTestMode mode)
 {
-    m_RenderState.zTestMode = mode;
+	m_RenderState.zTestMode = mode;
 }
 
-void Display::Display::SetCullMode(CullMode mode)
+void
+Display::Display::SetCullMode(CullMode mode)
 {
-    m_RenderState.cullMode = mode;
+	m_RenderState.cullMode = mode;
 }
 
-void Display::Display::SetAlphaTest(bool b)
+void
+Display::Display::SetAlphaTest(bool b)
 {
-    m_RenderState.alphaTest = b;
+	m_RenderState.alphaTest = b;
 }
 
 #pragma endregion
 
 #pragma region Draw queueing
 
-void Display::Display::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
+void
+Display::Display::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 {
-    PushCurrentRenderState();
+	PushCurrentRenderState();
 
-    m_Batcher.InsertSpriteDrawCommand(
+	m_Batcher.InsertSpriteDrawCommand(
 	  DrawMode::Quads, GetCurrentMatrixState(), v, iNumVerts);
 }
 
-void Display::Display::DrawQuadStripInternal(const RageSpriteVertex v[], int iNumVerts)
+void
+Display::Display::DrawQuadStripInternal(const RageSpriteVertex v[],
+										int iNumVerts)
 {
-    PushCurrentRenderState();
+	PushCurrentRenderState();
 
-    m_Batcher.InsertSpriteDrawCommand(
+	m_Batcher.InsertSpriteDrawCommand(
 	  DrawMode::QuadStrip, GetCurrentMatrixState(), v, iNumVerts);
 }
 
-void Display::Display::DrawFanInternal(const RageSpriteVertex v[], int iNumVerts)
+void
+Display::Display::DrawFanInternal(const RageSpriteVertex v[], int iNumVerts)
 {
-    PushCurrentRenderState();
+	PushCurrentRenderState();
 
-    m_Batcher.InsertSpriteDrawCommand(
+	m_Batcher.InsertSpriteDrawCommand(
 	  DrawMode::Fan, GetCurrentMatrixState(), v, iNumVerts);
 }
 
-void Display::Display::DrawStripInternal(const RageSpriteVertex v[], int iNumVerts)
+void
+Display::Display::DrawStripInternal(const RageSpriteVertex v[], int iNumVerts)
 {
-    PushCurrentRenderState();
+	PushCurrentRenderState();
 
-    m_Batcher.InsertSpriteDrawCommand(
+	m_Batcher.InsertSpriteDrawCommand(
 	  DrawMode::Strip, GetCurrentMatrixState(), v, iNumVerts);
 }
 
-void Display::Display::DrawTrianglesInternal(const RageSpriteVertex v[], int iNumVerts)
+void
+Display::Display::DrawTrianglesInternal(const RageSpriteVertex v[],
+										int iNumVerts)
 {
-    PushCurrentRenderState();
+	PushCurrentRenderState();
 
-    m_Batcher.InsertSpriteDrawCommand(
+	m_Batcher.InsertSpriteDrawCommand(
 	  DrawMode::Triangles, GetCurrentMatrixState(), v, iNumVerts);
 }
 
-void Display::Display::DrawSymmetricQuadStripInternal(const RageSpriteVertex v[], int iNumVerts)
+void
+Display::Display::DrawSymmetricQuadStripInternal(const RageSpriteVertex v[],
+												 int iNumVerts)
 {
-    PushCurrentRenderState();
+	PushCurrentRenderState();
 
-    m_Batcher.InsertSpriteDrawCommand(
+	m_Batcher.InsertSpriteDrawCommand(
 	  DrawMode::SymmetricQuadStrip, GetCurrentMatrixState(), v, iNumVerts);
 }
 
-void Display::Display::DrawCompiledGeometryInternal(const RageCompiledGeometry *p, int iMeshIndex)
+void
+Display::Display::DrawCompiledGeometryInternal(const RageCompiledGeometry* p,
+											   int iMeshIndex)
 {
-    PushCurrentRenderState();
+	PushCurrentRenderState();
 
 	m_Batcher.InsertCompiledGeometryDrawCommand(
 	  DrawMode::CompiledGeometry, GetCurrentMatrixState(), p, iMeshIndex);
@@ -260,113 +301,138 @@ void Display::Display::DrawCompiledGeometryInternal(const RageCompiledGeometry *
 
 #pragma region Unfinished things
 
-intptr_t Display::Display::CreateRenderTarget(const RenderTargetParam &param, int &iTextureWidthOut,
-                                              int &iTextureHeightOut)
+intptr_t
+Display::Display::CreateRenderTarget(const RenderTargetParam& param,
+									 int& iTextureWidthOut,
+									 int& iTextureHeightOut)
 {
-    assert(false && "Not implemented");
-    return intptr_t();
+	assert(false && "Not implemented");
+	return intptr_t();
 }
 
-intptr_t Display::Display::GetRenderTarget()
+intptr_t
+Display::Display::GetRenderTarget()
 {
-    assert(false && "Not implemented");
-    return intptr_t();
+	assert(false && "Not implemented");
+	return intptr_t();
 }
 
-void Display::Display::SetRenderTarget(intptr_t uTexHandle, bool bPreserveTexture)
+void
+Display::Display::SetRenderTarget(intptr_t uTexHandle, bool bPreserveTexture)
 {
-    assert(false && "Not implemented");
+	assert(false && "Not implemented");
 }
 
-RageCompiledGeometry *Display::Display::CreateCompiledGeometry()
+RageCompiledGeometry*
+Display::Display::CreateCompiledGeometry()
 {
-    assert(false && "Not implemented");
-    return nullptr;
+	assert(false && "Not implemented");
+	return nullptr;
 }
 
-void Display::Display::DeleteCompiledGeometry(RageCompiledGeometry *p)
+void
+Display::Display::DeleteCompiledGeometry(RageCompiledGeometry* p)
 {
-    assert(false && "Not implemented");
+	assert(false && "Not implemented");
 }
 
-RageSurface *Display::Display::CreateScreenshot()
+RageSurface*
+Display::Display::CreateScreenshot()
 {
-    return nullptr;
+	return nullptr;
 }
 
-bool Display::Display::SupportsThreadedRendering()
+bool
+Display::Display::SupportsThreadedRendering()
 {
-    return false;
+	return false;
 }
 
-bool Display::Display::SupportsPerVertexMatrixScale()
+bool
+Display::Display::SupportsPerVertexMatrixScale()
 {
-    return false;
+	return false;
 }
 
 #pragma endregion
 
-Display::MatrixState Display::Display::GetCurrentMatrixState()
+Display::MatrixState
+Display::Display::GetCurrentMatrixState()
 {
-    MatrixState m;
-    m.projection = *GetProjectionTop();
-    m.view = *GetViewTop();
-    m.world = *GetWorldTop();
-    m.texture = *GetTextureTop();
+	MatrixState m;
+	m.projection = *GetProjectionTop();
+	m.view = *GetViewTop();
+	m.world = *GetWorldTop();
+	m.texture = *GetTextureTop();
 
-    return m;
+	return m;
 }
 
-void Display::Display::PushCurrentRenderState()
+void
+Display::Display::PushCurrentRenderState()
 {
-    if (m_RenderState == m_PreviousRenderState)
-    {
-        return;
-    }
+	if (m_RenderState == m_PreviousRenderState) {
+		return;
+	}
 
-    m_PreviousRenderState = m_RenderState;
-    m_Batcher.InsertRenderStateCommand(m_RenderState);
+	m_PreviousRenderState = m_RenderState;
+	m_Batcher.InsertRenderStateCommand(m_RenderState);
 }
 
 #pragma region Unsupported / old graphics API functions
 
-void Display::Display::ClearZBuffer()
+void
+Display::Display::ClearZBuffer()
 {
 }
 
-bool Display::Display::IsZWriteEnabled() const
+bool
+Display::Display::IsZWriteEnabled() const
 {
-    return false;
+	return false;
 }
 
-bool Display::Display::IsZTestEnabled() const
+bool
+Display::Display::IsZTestEnabled() const
 {
-    return false;
+	return false;
 }
 
-void Display::Display::SetMaterial(const RageColor &emissive, const RageColor &ambient, const RageColor &diffuse,
-                                   const RageColor &specular, float shininess)
-{
-}
-
-void Display::Display::SetLighting(bool b)
-{
-}
-
-void Display::Display::SetLightOff(int index)
+void
+Display::Display::SetMaterial(const RageColor& emissive,
+							  const RageColor& ambient,
+							  const RageColor& diffuse,
+							  const RageColor& specular,
+							  float shininess)
 {
 }
 
-void Display::Display::SetLightDirectional(int index, const RageColor &ambient, const RageColor &diffuse,
-                                           const RageColor &specular, const RageVector3 &dir)
+void
+Display::Display::SetLighting(bool b)
 {
 }
 
-void Display::Display::SetSphereEnvironmentMapping(TextureUnit tu, bool b)
+void
+Display::Display::SetLightOff(int index)
 {
 }
 
-void Display::Display::SetCelShaded(int stage)
+void
+Display::Display::SetLightDirectional(int index,
+									  const RageColor& ambient,
+									  const RageColor& diffuse,
+									  const RageColor& specular,
+									  const RageVector3& dir)
+{
+}
+
+void
+Display::Display::SetSphereEnvironmentMapping(TextureUnit tu, bool b)
+{
+}
+
+void
+Display::Display::SetCelShaded(int stage)
 {
 }
 
