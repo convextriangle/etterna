@@ -9,7 +9,16 @@
 #include <RageUtil/File/RageFileManager.h>
 #include <RageUtil/Misc/RageMath.h>
 
+#ifdef min // >:3
+#undef min
+#endif
+
 constexpr uint64_t Timeout = 1000'000'000;
+
+RendererVK::RendererVK()
+  : m_Samplers{ nullptr, nullptr, nullptr, nullptr }
+{
+}
 
 std::string
 RendererVK::GetApiDescription() const
@@ -28,6 +37,7 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 	InitBatchBuffers();
 	InitCommandBuffers();
 	InitSyncStructures();
+	InitTextureSamplers();
 }
 
 /// ----------------------------------------
@@ -35,7 +45,7 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 /// ----------------------------------------
 void
 RendererVK::OnRender(const ActualVideoModeParams* p,
-					 const Display::CommandBatcher& batcher)
+					 Display::CommandBatcher& batcher)
 {
 	ThrowIfFail(m_Device.waitForFences(
 	  *m_InFlightFence[currentFrame], vk::True, Timeout));
@@ -192,6 +202,7 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 void
 RendererVK::DeleteTexture(intptr_t handle)
 {
+	assert(handle != 0);
 	m_GraphicsQueue.waitIdle();
 	m_Textures.erase(handle);
 }
@@ -200,7 +211,9 @@ void
 RendererVK::ClearAllTextures()
 {
 	m_GraphicsQueue.waitIdle();
+	auto emptyTexture = m_Textures[0];
 	m_Textures.clear();
+	m_Textures[0] = emptyTexture;
 }
 
 RendererVK::~RendererVK()
@@ -209,7 +222,7 @@ RendererVK::~RendererVK()
 	vkDeviceWaitIdle(static_cast<VkDevice>(static_cast<vk::Device>(m_Device)));
 }
 
-VkBool32
+static VkBool32
 VulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 					VkDebugUtilsMessageTypeFlagsEXT messageTypes,
 					const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -271,6 +284,7 @@ RendererVK::InitVulkanState()
 	vk11Features.shaderDrawParameters = true;
 
 	VkPhysicalDeviceFeatures vkFeatures = {};
+	vkFeatures.samplerAnisotropy = vk::True;
 	vkFeatures.multiDrawIndirect = vk::True;
 	vkFeatures.logicOp = vk::True;
 	vkFeatures.drawIndirectFirstInstance = vk::True;
@@ -462,7 +476,11 @@ RendererVK::InitGraphicsPipeline()
 		vk::DescriptorSetLayoutBinding(1,
 									   vk::DescriptorType::eStorageBuffer,
 									   1,
-									   vk::ShaderStageFlagBits::eVertex)
+									   vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(2,
+									   vk::DescriptorType::eCombinedImageSampler,
+									   Texture::MaxSlots,
+									   vk::ShaderStageFlagBits::eFragment)
 	};
 
 	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
@@ -689,8 +707,11 @@ RendererVK::InitBatchBuffers()
 	textureInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
 	m_TextureBuffer.Init(m_Allocator, textureInfo, textureAllocInfo);
 
-	std::vector<vk::DescriptorPoolSize> poolSizes = { vk::DescriptorPoolSize(
-	  vk::DescriptorType::eStorageBuffer, 2) };
+	std::vector<vk::DescriptorPoolSize> poolSizes = {
+		vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2),
+		vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler,
+							   Texture::MaxSlots)
+	};
 
 	vk::DescriptorPoolCreateInfo poolInfo(
 	  vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1, poolSizes);
@@ -704,7 +725,12 @@ RendererVK::InitBatchBuffers()
 		vk::DescriptorSetLayoutBinding(1,
 									   vk::DescriptorType::eStorageBuffer,
 									   1,
-									   vk::ShaderStageFlagBits::eVertex)
+									   vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(
+		  2,
+		  vk::DescriptorType::eCombinedImageSampler,
+		  Texture::MaxSlots,
+		  vk::ShaderStageFlagBits::eFragment)
 	};
 
 	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
@@ -779,7 +805,7 @@ RendererVK::InitBatchBuffers()
 }
 
 void
-RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
+RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 {
 	if (!batcher.m_IndirectCommandBuffer.empty()) {
 		std::memcpy(m_DrawCommandBuffer.GetMappedData(),
@@ -789,6 +815,55 @@ RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
 	}
 
 	if (!batcher.m_IndirectCommandArgumentBuffer.empty()) {
+		std::map<std::pair<uint8_t, intptr_t>, int> textureLocation;
+		std::array<vk::DescriptorImageInfo, Texture::MaxSlots> textureInfo;
+
+		for (auto& info : textureInfo) {
+			info.sampler = m_Samplers[0];
+			info.imageView = m_Textures[0].view;
+			info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+		}
+
+		for (auto& arg : batcher.m_IndirectCommandArgumentBuffer) {
+			const auto& renderState =
+			  batcher.m_RenderStateBuffer[arg.TextureSamplerIndex];
+
+			const uint8_t textureSettings =
+			  ((uint8_t)renderState.textureWrapping
+			   << (Texture::Wrapping - 1)) |
+			  ((uint8_t)renderState.textureFiltering
+			   << (Texture::Filtering - 1));
+
+			auto it = textureLocation.find(
+			  { textureSettings, renderState.textureHandle });
+			if (it != textureLocation.end()) {
+				arg.TextureSamplerIndex = it->second;
+			} else {
+				assert(textureLocation.size() < Texture::MaxSlots);
+				textureInfo[textureLocation.size()].sampler =
+				  m_Samplers[textureSettings];
+				textureInfo[textureLocation.size()].imageView =
+				  m_Textures[renderState.textureHandle].view;
+
+				arg.TextureSamplerIndex = textureLocation.size() + 1;
+				textureLocation.emplace_hint(
+				  it,
+				  std::make_pair(
+					std::make_pair(textureSettings, renderState.textureHandle),
+					arg.TextureSamplerIndex));
+			}
+		}
+
+		vk::WriteDescriptorSet writeDescriptor = {};
+		writeDescriptor.dstSet = m_DescriptorSets[0];
+		writeDescriptor.dstBinding = 2;
+		writeDescriptor.descriptorCount = Texture::MaxSlots;
+		writeDescriptor.descriptorType =
+		  vk::DescriptorType::eCombinedImageSampler;
+		writeDescriptor.pImageInfo = textureInfo.data();
+
+		m_Device.updateDescriptorSets({ writeDescriptor }, {});
+
 		std::memcpy(m_DrawArgumentBuffer.GetMappedData(),
 					batcher.m_IndirectCommandArgumentBuffer.data(),
 					sizeof(Display::DrawCommandArgument) *
@@ -813,5 +888,39 @@ RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
 int
 RendererVK::GetMaxTextureSize()
 {
-	return 4096; // TODO: account for maxImageDimension2D
+	return std::min(
+	  4096u, m_PhysicalDevice.getProperties().limits.maxImageDimension2D);
+}
+
+void
+RendererVK::InitTextureSamplers()
+{
+	vk::PhysicalDeviceProperties properties = m_PhysicalDevice.getProperties();
+	vk::SamplerCreateInfo samplerInfo = {};
+	samplerInfo.mipmapMode = vk::SamplerMipmapMode::eLinear;
+	samplerInfo.anisotropyEnable = vk::True;
+	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+	samplerInfo.compareEnable = vk::False;
+	samplerInfo.compareOp = vk::CompareOp::eAlways;
+
+	for (size_t i = 0; i < m_Samplers.size(); i++) {
+		samplerInfo.magFilter =
+		  (i & Texture::Filtering) ? vk::Filter::eLinear : vk::Filter::eNearest;
+		samplerInfo.minFilter =
+		  (i & Texture::Filtering) ? vk::Filter::eLinear : vk::Filter::eNearest;
+		samplerInfo.addressModeU = (i & Texture::Wrapping)
+									 ? vk::SamplerAddressMode::eRepeat
+									 : vk::SamplerAddressMode::eClampToBorder;
+		samplerInfo.addressModeV = (i & Texture::Wrapping)
+									 ? vk::SamplerAddressMode::eRepeat
+									 : vk::SamplerAddressMode::eClampToBorder;
+		samplerInfo.addressModeW = (i & Texture::Wrapping)
+									 ? vk::SamplerAddressMode::eRepeat
+									 : vk::SamplerAddressMode::eClampToBorder;
+		m_Samplers[i] = vk::raii::Sampler(m_Device, samplerInfo);
+	}
+
+	RageSurface* img =
+	  CreateSurface(1, 1, 32, 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff);
+	CreateTexture(img);
 }

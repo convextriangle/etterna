@@ -2,7 +2,7 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 
 struct DrawCommandArgument {
-    uint renderStateIndex;
+    uint textureSamplerIndex;
 };
 
 layout(std430, set = 0, binding = 0) readonly buffer DrawCommandArgumentBuffer {
@@ -26,6 +26,8 @@ layout(location = 2) in vec4 inColor;
 layout(location = 3) in vec2 inUV;
 
 layout(location = 0) out vec4 outColor;
+layout(location = 1) out uint outTexture;
+layout(location = 2) out vec2 outUV;
 
 void main() {
     uint matrixIndex = gl_BaseInstance;
@@ -40,4 +42,6 @@ void main() {
     
     gl_Position = projPos;
     outColor = inColor;
+    outUV = inUV;
+    outTexture = arguments[matrixIndex].textureSamplerIndex;
 }

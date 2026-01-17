@@ -48,15 +48,8 @@ Display::Display::BeginFrame()
 #error todo
 #endif
 	m_Batcher.Clear();
-	m_RenderState.cullMode = CULL_NONE;
-	m_RenderState.zTestMode = ZTEST_OFF;
-	m_RenderState.blendMode = BLEND_NORMAL;
-	m_RenderState.zBias = 0.0f;
-	m_RenderState.zWrite = false;
-	m_RenderState.alphaTest = true;
-	m_RenderState.textureFiltering[0] = true;
-	m_RenderState.textureMode[0] = TextureMode_Invalid;
-	m_RenderState.textureWrapping[0] = false;
+	m_RenderState.textureFiltering = true;
+	m_RenderState.textureWrapping = false;
 
 	PushCurrentRenderState();
 
@@ -153,7 +146,7 @@ Display::Display::ClearAllTextures()
 int
 Display::Display::GetNumTextureUnits()
 {
-	return TextureUnit::NUM_TextureUnit;
+	return 1;
 }
 
 int
@@ -169,61 +162,22 @@ Display::Display::GetMaxTextureSize() const
 void
 Display::Display::SetTexture(TextureUnit tu, intptr_t iTexture)
 {
-	// m_RenderState.textures[tu] = iTexture;
-}
-
-void
-Display::Display::SetTextureMode(TextureUnit tu, TextureMode tm)
-{
-	m_RenderState.textureMode[tu] = tm;
+	assert(tu == TextureUnit_1);
+	m_RenderState.textureHandle = iTexture;
 }
 
 void
 Display::Display::SetTextureWrapping(TextureUnit tu, bool b)
 {
-	m_RenderState.textureWrapping[tu] = b;
+	assert(tu == TextureUnit_1);
+	m_RenderState.textureWrapping = b;
 }
 
 void
 Display::Display::SetTextureFiltering(TextureUnit tu, bool b)
 {
-	m_RenderState.textureFiltering[tu] = b;
-}
-
-void
-Display::Display::SetBlendMode(BlendMode mode)
-{
-	m_RenderState.blendMode = mode;
-}
-
-void
-Display::Display::SetZWrite(bool b)
-{
-	m_RenderState.zWrite = b;
-}
-
-void
-Display::Display::SetZBias(float f)
-{
-	m_RenderState.zBias = f;
-}
-
-void
-Display::Display::SetZTestMode(ZTestMode mode)
-{
-	m_RenderState.zTestMode = mode;
-}
-
-void
-Display::Display::SetCullMode(CullMode mode)
-{
-	m_RenderState.cullMode = mode;
-}
-
-void
-Display::Display::SetAlphaTest(bool b)
-{
-	m_RenderState.alphaTest = b;
+	assert(tu == TextureUnit_1);
+	m_RenderState.textureFiltering = b;
 }
 
 #pragma endregion
@@ -380,6 +334,41 @@ Display::Display::PushCurrentRenderState()
 }
 
 #pragma region Unsupported / old graphics API functions
+
+void
+Display::Display::SetBlendMode(BlendMode mode)
+{
+}
+
+void
+Display::Display::SetTextureMode(TextureUnit tu, TextureMode tm)
+{
+}
+
+void
+Display::Display::SetZWrite(bool b)
+{
+}
+
+void
+Display::Display::SetZBias(float f)
+{
+}
+
+void
+Display::Display::SetZTestMode(ZTestMode mode)
+{
+}
+
+void
+Display::Display::SetCullMode(CullMode mode)
+{
+}
+
+void
+Display::Display::SetAlphaTest(bool b)
+{
+}
 
 void
 Display::Display::ClearZBuffer()

@@ -37,7 +37,7 @@ Texture::Texture(RageSurface* surface,
 	vk::ImageViewCreateInfo viewInfo;
 	viewInfo.image = image;
 	viewInfo.viewType = vk::ImageViewType::e2D;
-	viewInfo.format = vk::Format::eB8G8R8A8Unorm;
+	viewInfo.format = vk::Format::eR8G8B8A8Unorm;
 	viewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
 	viewInfo.subresourceRange.levelCount = 1;
 	viewInfo.subresourceRange.layerCount = 1;

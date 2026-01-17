@@ -9,18 +9,9 @@ namespace Display
 
 struct RenderState
 {
-    CullMode cullMode;
-    ZTestMode zTestMode;
-    BlendMode blendMode;
-    float zBias;
-    bool zWrite;
-    bool alphaTest;
-
-	// todo: revise these?
-    bool textureWrapping[NUM_TextureUnit];
-    bool textureFiltering[NUM_TextureUnit];
-    uint8_t textureMode[NUM_TextureUnit];
-    //intptr_t textures[NUM_TextureUnit];
+    bool textureWrapping;
+    bool textureFiltering;
+    intptr_t textureHandle;
 
 	bool operator==(RenderState& rhs);
 };

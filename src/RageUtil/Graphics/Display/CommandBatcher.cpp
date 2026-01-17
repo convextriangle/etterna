@@ -124,7 +124,7 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 	m_MatrixStateBuffer.push_back(matrixState);
 
 	DrawCommandArgument argument = {
-		.renderStateIndex = (uint32_t)m_RenderStateBuffer.size() - 1
+		.TextureSamplerIndex = (uint32_t)m_RenderStateBuffer.size() - 1
 	};
 	m_IndirectCommandArgumentBuffer.push_back(argument);
 	m_IndirectCommandBuffer.push_back(command);

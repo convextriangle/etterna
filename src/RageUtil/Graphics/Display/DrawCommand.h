@@ -27,7 +27,7 @@ struct DrawCommand
 
 struct DrawCommandArgument
 {
-    uint32_t renderStateIndex; // hi hello :3
+    uint32_t TextureSamplerIndex; // hi hello :3
 };
 
 } // namespace Display

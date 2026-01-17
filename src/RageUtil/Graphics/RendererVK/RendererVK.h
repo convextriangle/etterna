@@ -17,10 +17,11 @@
 class RendererVK : public Display::Renderer
 {
   public:
+	RendererVK();
 	std::string GetApiDescription() const override;
 	void InitializeRenderer(const VideoModeParams& p) override;
 	void OnRender(const ActualVideoModeParams* p,
-				  const Display::CommandBatcher& batcher) override;
+				  Display::CommandBatcher& batcher) override;
 	bool IsD3DInternal() override;
 	intptr_t CreateTexture(RageSurface* img) override;
 	void UpdateTexture(intptr_t textureHandle,
@@ -103,11 +104,14 @@ class RendererVK : public Display::Renderer
 	vk::raii::DescriptorPool m_DescriptorPool = nullptr;
 
 	void InitBatchBuffers();
-	void UpdateBatchBuffers(const Display::CommandBatcher& batcher);
+	void UpdateBatchBuffers(Display::CommandBatcher& batcher);
 
 	intptr_t m_TextureCounter = 0;
 	std::unordered_map<intptr_t, Texture> m_Textures;
 	int GetMaxTextureSize();
+
+	std::array<vk::raii::Sampler, Texture::PossibleSamplerCount> m_Samplers;
+	void InitTextureSamplers();
 };
 
 #endif
