@@ -91,7 +91,7 @@ class RendererVK : public Display::Renderer
 	void InitSyncStructures();
 	void RecordCommands(uint32_t imageIndex, uint32_t drawCount);
 
-	constexpr static size_t FramesInFlight = 2;
+	constexpr static size_t FramesInFlight = 3;
 	constexpr static size_t MaxDrawCount = 50'000;
 
 	BufferHelper m_SpriteVertexBuffer;
@@ -109,6 +109,7 @@ class RendererVK : public Display::Renderer
 	intptr_t m_TextureCounter = 0;
 	std::unordered_map<intptr_t, Texture> m_Textures;
 	int GetMaxTextureSize();
+	void DestroyTexture(Texture& texture);
 
 	std::array<vk::raii::Sampler, Texture::PossibleSamplerCount> m_Samplers;
 	void InitTextureSamplers();

@@ -73,7 +73,6 @@ list(APPEND SMDATA_RAGE_GRAPHICS_SRC
   "Graphics/Display/RenderState.cpp"
   "Graphics/RendererVK/RendererVK.cpp"
   "Graphics/RendererVK/VkUtils.cpp"
-  "Graphics/RendererVK/Texture.cpp"
   "Graphics/RendererVK/BufferHelper.cpp"
 )
 list(APPEND SMDATA_RAGE_GRAPHICS_HPP

@@ -108,9 +108,40 @@ RendererVK::CreateTexture(RageSurface* img)
 {
 	intptr_t currentHandle = m_TextureCounter++;
 
-	Texture texture{
-		img, (uint32_t)img->w, (uint32_t)img->h, m_Allocator, m_Device
-	};
+	Texture texture = {};
+	texture.width = power_of_two(img->w);
+	texture.height = power_of_two(img->h);
+
+	VmaAllocationCreateInfo allocCreateInfo = {};
+	allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+	VkImageCreateInfo imageInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageInfo.extent = { texture.width, texture.height, 1 };
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.usage =
+	  VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+	VmaAllocationInfo allocInfo = {};
+	ThrowIfFail(vmaCreateImage(m_Allocator,
+							   &imageInfo,
+							   &allocCreateInfo,
+							   &texture.image,
+							   &texture.allocation,
+							   &allocInfo));
+
+	vk::ImageViewCreateInfo viewInfo;
+	viewInfo.image = texture.image;
+	viewInfo.viewType = vk::ImageViewType::e2D;
+	viewInfo.format = vk::Format::eR8G8B8A8Unorm;
+	viewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.layerCount = 1;
+	texture.view = (*m_Device).createImageView(viewInfo);
+
 	m_Textures.insert({ currentHandle, texture });
 
 	UpdateTexture(currentHandle, img, 0, 0, img->w, img->h);
@@ -204,6 +235,8 @@ RendererVK::DeleteTexture(intptr_t handle)
 {
 	assert(handle != 0);
 	m_GraphicsQueue.waitIdle();
+
+	DestroyTexture(m_Textures[handle]);
 	m_Textures.erase(handle);
 }
 
@@ -218,6 +251,10 @@ RendererVK::ClearAllTextures()
 
 RendererVK::~RendererVK()
 {
+	for (auto& [handle, texture] : m_Textures) {
+		DestroyTexture(texture);
+	}
+
 	// WHAT
 	vkDeviceWaitIdle(static_cast<VkDevice>(static_cast<vk::Device>(m_Device)));
 }
@@ -477,10 +514,11 @@ RendererVK::InitGraphicsPipeline()
 									   vk::DescriptorType::eStorageBuffer,
 									   1,
 									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(2,
-									   vk::DescriptorType::eCombinedImageSampler,
-									   Texture::MaxSlots,
-									   vk::ShaderStageFlagBits::eFragment)
+		vk::DescriptorSetLayoutBinding(
+		  2,
+		  vk::DescriptorType::eCombinedImageSampler,
+		  Texture::MaxSlots,
+		  vk::ShaderStageFlagBits::eFragment)
 	};
 
 	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
@@ -890,6 +928,19 @@ RendererVK::GetMaxTextureSize()
 {
 	return std::min(
 	  4096u, m_PhysicalDevice.getProperties().limits.maxImageDimension2D);
+}
+
+void
+RendererVK::DestroyTexture(Texture& texture)
+{
+	if (texture.image) {
+		vmaDestroyImage(m_Allocator, texture.image, texture.allocation);
+	}
+	if (texture.view) {
+		vkDestroyImageView(*m_Device, texture.view, nullptr);
+	}
+
+	texture = {};
 }
 
 void
