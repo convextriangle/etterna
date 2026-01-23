@@ -10,6 +10,5 @@ layout(location = 2) in vec2 inUV;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    outColor = inColor * (inTexture > 0 ? texture(textures[inTexture - 1], inUV) : vec4(1.0));
-    outColor.a = 1.0;
+    outColor = inColor;
 }

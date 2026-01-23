@@ -422,11 +422,6 @@ RendererVK::InitImageViews()
 		vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1
 	};
 
-	createInfo.components.r = vk::ComponentSwizzle::eIdentity;
-	createInfo.components.g = vk::ComponentSwizzle::eIdentity;
-	createInfo.components.b = vk::ComponentSwizzle::eIdentity;
-	createInfo.components.a = vk::ComponentSwizzle::eIdentity;
-
 	for (auto& image : m_SwapchainImages) {
 		createInfo.image = image;
 		m_SwapchainImageViews.emplace_back(m_Device, createInfo);

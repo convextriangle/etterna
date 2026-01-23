@@ -35,8 +35,10 @@ void main() {
     mat4 worldMatrix = matrices[matrixIndex].world;
     mat4 viewMatrix = matrices[matrixIndex].view;
     mat4 projMatrix = matrices[matrixIndex].projection;
+    mat4 texMatrix = matrices[matrixIndex].texture;
     
-    vec4 worldPos = worldMatrix * vec4(inPosition, 1.0);
+    vec4 texPos = texMatrix * vec4(inPosition, 1.0);
+    vec4 worldPos = worldMatrix * texPos;
     vec4 viewPos = viewMatrix * worldPos;
     vec4 projPos = projMatrix * viewPos;
     
