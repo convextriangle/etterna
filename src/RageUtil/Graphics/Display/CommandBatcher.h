@@ -1,7 +1,7 @@
 #ifndef DISPLAY_COMMAND_BATCHER_H
 #define DISPLAY_COMMAND_BATCHER_H
 
-#include "DrawCommand.h"
+#include "Triangle.h"
 #include "RenderState.h"
 #include <queue>
 #include <string>
@@ -19,10 +19,7 @@ class CommandBatcher
                                            int iMeshIndex);
     void Clear();
 
-    std::vector<DrawCommand> m_IndirectCommandBuffer;
-    std::vector<DrawCommandArgument> m_IndirectCommandArgumentBuffer;
-    std::vector<RageSpriteVertex> m_SpriteVertexBuffer;
-    std::vector<RageModelVertex> m_ModelVertexBuffer;
+    std::vector<Triangle> m_TriangleBuffer;
     std::vector<RenderState> m_RenderStateBuffer;
     std::vector<MatrixState> m_MatrixStateBuffer;
 };

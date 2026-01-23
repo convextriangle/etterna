@@ -72,8 +72,6 @@ list(APPEND SMDATA_RAGE_GRAPHICS_SRC
   "Graphics/Display/Display.cpp"
   "Graphics/Display/RenderState.cpp"
   "Graphics/RendererVK/RendererVK.cpp"
-  "Graphics/RendererVK/VkUtils.cpp"
-  "Graphics/RendererVK/BufferHelper.cpp"
 )
 list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/RageBitmapTexture.h"
@@ -109,11 +107,8 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/Display/RenderState.h"
   "Graphics/Display/Display.h"
   "Graphics/Display/Renderer.h"
-  "Graphics/Display/DrawCommand.h"
+  "Graphics/Display/Triangle.h"
   "Graphics/RendererVK/RendererVK.h"
-  "Graphics/RendererVK/VkUtils.h"
-  "Graphics/RendererVK/Texture.h"
-  "Graphics/RendererVK/BufferHelper.h"
 )
 
 if(WIN32)
