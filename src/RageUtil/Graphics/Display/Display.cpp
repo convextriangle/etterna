@@ -36,6 +36,7 @@ Display::Display::GetDisplaySpecs(DisplaySpecs& out) const
 void
 Display::Display::ResolutionChanged()
 {
+	m_Renderer->ResolutionChanged();
 	RageDisplay::ResolutionChanged();
 }
 
@@ -53,13 +54,14 @@ Display::Display::BeginFrame()
 
 	PushCurrentRenderState();
 
-	return m_IsInitDone;
+	return m_IsInitDone && RageDisplay::BeginFrame();
 }
 
 void
 Display::Display::EndFrame()
 {
 	m_Renderer->OnRender(GetActualVideoModeParams(), m_Batcher);
+	RageDisplay::EndFrame();
 }
 
 const ActualVideoModeParams*
@@ -98,9 +100,9 @@ const RageDisplay::RagePixelFormatDesc*
 Display::Display::GetPixelFormatDesc(RagePixelFormat pf) const
 {
 	assert(pf == RagePixelFormat_RGBA8);
-	static auto desc =
+	static auto desc = // silly goose
 	  RagePixelFormatDesc{ 32,
-						   { 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF } };
+						   { 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 } };
 	return &desc;
 }
 

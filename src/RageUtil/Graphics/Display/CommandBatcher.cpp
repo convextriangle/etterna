@@ -33,7 +33,7 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 
 	Triangle triangle = { {},
 						  (uint32_t)m_MatrixStateBuffer.size() - 1,
-						  (uint32_t)m_RenderStateBuffer.size() };
+						  (uint32_t)m_RenderStateBuffer.size() - 1 };
 
 	switch (drawMode) {
 		case DrawMode::Triangles: {

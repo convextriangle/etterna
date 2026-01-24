@@ -1,12 +1,21 @@
 #version 460
 #extension GL_EXT_nonuniform_qualifier : enable
 
-struct DrawCommandArgument {
-    uint textureSamplerIndex;
+struct Vertex {
+    float pos[3];
+    float normal[3];
+    uint color;
+    float uv[2];
 };
 
-layout(std430, set = 0, binding = 0) readonly buffer DrawCommandArgumentBuffer {
-    DrawCommandArgument arguments[];
+struct Triangle {
+    Vertex vertices[3];
+    uint matrixIndex;
+    uint textureIndex;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer TriangleBuffer {
+    Triangle triangles[];
 };
 
 struct MatrixState {
@@ -20,30 +29,50 @@ layout(std430, set = 0, binding = 1) readonly buffer MatrixStateBuffer {
     MatrixState matrices[];
 };
 
-layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec3 inNormal;
-layout(location = 2) in vec4 inColor;
-layout(location = 3) in vec2 inUV;
+layout(location = 0) out vec4 vertexColor;
+layout(location = 1) out uint textureIndex;
+layout(location = 2) out vec2 vertexUV;
 
-layout(location = 0) out vec4 outColor;
-layout(location = 1) out uint outTexture;
-layout(location = 2) out vec2 outUV;
+vec2 unpackVec2(float array[2]){
+    return vec2(array[0], array[1]);
+}
+
+vec3 unpackVec3(float array[3]){
+    return vec3(array[0], array[1], array[2]);
+}
+
+vec4 unpackColor(uint c)
+{
+    float b = float(c & 0xFFu);
+    float g = float((c >> 8) & 0xFFu);
+    float r = float((c >> 16) & 0xFFu);
+    float a = float((c >> 24) & 0xFFu);
+
+    return vec4(r, g, b, a) / 255.0;
+}
 
 void main() {
-    uint matrixIndex = gl_BaseInstance;
+    Triangle currentTriangle = triangles[gl_VertexIndex / 3];
+    Vertex currentVertex = currentTriangle.vertices[gl_VertexIndex % 3];
     
-    mat4 worldMatrix = matrices[matrixIndex].world;
-    mat4 viewMatrix = matrices[matrixIndex].view;
-    mat4 projMatrix = matrices[matrixIndex].projection;
-    mat4 texMatrix = matrices[matrixIndex].texture;
+    vertexColor = unpackColor(currentVertex.color);
+    textureIndex = currentTriangle.textureIndex;
+
+    uint matrixIndex = currentTriangle.matrixIndex;
     
-    vec4 texPos = texMatrix * vec4(inPosition, 1.0);
-    vec4 worldPos = worldMatrix * texPos;
-    vec4 viewPos = viewMatrix * worldPos;
-    vec4 projPos = projMatrix * viewPos;
+    mat4 world = matrices[matrixIndex].world;
+    mat4 view = matrices[matrixIndex].view;
+    mat4 proj = matrices[matrixIndex].projection;
+    mat4 tex = matrices[matrixIndex].texture;
+    
+    vec4 worldPos = world * vec4(unpackVec3(currentVertex.pos), 1.0);
+    vec4 viewPos = view * worldPos;
+    vec4 projPos = proj * viewPos;
+    projPos.z = 0.0; // whart?
     
     gl_Position = projPos;
-    outColor = inColor;
-    outUV = inUV;
-    outTexture = arguments[matrixIndex].textureSamplerIndex;
+
+    vertexUV = unpackVec2(currentVertex.uv);
+    vertexUV.x += tex[3][0];
+    vertexUV.y += tex[3][1];
 }

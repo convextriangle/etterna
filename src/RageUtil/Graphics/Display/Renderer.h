@@ -24,6 +24,7 @@ class Renderer
 							   int height) = 0;
 	virtual void DeleteTexture(intptr_t handle) = 0;
 	virtual void ClearAllTextures() = 0;
+	virtual void ResolutionChanged() = 0;
 };
 }
 
