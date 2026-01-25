@@ -981,6 +981,7 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 			  batcher.m_RenderStateBuffer[triangle.TextureIndex];
 
 			if (!renderState.textureHandle) {
+				triangle.TextureIndex = 0;
 				continue;
 			}
 
