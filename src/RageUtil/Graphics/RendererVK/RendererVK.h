@@ -85,8 +85,7 @@ class RendererVK : public Display::Renderer
 	std::vector<vk::raii::Semaphore> m_PresentCompleteSemaphore;
 	std::vector<vk::raii::Semaphore> m_RenderFinishedSemaphore;
 	std::vector<vk::raii::Fence> m_InFlightFence;
-	uint32_t semaphoreIndex = 0;
-	uint32_t currentFrame = 0;
+	uint32_t m_CurrentFrame = 0;
 	void InitSyncStructures();
 	void RecordCommands(uint32_t imageIndex, uint32_t drawCount);
 
