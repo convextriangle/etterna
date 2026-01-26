@@ -73,7 +73,7 @@ list(APPEND SMDATA_RAGE_GRAPHICS_SRC
   "Graphics/Display/RenderState.cpp"
   "Graphics/RendererVK/RendererVK.cpp"
   "Graphics/RendererVK/VkUtils.cpp"
-  "Graphics/RendererVK/BufferHelper.cpp"
+  "Graphics/RendererVK/PersistentBuffer.cpp"
 )
 list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/RageBitmapTexture.h"
@@ -112,7 +112,7 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/Display/Triangle.h"
   "Graphics/RendererVK/RendererVK.h"
   "Graphics/RendererVK/VkUtils.h"
-  "Graphics/RendererVK/BufferHelper.h"
+  "Graphics/RendererVK/PersistentBuffer.h"
   "Graphics/RendererVK/Texture.h"
 )
 
