@@ -275,7 +275,9 @@ RendererVK::InitVulkanState()
 {
 	vkb::InstanceBuilder builder;
 	auto instanceResult =
-	  builder.request_validation_layers(true)
+	  builder
+		.request_validation_layers(true)
+#ifdef _DEBUG || DEBUG
 		.use_default_debug_messenger()
 		.add_validation_feature_enable(
 		  VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT)
@@ -284,6 +286,7 @@ RendererVK::InitVulkanState()
 		.add_validation_feature_enable(
 		  VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT)
 		.set_debug_callback(VulkanDebugCallback)
+#endif
 		.require_api_version(1, 3, 0)
 		.enable_extension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
 		.build();
@@ -292,8 +295,10 @@ RendererVK::InitVulkanState()
 	}
 
 	m_Instance = vk::raii::Instance(m_Context, instanceResult->instance);
+#ifdef _DEBUG || DEBUG
 	m_DebugMessenger = vk::raii::DebugUtilsMessengerEXT(
 	  m_Instance, instanceResult->debug_messenger);
+#endif
 
 	VkWin32SurfaceCreateInfoKHR createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -313,7 +318,6 @@ RendererVK::InitVulkanState()
 	vk12Features.bufferDeviceAddress = true;
 	vk12Features.descriptorIndexing = true;
 	vk12Features.runtimeDescriptorArray = true;
-	vk12Features.drawIndirectCount = true;
 
 	VkPhysicalDeviceVulkan11Features vk11Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES
