@@ -2,7 +2,7 @@
 #include "VkUtils.h"
 
 void
-BufferHelper::Init(VmaAllocator allocator,
+PersistentBuffer::Init(VmaAllocator allocator,
 				   const vk::BufferCreateInfo& createInfo,
 				   const VmaAllocationCreateInfo& allocInfo)
 {
@@ -17,18 +17,18 @@ BufferHelper::Init(VmaAllocator allocator,
 }
 
 vk::Buffer
-BufferHelper::Get() const
+PersistentBuffer::Get() const
 {
 	return vk::Buffer(buffer);
 }
 
 void*
-BufferHelper::GetMappedData() const
+PersistentBuffer::GetMappedData() const
 {
 	return allocInfo.pMappedData;
 }
 
-BufferHelper::~BufferHelper()
+PersistentBuffer::~PersistentBuffer()
 {
 	if (buffer != VK_NULL_HANDLE && allocation != VK_NULL_HANDLE) {
 		vmaDestroyBuffer(allocator, buffer, allocation);

@@ -55,6 +55,7 @@ class RendererVK : public Display::Renderer
 
 	constexpr static vk::Format ImageFormat = vk::Format::eB8G8R8A8Unorm;
 
+	bool m_SwapchainIsInvalid = false;
 	void InitSwapchain(const VideoModeParams& p);
 	void RecreateSwapchain(const VideoModeParams& p);
 	void CleanupSwapchain();
@@ -66,8 +67,6 @@ class RendererVK : public Display::Renderer
 	vk::raii::Pipeline m_GraphicsPipeline = nullptr;
 	vk::raii::DescriptorSetLayout m_DescriptorSetLayout = nullptr;
 	void InitGraphicsPipeline();
-
-	vk::PipelineVertexInputStateCreateInfo GetSpriteVertexInfo();
 
 	vk::raii::CommandPool m_CommandPool = nullptr;
 	void InitCommandPool();
@@ -94,9 +93,9 @@ class RendererVK : public Display::Renderer
 	constexpr static size_t FramesInFlight = 3;
 	constexpr static size_t MaxDrawCount = 50'000;
 
-	BufferHelper m_TriangleBuffer;
-	BufferHelper m_MatrixStateBuffer;
-	BufferHelper m_TextureBuffer;
+	std::array<PersistentBuffer, FramesInFlight> m_TriangleBuffer;
+	std::array<PersistentBuffer, FramesInFlight> m_MatrixStateBuffer;
+	PersistentBuffer m_TextureBuffer;
 
 	std::vector<vk::raii::DescriptorSet> m_DescriptorSets;
 	vk::raii::DescriptorPool m_DescriptorPool = nullptr;

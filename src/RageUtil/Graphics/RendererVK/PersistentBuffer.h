@@ -4,7 +4,7 @@
 #include <vulkan/vulkan_raii.hpp>
 #include <vk_mem_alloc.h>
 
-struct BufferHelper
+struct PersistentBuffer
 {
 	VkBuffer buffer = VK_NULL_HANDLE;
 	VmaAllocation allocation = VK_NULL_HANDLE;
@@ -19,7 +19,7 @@ struct BufferHelper
 
 	void* GetMappedData() const;
 
-	~BufferHelper();
+	~PersistentBuffer();
 };
 
 #endif

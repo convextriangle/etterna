@@ -55,8 +55,9 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 	auto [result, imageIndex] = m_Swapchain.acquireNextImage(
 	  Timeout, *m_PresentCompleteSemaphore[semaphoreIndex], nullptr);
 
-	if (result == vk::Result::eErrorOutOfDateKHR) {
+	if (result == vk::Result::eErrorOutOfDateKHR || m_SwapchainIsInvalid) {
 		RecreateSwapchain(*p);
+		m_SwapchainIsInvalid = false;
 		return;
 	}
 	ThrowIfFail(result);
@@ -558,6 +559,10 @@ RendererVK::InitGraphicsPipeline()
 	pipelineRenderingCreateInfo.colorAttachmentCount = 1;
 	pipelineRenderingCreateInfo.pColorAttachmentFormats = &ImageFormat;
 
+	// we don't actually need any vertex info since we're reading stuffs from
+	// the storage buffer
+	vk::PipelineVertexInputStateCreateInfo vertexInfo = {};
+
 	vk::GraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.pNext = &pipelineRenderingCreateInfo;
 	pipelineInfo.stageCount = 2;
@@ -568,6 +573,7 @@ RendererVK::InitGraphicsPipeline()
 	pipelineInfo.pMultisampleState = &multisampling;
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = &dynamicState;
+	pipelineInfo.pVertexInputState = &vertexInfo;
 	pipelineInfo.layout = m_PipelineLayout;
 	pipelineInfo.renderPass = nullptr;
 
@@ -686,7 +692,7 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 	  vk::PipelineBindPoint::eGraphics,
 	  *m_PipelineLayout,
 	  0,
-	  { *m_DescriptorSets[0] },
+	  { *m_DescriptorSets[currentFrame] },
 	  nullptr);
 
 	m_CommandBuffers[currentFrame].setViewport(
@@ -732,14 +738,16 @@ RendererVK::InitBatchBuffers()
 	textureInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
 	m_TextureBuffer.Init(m_Allocator, textureInfo, textureAllocInfo);
 
-	std::vector<vk::DescriptorPoolSize> poolSizes = {
-		vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2),
-		vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler,
-							   Texture::MaxSlots)
-	};
+	vk::DescriptorPoolSize poolSizes[2] = {};
+	poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
+	poolSizes[0].descriptorCount = 2 * FramesInFlight;
+	poolSizes[1].type = vk::DescriptorType::eCombinedImageSampler;
+	poolSizes[1].descriptorCount = Texture::MaxSlots * FramesInFlight;
 
-	vk::DescriptorPoolCreateInfo poolInfo(
-	  vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1, poolSizes);
+	vk::DescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.poolSizeCount = 2;
+	poolInfo.pPoolSizes = poolSizes;
+	poolInfo.maxSets = FramesInFlight;
 	m_DescriptorPool = vk::raii::DescriptorPool(m_Device, poolInfo);
 
 	std::vector<vk::DescriptorSetLayoutBinding> bindings = {
@@ -761,52 +769,59 @@ RendererVK::InitBatchBuffers()
 	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
 	m_DescriptorSetLayout = vk::raii::DescriptorSetLayout(m_Device, layoutInfo);
 
+	std::vector<vk::DescriptorSetLayout> layouts(FramesInFlight,
+												 *m_DescriptorSetLayout);
+
 	vk::DescriptorSetAllocateInfo allocInfo(
-	  *m_DescriptorPool, 1, &*m_DescriptorSetLayout);
+	  *m_DescriptorPool, FramesInFlight, layouts.data());
 	m_DescriptorSets = m_Device.allocateDescriptorSets(allocInfo);
 
-	vk::BufferCreateInfo triangleBufferInfo{};
-	triangleBufferInfo.size = sizeof(Display::Triangle) * MaxDrawCount;
-	triangleBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
-	VmaAllocationCreateInfo triangleAllocInfo = {};
-	triangleAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-	triangleAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	m_TriangleBuffer.Init(m_Allocator, triangleBufferInfo, triangleAllocInfo);
+	for (int i = 0; i < FramesInFlight; i++) {
+		vk::BufferCreateInfo triangleBufferInfo{};
+		triangleBufferInfo.size = sizeof(Display::Triangle) * MaxDrawCount;
+		triangleBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
+		VmaAllocationCreateInfo triangleAllocInfo = {};
+		triangleAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		triangleAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		m_TriangleBuffer[i].Init(
+		  m_Allocator, triangleBufferInfo, triangleAllocInfo);
 
-	vk::BufferCreateInfo matrixBufferInfo{};
-	matrixBufferInfo.size = sizeof(Display::MatrixState) * MaxDrawCount;
-	matrixBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
+		vk::BufferCreateInfo matrixBufferInfo{};
+		matrixBufferInfo.size = sizeof(Display::MatrixState) * MaxDrawCount;
+		matrixBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
 
-	VmaAllocationCreateInfo matrixAllocInfo = {};
-	matrixAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-	matrixAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	m_MatrixStateBuffer.Init(m_Allocator, matrixBufferInfo, matrixAllocInfo);
+		VmaAllocationCreateInfo matrixAllocInfo = {};
+		matrixAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		matrixAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		m_MatrixStateBuffer[i].Init(
+		  m_Allocator, matrixBufferInfo, matrixAllocInfo);
 
-	vk::DescriptorBufferInfo triangleInfo(
-	  m_TriangleBuffer.Get(), 0, VK_WHOLE_SIZE);
-	vk::DescriptorBufferInfo matrixInfo(
-	  m_MatrixStateBuffer.Get(), 0, VK_WHOLE_SIZE);
+		vk::DescriptorBufferInfo triangleInfo(
+		  m_TriangleBuffer[i].Get(), 0, VK_WHOLE_SIZE);
+		vk::DescriptorBufferInfo matrixInfo(
+		  m_MatrixStateBuffer[i].Get(), 0, VK_WHOLE_SIZE);
 
-	std::vector<vk::WriteDescriptorSet> writes = {
-		vk::WriteDescriptorSet(m_DescriptorSets[0],
-							   0,
-							   0,
-							   1,
-							   vk::DescriptorType::eStorageBuffer,
-							   nullptr,
-							   &triangleInfo,
-							   nullptr),
-		vk::WriteDescriptorSet(m_DescriptorSets[0],
-							   1,
-							   0,
-							   1,
-							   vk::DescriptorType::eStorageBuffer,
-							   nullptr,
-							   &matrixInfo,
-							   nullptr)
-	};
+		std::vector<vk::WriteDescriptorSet> writes = {
+			vk::WriteDescriptorSet(m_DescriptorSets[i],
+								   0,
+								   0,
+								   1,
+								   vk::DescriptorType::eStorageBuffer,
+								   nullptr,
+								   &triangleInfo,
+								   nullptr),
+			vk::WriteDescriptorSet(m_DescriptorSets[i],
+								   1,
+								   0,
+								   1,
+								   vk::DescriptorType::eStorageBuffer,
+								   nullptr,
+								   &matrixInfo,
+								   nullptr)
+		};
 
-	m_Device.updateDescriptorSets(writes, nullptr);
+		m_Device.updateDescriptorSets(writes, nullptr);
+	}
 }
 
 void
@@ -858,7 +873,7 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 		}
 
 		vk::WriteDescriptorSet writeDescriptor = {};
-		writeDescriptor.dstSet = m_DescriptorSets[0];
+		writeDescriptor.dstSet = m_DescriptorSets[currentFrame];
 		writeDescriptor.dstBinding = 2;
 		writeDescriptor.descriptorCount = Texture::MaxSlots;
 		writeDescriptor.descriptorType =
@@ -867,14 +882,14 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 
 		m_Device.updateDescriptorSets({ writeDescriptor }, {});
 
-		std::memcpy(m_TriangleBuffer.GetMappedData(),
+		std::memcpy(m_TriangleBuffer[currentFrame].GetMappedData(),
 					batcher.m_TriangleBuffer.data(),
 					sizeof(Display::Triangle) *
 					  batcher.m_TriangleBuffer.size());
 	}
 
 	if (!batcher.m_MatrixStateBuffer.empty()) {
-		std::memcpy(m_MatrixStateBuffer.GetMappedData(),
+		std::memcpy(m_MatrixStateBuffer[currentFrame].GetMappedData(),
 					batcher.m_MatrixStateBuffer.data(),
 					sizeof(Display::MatrixState) *
 					  batcher.m_MatrixStateBuffer.size());
@@ -937,5 +952,5 @@ RendererVK::InitTextureSamplers()
 void
 RendererVK::ResolutionChanged()
 {
-	// TODO
+	m_SwapchainIsInvalid = true;
 }
