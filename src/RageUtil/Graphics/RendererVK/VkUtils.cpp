@@ -38,7 +38,6 @@ Fail(const std::source_location location)
 	throw std::runtime_error(message.c_str());
 }
 
-// NOTE: this works and all but shaderc is a chonker dependency. need to replace with glslang or smth
 std::vector<uint32_t>
 CompileShader(const std::string& sourceName,
 			  shaderc_shader_kind shaderKind,
