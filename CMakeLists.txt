@@ -117,7 +117,7 @@ target_link_libraries(Etterna PRIVATE ghc_filesystem)
 
 target_link_libraries(Etterna PRIVATE vk-bootstrap::vk-bootstrap)
 target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
-find_package(Vulkan)
+find_package(Vulkan REQUIRED)
 target_link_libraries(Etterna PRIVATE Vulkan::Vulkan)
 target_link_libraries(Etterna PRIVATE shaderc)
 
