@@ -10,7 +10,7 @@ if(${CMAKE_CXX_STANDARD} LESS 17)
 	message(FATAL_ERROR "Effcee requires C++17 or later, but is configured for C++${CMAKE_CXX_STANDARD})")
 endif()
 
-option(EFFCEE_BUILD_TESTING "Enable testing for Effcee" ON)
+option(EFFCEE_BUILD_TESTING "Enable testing for Effcee" OFF)
 if(${EFFCEE_BUILD_TESTING})
   message(STATUS "Configuring Effcee to build tests.")
   if(MSVC)

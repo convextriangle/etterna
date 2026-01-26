@@ -33,7 +33,7 @@ endif()
 
 option(SHADERC_SKIP_TESTS "Skip building tests" ${SHADERC_SKIP_TESTS})
 if(NOT ${SHADERC_SKIP_TESTS})
-  set(SHADERC_ENABLE_TESTS ON)
+  set(SHADERC_ENABLE_TESTS OFF)
 endif()
 if(${SHADERC_ENABLE_TESTS})
   message(STATUS "Configuring Shaderc to build tests.")

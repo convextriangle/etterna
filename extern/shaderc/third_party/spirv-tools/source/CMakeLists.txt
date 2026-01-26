@@ -166,7 +166,6 @@ set_source_files_properties(
 
 add_subdirectory(opt)
 add_subdirectory(reduce)
-add_subdirectory(fuzz)
 add_subdirectory(link)
 add_subdirectory(lint)
 add_subdirectory(diff)

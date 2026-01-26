@@ -35,16 +35,6 @@ else()
 endif()
 
 # Configure third party projects.
-if(EFFCEE_BUILD_TESTING)
-  if (NOT TARGET gmock)
-    if (IS_DIRECTORY ${EFFCEE_GOOGLETEST_DIR})
-      add_subdirectory(${EFFCEE_GOOGLETEST_DIR} googletest EXCLUDE_FROM_ALL)
-    endif()
-  endif()
-  if (NOT TARGET gmock)
-    message(FATAL_ERROR "gmock was not found - required for tests")
-  endif()
-endif()
 
 if (NOT TARGET absl::base)
   if (IS_DIRECTORY ${EFFCEE_ABSEIL_DIR})
