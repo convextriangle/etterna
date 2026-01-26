@@ -12,7 +12,7 @@
 #include <array>
 #include "VkUtils.h"
 #include "Texture.h"
-#include "BufferHelper.h"
+#include "PersistentBuffer.h"
 
 class RendererVK : public Display::Renderer
 {
@@ -90,7 +90,7 @@ class RendererVK : public Display::Renderer
 	void InitSyncStructures();
 	void RecordCommands(uint32_t imageIndex, uint32_t drawCount);
 
-	constexpr static size_t FramesInFlight = 3;
+	constexpr static size_t FramesInFlight = 6;
 	constexpr static size_t MaxDrawCount = 50'000;
 
 	std::array<PersistentBuffer, FramesInFlight> m_TriangleBuffer;
