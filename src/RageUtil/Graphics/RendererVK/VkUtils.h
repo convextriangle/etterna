@@ -26,10 +26,10 @@ CompileShader(const std::string& sourceName,
 			  shaderc_shader_kind shaderKind,
 			  const std::string& source);
 
-vk::raii::ShaderModule
+vk::raii::ShaderEXT
 LoadShaderFromFile(std::string path,
 				   vk::raii::Device& device,
-				   shaderc_shader_kind shaderKind);
-
+				   shaderc_shader_kind shaderKind,
+				   vk::ShaderCreateInfoEXT shaderCreateInfo);
 
 #endif

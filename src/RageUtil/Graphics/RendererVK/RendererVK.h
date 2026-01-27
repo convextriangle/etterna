@@ -64,8 +64,9 @@ class RendererVK : public Display::Renderer
 	void InitImageViews();
 
 	vk::raii::PipelineLayout m_PipelineLayout = nullptr;
-	vk::raii::Pipeline m_GraphicsPipeline = nullptr;
 	vk::raii::DescriptorSetLayout m_DescriptorSetLayout = nullptr;
+	vk::raii::ShaderEXT m_FragmentShader = nullptr;
+	vk::raii::ShaderEXT m_VertexShader = nullptr;
 	void InitGraphicsPipeline();
 
 	vk::raii::CommandPool m_CommandPool = nullptr;
