@@ -276,8 +276,8 @@ RendererVK::InitVulkanState()
 	vkb::InstanceBuilder builder;
 	auto instanceResult =
 	  builder
-#ifdef _DEBUG || DEBUG
 		.request_validation_layers(true)
+#ifdef _DEBUG || DEBUG
 		.use_default_debug_messenger()
 		.add_validation_feature_enable(
 		  VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT)
@@ -300,26 +300,35 @@ RendererVK::InitVulkanState()
 	  m_Instance, instanceResult->debug_messenger);
 #endif
 
-	vk::Win32SurfaceCreateInfoKHR createInfo = {};
+	VkWin32SurfaceCreateInfoKHR createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 	createInfo.hwnd = GraphicsWindow::GetHwnd();
 	createInfo.hinstance = GetModuleHandle(nullptr);
 	m_Surface = m_Instance.createWin32SurfaceKHR(createInfo);
 
-	vk::PhysicalDeviceVulkan13Features vk13Features = {};
+	VkPhysicalDeviceVulkan13Features vk13Features = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES
+	};
 	vk13Features.dynamicRendering = true;
 	vk13Features.synchronization2 = true;
 
-	vk::PhysicalDeviceVulkan12Features vk12Features = {};
+	VkPhysicalDeviceVulkan12Features vk12Features = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
+	};
 	vk12Features.bufferDeviceAddress = true;
 	vk12Features.descriptorIndexing = true;
 	vk12Features.runtimeDescriptorArray = true;
 
-	vk::PhysicalDeviceVulkan11Features vk11Features = {};
+	VkPhysicalDeviceVulkan11Features vk11Features = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES
+	};
 	vk11Features.shaderDrawParameters = true;
 
-	vk::PhysicalDeviceFeatures vkFeatures = {};
+	VkPhysicalDeviceFeatures vkFeatures = {};
 	vkFeatures.samplerAnisotropy = vk::True;
+	vkFeatures.multiDrawIndirect = vk::True;
 	vkFeatures.logicOp = vk::True;
+	vkFeatures.drawIndirectFirstInstance = vk::True;
 
 	vkb::PhysicalDeviceSelector selector(*instanceResult);
 	auto physicalDeviceResult =
@@ -329,23 +338,13 @@ RendererVK::InitVulkanState()
 		.set_required_features_11(vk11Features)
 		.set_required_features(vkFeatures)
 		.set_surface(static_cast<vk::SurfaceKHR>(m_Surface))
-		.add_required_extension(VK_EXT_SHADER_OBJECT_EXTENSION_NAME)
 		.select();
 	if (!physicalDeviceResult) {
 		Fail();
 	}
 
 	vkb::DeviceBuilder deviceBuilder(*physicalDeviceResult);
-
-	vk::PhysicalDeviceShaderObjectFeaturesEXT shaderFeatures = {};
-	shaderFeatures.shaderObject = true;
-
-	vk::PhysicalDeviceDynamicRenderingFeaturesKHR renderingFeatures = {};
-	renderingFeatures.dynamicRendering = true;
-
-	auto deviceResult = deviceBuilder.add_pNext(&renderingFeatures)
-						  .add_pNext(&shaderFeatures)
-						  .build();
+	auto deviceResult = deviceBuilder.build();
 	if (!deviceResult) {
 		Fail();
 	}
@@ -466,6 +465,56 @@ RendererVK::InitImageViews()
 void
 RendererVK::InitGraphicsPipeline()
 {
+	auto fragmentShader = LoadShaderFromFile(
+	  FILEMAN->ResolvePath("Data/Shaders/Vulkan/fragment.glsl"),
+	  m_Device,
+	  shaderc_glsl_fragment_shader);
+	auto vertexShader = LoadShaderFromFile(
+	  FILEMAN->ResolvePath("Data/Shaders/Vulkan/vertex.glsl"),
+	  m_Device,
+	  shaderc_glsl_vertex_shader);
+
+	vk::PipelineShaderStageCreateInfo vertexShaderStageInfo{};
+	vertexShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
+	vertexShaderStageInfo.module = vertexShader,
+	vertexShaderStageInfo.pName = "main";
+
+	vk::PipelineShaderStageCreateInfo fragmentShaderStageInfo{};
+	fragmentShaderStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
+	fragmentShaderStageInfo.module = fragmentShader,
+	fragmentShaderStageInfo.pName = "main";
+
+	vk::PipelineShaderStageCreateInfo shaderStages[] = {
+		vertexShaderStageInfo, fragmentShaderStageInfo
+	};
+
+	std::vector dynamicStates = { vk::DynamicState::eViewport,
+								  vk::DynamicState::eScissor };
+
+	vk::PipelineDynamicStateCreateInfo dynamicState{};
+	dynamicState.dynamicStateCount =
+	  static_cast<uint32_t>(dynamicStates.size());
+	dynamicState.pDynamicStates = dynamicStates.data();
+
+	vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
+	inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
+
+	vk::PipelineViewportStateCreateInfo viewportState({}, 1, {}, 1);
+
+	vk::PipelineRasterizationStateCreateInfo rasterizer{};
+	rasterizer.depthClampEnable = vk::False;
+	rasterizer.rasterizerDiscardEnable = vk::False;
+	rasterizer.polygonMode = vk::PolygonMode::eFill;
+	rasterizer.cullMode = vk::CullModeFlagBits::eNone;
+	rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
+	rasterizer.depthBiasEnable = vk::False;
+	rasterizer.depthBiasSlopeFactor = 1.0f;
+	rasterizer.lineWidth = 1.0f;
+
+	vk::PipelineMultisampleStateCreateInfo multisampling{};
+	multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
+	multisampling.sampleShadingEnable = vk::False;
+
 	vk::PipelineColorBlendAttachmentState colorBlendAttachment;
 	colorBlendAttachment.blendEnable = vk::True;
 	colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
@@ -509,28 +558,29 @@ RendererVK::InitGraphicsPipeline()
 
 	m_PipelineLayout = vk::raii::PipelineLayout(m_Device, pipelineLayoutInfo);
 
-	vk::ShaderCreateInfoEXT shaderInfo = {};
-	shaderInfo.flags = vk::ShaderCreateFlagBitsEXT::eLinkStage;
-	shaderInfo.codeType = vk::ShaderCodeTypeEXT::eSpirv;
-	shaderInfo.pName = "main";
-	shaderInfo.setLayoutCount = 1;
-	shaderInfo.pSetLayouts = &*m_DescriptorSetLayout;
-	shaderInfo.stage = vk::ShaderStageFlagBits::eFragment;
+	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo = {};
+	pipelineRenderingCreateInfo.colorAttachmentCount = 1;
+	pipelineRenderingCreateInfo.pColorAttachmentFormats = &ImageFormat;
 
-	m_FragmentShader = LoadShaderFromFile(
-	  FILEMAN->ResolvePath("Data/Shaders/Vulkan/fragment.glsl"),
-	  m_Device,
-	  shaderc_glsl_fragment_shader,
-	  shaderInfo);
+	// we don't actually need any vertex info since we're reading stuffs from
+	// the storage buffer
+	vk::PipelineVertexInputStateCreateInfo vertexInfo = {};
 
-	shaderInfo.stage = vk::ShaderStageFlagBits::eVertex;
-	shaderInfo.nextStage = vk::ShaderStageFlagBits::eFragment;
+	vk::GraphicsPipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.pNext = &pipelineRenderingCreateInfo;
+	pipelineInfo.stageCount = 2;
+	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.pInputAssemblyState = &inputAssembly;
+	pipelineInfo.pViewportState = &viewportState;
+	pipelineInfo.pRasterizationState = &rasterizer;
+	pipelineInfo.pMultisampleState = &multisampling;
+	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pDynamicState = &dynamicState;
+	pipelineInfo.pVertexInputState = &vertexInfo;
+	pipelineInfo.layout = m_PipelineLayout;
+	pipelineInfo.renderPass = nullptr;
 
-	m_VertexShader = LoadShaderFromFile(
-	  FILEMAN->ResolvePath("Data/Shaders/Vulkan/vertex.glsl"),
-	  m_Device,
-	  shaderc_glsl_vertex_shader,
-	  shaderInfo);
+	m_GraphicsPipeline = vk::raii::Pipeline(m_Device, nullptr, pipelineInfo);
 }
 
 void
@@ -638,50 +688,8 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 
 	m_CommandBuffers[m_CurrentFrame].beginRendering(renderingInfo);
 
-	m_CommandBuffers[m_CurrentFrame].setViewportWithCountEXT(
-	  { vk::Viewport(0.0f,
-					 static_cast<float>(m_SwapchainExtent.height),
-					 static_cast<float>(m_SwapchainExtent.width),
-					 -static_cast<float>(m_SwapchainExtent.height),
-					 0.0f,
-					 1.0f) });
-	m_CommandBuffers[m_CurrentFrame].setScissorWithCountEXT(
-	  { vk::Rect2D(vk::Offset2D(0, 1), m_SwapchainExtent) });
-	m_CommandBuffers[m_CurrentFrame].setCullModeEXT(
-	  vk::CullModeFlagBits::eNone);
-	m_CommandBuffers[m_CurrentFrame].setFrontFaceEXT(
-	  vk::FrontFace::eCounterClockwise);
-	m_CommandBuffers[m_CurrentFrame].setLineWidth(1.0f);
-	m_CommandBuffers[m_CurrentFrame].setDepthTestEnableEXT(vk::True);
-	m_CommandBuffers[m_CurrentFrame].setDepthWriteEnableEXT(vk::True);
-	m_CommandBuffers[m_CurrentFrame].setDepthCompareOpEXT(
-	  vk::CompareOp::eLessOrEqual);
-	m_CommandBuffers[m_CurrentFrame].setPrimitiveTopologyEXT(
-	  vk::PrimitiveTopology::eTriangleList);
-	m_CommandBuffers[m_CurrentFrame].setRasterizerDiscardEnableEXT(vk::False);
-	m_CommandBuffers[m_CurrentFrame].setPolygonModeEXT(vk::PolygonMode::eFill);
-	m_CommandBuffers[m_CurrentFrame].setRasterizationSamplesEXT(
-	  vk::SampleCountFlagBits::e1);
-	m_CommandBuffers[m_CurrentFrame].setAlphaToCoverageEnableEXT(vk::False);
-	m_CommandBuffers[m_CurrentFrame].setDepthBiasEnableEXT(vk::False);
-	m_CommandBuffers[m_CurrentFrame].setStencilTestEnableEXT(vk::False);
-	m_CommandBuffers[m_CurrentFrame].setPrimitiveRestartEnableEXT(vk::False);
-	m_CommandBuffers[m_CurrentFrame].setColorBlendEnableEXT(0, VK_TRUE);
-
-	vk::ColorBlendEquationEXT blendEquation = {};
-	blendEquation.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
-	blendEquation.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-	blendEquation.colorBlendOp = vk::BlendOp::eAdd;
-	blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-	blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eZero;
-	blendEquation.alphaBlendOp = vk::BlendOp::eAdd;
-
-	m_CommandBuffers[m_CurrentFrame].setColorBlendEquationEXT(
-	  0, { blendEquation });
-	m_CommandBuffers[m_CurrentFrame].setColorWriteMaskEXT(
-	  0,
-	  vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-		vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+	m_CommandBuffers[m_CurrentFrame].bindPipeline(
+	  vk::PipelineBindPoint::eGraphics, *m_GraphicsPipeline);
 
 	m_CommandBuffers[m_CurrentFrame].bindDescriptorSets(
 	  vk::PipelineBindPoint::eGraphics,
@@ -690,11 +698,16 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 	  { *m_DescriptorSets[m_CurrentFrame] },
 	  nullptr);
 
-	vk::ShaderStageFlagBits stages[2] = { vk::ShaderStageFlagBits::eVertex,
-										  vk::ShaderStageFlagBits::eFragment };
-
-	m_CommandBuffers[m_CurrentFrame].bindShadersEXT(
-	  stages, { m_VertexShader, m_FragmentShader });
+	m_CommandBuffers[m_CurrentFrame].setViewport(
+	  0,
+	  vk::Viewport(0.0f,
+				   static_cast<float>(m_SwapchainExtent.height),
+				   static_cast<float>(m_SwapchainExtent.width),
+				   -static_cast<float>(m_SwapchainExtent.height),
+				   0.0f,
+				   1.0f));
+	m_CommandBuffers[m_CurrentFrame].setScissor(
+	  0, vk::Rect2D(vk::Offset2D(0, 1), m_SwapchainExtent));
 
 	if (drawCount > 0) {
 		m_CommandBuffers[m_CurrentFrame].draw(drawCount, 1, 0, 0);

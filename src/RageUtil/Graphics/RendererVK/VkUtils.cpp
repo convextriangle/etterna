@@ -21,8 +21,7 @@ ThrowIfFail(VkResult result, const std::source_location location)
 	throw std::runtime_error(message.c_str());
 }
 
-void
-ThrowIfFail(vk::Result result, const std::source_location location)
+void ThrowIfFail(vk::Result result, const std::source_location location)
 {
 	ThrowIfFail(static_cast<VkResult>(result), location);
 }
@@ -60,11 +59,10 @@ CompileShader(const std::string& sourceName,
 	return { result.begin(), result.end() };
 }
 
-vk::raii::ShaderEXT
+vk::raii::ShaderModule
 LoadShaderFromFile(std::string path,
 				   vk::raii::Device& device,
-				   shaderc_shader_kind shaderKind,
-				   vk::ShaderCreateInfoEXT shaderCreateInfo)
+				   shaderc_shader_kind shaderKind)
 {
 #ifdef _WIN32
 	if (path[0] == '/') {
@@ -77,8 +75,11 @@ LoadShaderFromFile(std::string path,
 	contents << inputFile.rdbuf();
 	auto shaderBlob = CompileShader("meow", shaderKind, contents.str());
 
-	shaderCreateInfo.codeSize = shaderBlob.size() * sizeof(uint32_t);
-	shaderCreateInfo.pCode = shaderBlob.data();
+	VkShaderModuleCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.pNext = nullptr;
+	createInfo.codeSize = shaderBlob.size() * sizeof(uint32_t);
+	createInfo.pCode = shaderBlob.data();
 
-	return vk::raii::ShaderEXT(device, shaderCreateInfo);
+	return vk::raii::ShaderModule(device, createInfo);
 }
