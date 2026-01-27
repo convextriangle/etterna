@@ -276,8 +276,8 @@ RendererVK::InitVulkanState()
 	vkb::InstanceBuilder builder;
 	auto instanceResult =
 	  builder
-		.request_validation_layers(true)
 #ifdef _DEBUG || DEBUG
+		.request_validation_layers(true)
 		.use_default_debug_messenger()
 		.add_validation_feature_enable(
 		  VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT)
