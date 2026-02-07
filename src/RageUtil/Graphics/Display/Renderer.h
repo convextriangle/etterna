@@ -4,6 +4,7 @@
 #include <string>
 #include "RageUtil/Graphics/RageDisplay.h"
 #include "RageUtil/Graphics/Display/CommandBatcher.h"
+#include "RageUtil/Graphics/RageSurface.h"
 
 namespace Display {
 class Renderer
@@ -25,6 +26,7 @@ class Renderer
 	virtual void DeleteTexture(intptr_t handle) = 0;
 	virtual void ClearAllTextures() = 0;
 	virtual void ResolutionChanged() = 0;
+	virtual RageSurface* CreateScreenshot() = 0;
 };
 }
 

@@ -32,6 +32,7 @@ class RendererVK : public Display::Renderer
 					   int height) override;
 	void DeleteTexture(intptr_t handle) override;
 	void ClearAllTextures() override;
+	RageSurface* CreateScreenshot() override;
 
 	~RendererVK() override;
 
@@ -43,9 +44,9 @@ class RendererVK : public Display::Renderer
 	vk::raii::Device m_Device = nullptr;
 	vk::raii::SurfaceKHR m_Surface = nullptr;
 	vk::raii::Queue m_GraphicsQueue = nullptr;
-	uint32_t m_GraphicsQueueFamily;
+	uint32_t m_GraphicsQueueFamily = 0;
 	vk::raii::Queue m_PresentQueue = nullptr;
-	uint32_t m_PresentQueueFamily;
+	uint32_t m_PresentQueueFamily = 0;
 	VmaAllocator m_Allocator = nullptr;
 	void InitVulkanState();
 

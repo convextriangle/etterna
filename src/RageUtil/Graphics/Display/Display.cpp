@@ -292,10 +292,12 @@ Display::Display::DeleteCompiledGeometry(RageCompiledGeometry* p)
 	assert(false && "Not implemented");
 }
 
+#pragma endregion
+
 RageSurface*
 Display::Display::CreateScreenshot()
 {
-	return nullptr;
+	return m_Renderer->CreateScreenshot();
 }
 
 bool
@@ -309,8 +311,6 @@ Display::Display::SupportsPerVertexMatrixScale()
 {
 	return false;
 }
-
-#pragma endregion
 
 Display::MatrixState
 Display::Display::GetCurrentMatrixState()

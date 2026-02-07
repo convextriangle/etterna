@@ -21,7 +21,8 @@ ThrowIfFail(VkResult result, const std::source_location location)
 	throw std::runtime_error(message.c_str());
 }
 
-void ThrowIfFail(vk::Result result, const std::source_location location)
+void
+ThrowIfFail(vk::Result result, const std::source_location location)
 {
 	ThrowIfFail(static_cast<VkResult>(result), location);
 }
@@ -82,4 +83,22 @@ LoadShaderFromFile(std::string path,
 	createInfo.pCode = shaderBlob.data();
 
 	return vk::raii::ShaderModule(device, createInfo);
+}
+
+std::optional<uint32_t>
+GetMemoryType(uint32_t typeBits,
+			  vk::MemoryPropertyFlags neededProps,
+			  vk::PhysicalDeviceMemoryProperties memoryProps)
+{
+	for (uint32_t i = 0; i < memoryProps.memoryTypeCount; i++) {
+		if ((typeBits & 1) == 1) {
+			if ((memoryProps.memoryTypes[i].propertyFlags & neededProps) ==
+				neededProps) {
+				return i;
+			}
+		}
+		typeBits >>= 1;
+	}
+
+	return std::nullopt;
 }

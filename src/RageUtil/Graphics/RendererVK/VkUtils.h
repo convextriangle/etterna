@@ -7,6 +7,7 @@
 #include <source_location>
 #include <span>
 #include <shaderc/shaderc.hpp>
+#include <optional>
 
 void
 ThrowIfFail(
@@ -31,5 +32,9 @@ LoadShaderFromFile(std::string path,
 				   vk::raii::Device& device,
 				   shaderc_shader_kind shaderKind);
 
+std::optional<uint32_t>
+GetMemoryType(uint32_t typeBits,
+			  vk::MemoryPropertyFlags neededProps,
+			  vk::PhysicalDeviceMemoryProperties memoryProps);
 
 #endif
