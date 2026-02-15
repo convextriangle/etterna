@@ -979,17 +979,17 @@ RendererVK::InitBatchBuffers()
 	m_DescriptorSets = m_Device.allocateDescriptorSets(allocInfo);
 
 	for (int i = 0; i < FramesInFlight; i++) {
-		vk::BufferCreateInfo triangleBufferInfo{};
-		triangleBufferInfo.size = sizeof(Display::Triangle) * MaxDrawCount;
-		triangleBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
-		VmaAllocationCreateInfo triangleAllocInfo = {};
-		triangleAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-		triangleAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-		m_TriangleBuffer[i].Init(
-		  m_Allocator, triangleBufferInfo, triangleAllocInfo);
+		vk::BufferCreateInfo vertexBufferInfo{};
+		vertexBufferInfo.size = sizeof(Display::Vertex) * MaxDrawCount;
+		vertexBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
+		VmaAllocationCreateInfo vertexAllocInfo = {};
+		vertexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		vertexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		m_VertexBuffer[i].Init(
+		  m_Allocator, vertexBufferInfo, vertexAllocInfo);
 
 		vk::BufferCreateInfo indexBufferInfo{};
-		indexBufferInfo.size = sizeof(uint32_t) * 3 * MaxDrawCount;
+		indexBufferInfo.size = sizeof(uint32_t) * 5 * MaxDrawCount;
 		indexBufferInfo.usage = vk::BufferUsageFlagBits::eIndexBuffer;
 		VmaAllocationCreateInfo indexAllocInfo = {};
 		indexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -1007,7 +1007,7 @@ RendererVK::InitBatchBuffers()
 		  m_Allocator, matrixBufferInfo, matrixAllocInfo);
 
 		vk::DescriptorBufferInfo triangleInfo(
-		  m_TriangleBuffer[i].Get(), 0, VK_WHOLE_SIZE);
+		  m_VertexBuffer[i].Get(), 0, VK_WHOLE_SIZE);
 		vk::DescriptorBufferInfo matrixInfo(
 		  m_MatrixStateBuffer[i].Get(), 0, VK_WHOLE_SIZE);
 
@@ -1037,7 +1037,7 @@ RendererVK::InitBatchBuffers()
 void
 RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 {
-	if (!batcher.m_TriangleBuffer.empty()) {
+	if (!batcher.m_VertexBuffer.empty()) {
 		std::map<std::pair<uint8_t, intptr_t>, int> textureLocation;
 		std::array<vk::DescriptorImageInfo, Texture::MaxSlots> textureInfo;
 
@@ -1047,12 +1047,12 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 			info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 		}
 
-		for (auto& triangle : batcher.m_TriangleBuffer) {
+		for (auto& vertex : batcher.m_VertexBuffer) {
 			const auto& renderState =
-			  batcher.m_RenderStateBuffer[triangle.TextureIndex];
+			  batcher.m_RenderStateBuffer[vertex.TextureIndex];
 
 			if (!renderState.textureHandle) {
-				triangle.TextureIndex = 0;
+				vertex.TextureIndex = 0;
 				continue;
 			}
 
@@ -1065,7 +1065,7 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 			auto it = textureLocation.find(
 			  { textureSettings, renderState.textureHandle });
 			if (it != textureLocation.end()) {
-				triangle.TextureIndex = it->second;
+				vertex.TextureIndex = it->second;
 			} else {
 				assert(textureLocation.size() < Texture::MaxSlots);
 				textureInfo[textureLocation.size()].sampler =
@@ -1073,12 +1073,12 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 				textureInfo[textureLocation.size()].imageView =
 				  m_Textures[renderState.textureHandle].view;
 
-				triangle.TextureIndex = textureLocation.size() + 1;
+				vertex.TextureIndex = textureLocation.size() + 1;
 				textureLocation.emplace_hint(
 				  it,
 				  std::make_pair(
 					std::make_pair(textureSettings, renderState.textureHandle),
-					triangle.TextureIndex));
+					vertex.TextureIndex));
 			}
 		}
 
@@ -1092,10 +1092,9 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 
 		m_Device.updateDescriptorSets({ writeDescriptor }, {});
 
-		std::memcpy(m_TriangleBuffer[m_CurrentFrame].GetMappedData(),
-					batcher.m_TriangleBuffer.data(),
-					sizeof(Display::Triangle) *
-					  batcher.m_TriangleBuffer.size());
+		std::memcpy(m_VertexBuffer[m_CurrentFrame].GetMappedData(),
+					batcher.m_VertexBuffer.data(),
+					sizeof(Display::Vertex) * batcher.m_VertexBuffer.size());
 
 		std::memcpy(m_IndexBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_IndexBuffer.data(),

@@ -91,9 +91,9 @@ class RendererVK : public Display::Renderer
 	void RecordCommands(uint32_t imageIndex, uint32_t indexCount);
 
 	constexpr static size_t FramesInFlight = 3;
-	constexpr static size_t MaxDrawCount = 50'000;
+	constexpr static size_t MaxDrawCount = 100'000;
 
-	std::array<PersistentBuffer, FramesInFlight> m_TriangleBuffer;
+	std::array<PersistentBuffer, FramesInFlight> m_VertexBuffer;
 	std::array<PersistentBuffer, FramesInFlight> m_IndexBuffer;
 	std::array<PersistentBuffer, FramesInFlight> m_MatrixStateBuffer;
 	PersistentBuffer m_TextureBuffer;

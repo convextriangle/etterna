@@ -6,16 +6,12 @@ struct Vertex {
     float normal[3];
     uint color;
     float uv[2];
-};
-
-struct Triangle {
-    Vertex vertices[3];
     uint matrixIndex;
     uint textureIndex;
 };
 
-layout(std430, set = 0, binding = 0) readonly buffer TriangleBuffer {
-    Triangle triangles[];
+layout(std430, set = 0, binding = 0) readonly buffer VertexBuffer {
+    Vertex vertices[];
 };
 
 struct MatrixState {
@@ -52,13 +48,12 @@ vec4 unpackColor(uint c)
 }
 
 void main() {
-    Triangle currentTriangle = triangles[gl_VertexIndex / 3];
-    Vertex currentVertex = currentTriangle.vertices[gl_VertexIndex % 3];
+    Vertex currentVertex = vertices[gl_VertexIndex];
     
     vertexColor = unpackColor(currentVertex.color);
-    textureIndex = currentTriangle.textureIndex;
+    textureIndex = currentVertex.textureIndex;
 
-    uint matrixIndex = currentTriangle.matrixIndex;
+    uint matrixIndex = currentVertex.matrixIndex;
     
     mat4 world = matrices[matrixIndex].world;
     mat4 view = matrices[matrixIndex].view;

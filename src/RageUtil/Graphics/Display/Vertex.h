@@ -9,9 +9,9 @@
 namespace Display
 {
 
-struct Triangle
+struct Vertex
 {
-    RageSpriteVertex Vertex[3];
+    RageSpriteVertex InnerData;
     uint32_t MatrixIndex;
     uint32_t TextureIndex;
 };
