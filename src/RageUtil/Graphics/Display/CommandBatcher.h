@@ -20,7 +20,8 @@ class CommandBatcher
     void Clear();
 
     std::vector<Triangle> m_TriangleBuffer;
-    std::vector<RenderState> m_RenderStateBuffer;
+	std::vector<uint32_t> m_IndexBuffer;
+	std::vector<RenderState> m_RenderStateBuffer;
     std::vector<MatrixState> m_MatrixStateBuffer;
 };
 

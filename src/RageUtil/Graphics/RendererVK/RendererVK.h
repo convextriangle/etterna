@@ -88,12 +88,13 @@ class RendererVK : public Display::Renderer
 	std::vector<vk::raii::Fence> m_InFlightFence;
 	uint32_t m_CurrentFrame = 0;
 	void InitSyncStructures();
-	void RecordCommands(uint32_t imageIndex, uint32_t drawCount);
+	void RecordCommands(uint32_t imageIndex, uint32_t indexCount);
 
 	constexpr static size_t FramesInFlight = 3;
 	constexpr static size_t MaxDrawCount = 50'000;
 
 	std::array<PersistentBuffer, FramesInFlight> m_TriangleBuffer;
+	std::array<PersistentBuffer, FramesInFlight> m_IndexBuffer;
 	std::array<PersistentBuffer, FramesInFlight> m_MatrixStateBuffer;
 	PersistentBuffer m_TextureBuffer;
 

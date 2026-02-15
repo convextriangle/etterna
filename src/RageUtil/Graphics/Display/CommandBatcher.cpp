@@ -25,10 +25,6 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 	//	  and most of the ye olde draw modes aren't supported
 	//    so just convert to a triangle list
 	// -- unrolled loops look funny though
-	// -- maybe this can be done on the GPU via mesh shaders and/or work graphs
-	// but that's for unstable_vk_mintyfresh
-	// -- and like two people have GPUs that support stuff like this so no thank
-	// you
 	m_MatrixStateBuffer.push_back(matrixState);
 
 	Triangle triangle = { {},
@@ -42,6 +38,9 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 				triangle.Vertex[1] = vertexData[3 * i + 1];
 				triangle.Vertex[2] = vertexData[3 * i + 2];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 			}
 			break;
 		}
@@ -51,11 +50,17 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 				triangle.Vertex[1] = vertexData[i * 4 + 1];
 				triangle.Vertex[2] = vertexData[i * 4 + 2];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 
 				triangle.Vertex[0] = vertexData[i * 4 + 2];
 				triangle.Vertex[1] = vertexData[i * 4 + 3];
 				triangle.Vertex[2] = vertexData[i * 4 + 0];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 			}
 
 			break;
@@ -66,11 +71,17 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 				triangle.Vertex[1] = vertexData[i * 2 + 1];
 				triangle.Vertex[2] = vertexData[i * 2 + 2];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 
 				triangle.Vertex[0] = vertexData[i * 2 + 1];
 				triangle.Vertex[1] = vertexData[i * 2 + 2];
 				triangle.Vertex[2] = vertexData[i * 2 + 3];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 			}
 
 			break;
@@ -83,6 +94,9 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 				triangle.Vertex[1] = vertexData[i];
 				triangle.Vertex[2] = vertexData[i + 1];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 			}
 
 			break;
@@ -96,11 +110,17 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 					triangle.Vertex[1] = vertexData[i + 1];
 					triangle.Vertex[2] = vertexData[i + 2];
 					m_TriangleBuffer.push_back(triangle);
+					m_IndexBuffer.push_back(m_IndexBuffer.size());
+					m_IndexBuffer.push_back(m_IndexBuffer.size());
+					m_IndexBuffer.push_back(m_IndexBuffer.size());
 				} else {
 					triangle.Vertex[0] = vertexData[i + 1];
 					triangle.Vertex[1] = vertexData[i];
 					triangle.Vertex[2] = vertexData[i + 2];
 					m_TriangleBuffer.push_back(triangle);
+					m_IndexBuffer.push_back(m_IndexBuffer.size());
+					m_IndexBuffer.push_back(m_IndexBuffer.size());
+					m_IndexBuffer.push_back(m_IndexBuffer.size());
 				}
 			}
 
@@ -113,21 +133,33 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 				triangle.Vertex[1] = vertexData[i * 3 + 3];
 				triangle.Vertex[2] = vertexData[i + 3 + 0];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 
 				triangle.Vertex[0] = vertexData[i * 3 + 1];
 				triangle.Vertex[1] = vertexData[i * 3 + 4];
 				triangle.Vertex[2] = vertexData[i * 3 + 3];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 
 				triangle.Vertex[0] = vertexData[i * 3 + 1];
 				triangle.Vertex[1] = vertexData[i * 3 + 5];
 				triangle.Vertex[2] = vertexData[i * 3 + 4];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 
 				triangle.Vertex[0] = vertexData[i * 3 + 1];
 				triangle.Vertex[1] = vertexData[i * 3 + 2];
 				triangle.Vertex[2] = vertexData[i * 3 + 5];
 				m_TriangleBuffer.push_back(triangle);
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
+				m_IndexBuffer.push_back(m_IndexBuffer.size());
 			}
 
 			break;
@@ -165,6 +197,7 @@ void
 Display::CommandBatcher::Clear()
 {
 	m_TriangleBuffer.clear();
+	m_IndexBuffer.clear();
 	m_RenderStateBuffer.clear();
 	m_MatrixStateBuffer.clear();
 }

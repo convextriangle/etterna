@@ -1,3 +1,7 @@
+#ifndef NOMINMAX // >:3
+#define NOMINMAX
+#endif
+
 #define VMA_IMPLEMENTATION
 #include "RendererVK.h"
 
@@ -8,10 +12,6 @@
 #include <numbers>
 #include <RageUtil/File/RageFileManager.h>
 #include <RageUtil/Misc/RageMath.h>
-
-#ifdef min // >:3
-#undef min
-#endif
 
 constexpr uint64_t Timeout = 1000'000'000;
 
@@ -64,7 +64,7 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 
 	m_Device.resetFences(*m_InFlightFence[m_CurrentFrame]);
 	m_CommandBuffers[m_CurrentFrame].reset();
-	RecordCommands(imageIndex, batcher.m_TriangleBuffer.size() * 3);
+	RecordCommands(imageIndex, batcher.m_IndexBuffer.size());
 
 	vk::PipelineStageFlags waitDestinationStageMask(
 	  vk::PipelineStageFlagBits::eColorAttachmentOutput);
@@ -856,7 +856,7 @@ RendererVK::InitSyncStructures()
 }
 
 void
-RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
+RendererVK::RecordCommands(uint32_t imageIndex, uint32_t indexCount)
 {
 	m_CommandBuffers[m_CurrentFrame].begin({});
 	TransitionImageLayout(imageIndex,
@@ -905,8 +905,11 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t drawCount)
 	m_CommandBuffers[m_CurrentFrame].setScissor(
 	  0, vk::Rect2D(vk::Offset2D(0, 1), m_SwapchainExtent));
 
-	if (drawCount > 0) {
-		m_CommandBuffers[m_CurrentFrame].draw(drawCount, 1, 0, 0);
+	m_CommandBuffers[m_CurrentFrame].bindIndexBuffer(
+	  m_IndexBuffer[m_CurrentFrame].Get(), 0, vk::IndexType::eUint32);
+
+	if (indexCount > 0) {
+		m_CommandBuffers[m_CurrentFrame].drawIndexed(indexCount, 1, 0, 0, 0);
 	}
 
 	m_CommandBuffers[m_CurrentFrame].endRendering();
@@ -984,6 +987,14 @@ RendererVK::InitBatchBuffers()
 		triangleAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		m_TriangleBuffer[i].Init(
 		  m_Allocator, triangleBufferInfo, triangleAllocInfo);
+
+		vk::BufferCreateInfo indexBufferInfo{};
+		indexBufferInfo.size = sizeof(uint32_t) * 3 * MaxDrawCount;
+		indexBufferInfo.usage = vk::BufferUsageFlagBits::eIndexBuffer;
+		VmaAllocationCreateInfo indexAllocInfo = {};
+		indexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		indexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		m_IndexBuffer[i].Init(m_Allocator, indexBufferInfo, indexAllocInfo);
 
 		vk::BufferCreateInfo matrixBufferInfo{};
 		matrixBufferInfo.size = sizeof(Display::MatrixState) * MaxDrawCount;
@@ -1085,6 +1096,10 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 					batcher.m_TriangleBuffer.data(),
 					sizeof(Display::Triangle) *
 					  batcher.m_TriangleBuffer.size());
+
+		std::memcpy(m_IndexBuffer[m_CurrentFrame].GetMappedData(),
+					batcher.m_IndexBuffer.data(),
+					sizeof(uint32_t) * batcher.m_IndexBuffer.size());
 	}
 
 	if (!batcher.m_MatrixStateBuffer.empty()) {
