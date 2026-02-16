@@ -701,7 +701,7 @@ RendererVK::InitGraphicsPipeline()
 	rasterizer.depthClampEnable = vk::False;
 	rasterizer.rasterizerDiscardEnable = vk::False;
 	rasterizer.polygonMode = vk::PolygonMode::eFill;
-	rasterizer.cullMode = vk::CullModeFlagBits::eNone;
+	rasterizer.cullMode = vk::CullModeFlagBits::eBack;
 	rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
 	rasterizer.depthBiasEnable = vk::False;
 	rasterizer.depthBiasSlopeFactor = 1.0f;
