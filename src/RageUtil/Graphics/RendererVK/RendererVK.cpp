@@ -443,6 +443,14 @@ RendererVK::CreateScreenshot()
 	return surface;
 }
 
+intptr_t
+RendererVK::CreateRenderTarget(const RenderTargetParam& param,
+							   int& iTextureWidthOut,
+							   int& iTextureHeightOut)
+{
+	return intptr_t();
+}
+
 RendererVK::~RendererVK()
 {
 	for (auto& [handle, texture] : m_Textures) {
@@ -1166,4 +1174,48 @@ void
 RendererVK::ResolutionChanged()
 {
 	m_SwapchainIsInvalid = true;
+}
+
+intptr_t
+RendererVK::CreateRenderTargetTexture(int width, int height)
+{
+	intptr_t currentHandle = m_TextureCounter++;
+
+	Texture texture = {};
+	texture.width = power_of_two(width);
+	texture.height = power_of_two(height);
+
+	VmaAllocationCreateInfo allocCreateInfo = {};
+	allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+	VkImageCreateInfo imageInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageInfo.extent = { texture.width, texture.height, 1 };
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.usage =
+	  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+	VmaAllocationInfo allocInfo = {};
+	ThrowIfFail(vmaCreateImage(m_Allocator,
+							   &imageInfo,
+							   &allocCreateInfo,
+							   &texture.image,
+							   &texture.allocation,
+							   &allocInfo));
+
+	vk::ImageViewCreateInfo viewInfo;
+	viewInfo.image = texture.image;
+	viewInfo.viewType = vk::ImageViewType::e2D;
+	viewInfo.format = vk::Format::eR8G8B8A8Unorm;
+	viewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.layerCount = 1;
+	texture.view = (*m_Device).createImageView(viewInfo);
+
+	m_Textures.insert({ currentHandle, texture });
+
+	return currentHandle;
 }

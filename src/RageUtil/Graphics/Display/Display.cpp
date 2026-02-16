@@ -256,15 +256,12 @@ Display::Display::DrawCompiledGeometryInternal(const RageCompiledGeometry* p,
 
 #pragma endregion
 
-#pragma region Unfinished things
-
 intptr_t
 Display::Display::CreateRenderTarget(const RenderTargetParam& param,
 									 int& iTextureWidthOut,
 									 int& iTextureHeightOut)
 {
-	assert(false && "Not implemented");
-	return intptr_t();
+	return m_Renderer->CreateRenderTarget(param, iTextureWidthOut, iTextureHeightOut);
 }
 
 intptr_t
@@ -279,8 +276,6 @@ Display::Display::SetRenderTarget(intptr_t uTexHandle, bool bPreserveTexture)
 {
 	assert(false && "Not implemented");
 }
-
-#pragma endregion
 
 RageCompiledGeometry*
 Display::Display::CreateCompiledGeometry()

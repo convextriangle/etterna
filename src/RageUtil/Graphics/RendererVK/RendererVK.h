@@ -33,6 +33,9 @@ class RendererVK : public Display::Renderer
 	void DeleteTexture(intptr_t handle) override;
 	void ClearAllTextures() override;
 	RageSurface* CreateScreenshot() override;
+	intptr_t CreateRenderTarget(const RenderTargetParam& param,
+								int& iTextureWidthOut,
+								int& iTextureHeightOut) override;
 
 	~RendererVK() override;
 
@@ -112,6 +115,8 @@ class RendererVK : public Display::Renderer
 	std::array<vk::raii::Sampler, Texture::PossibleSamplerCount> m_Samplers;
 	void InitTextureSamplers();
 	void ResolutionChanged() override;
+
+	intptr_t CreateRenderTargetTexture(int width, int height);
 };
 
 #endif

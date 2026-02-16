@@ -27,6 +27,9 @@ class Renderer
 	virtual void ClearAllTextures() = 0;
 	virtual void ResolutionChanged() = 0;
 	virtual RageSurface* CreateScreenshot() = 0;
+	virtual intptr_t CreateRenderTarget(const RenderTargetParam& param,
+									 int& iTextureWidthOut,
+									 int& iTextureHeightOut) = 0;
 };
 }
 
