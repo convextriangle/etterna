@@ -1,4 +1,5 @@
 #include "Display.h"
+#include "CompiledGeometry.h"
 #include "Core/Services/Locator.hpp"
 #include <cassert>
 #include <source_location>
@@ -279,20 +280,20 @@ Display::Display::SetRenderTarget(intptr_t uTexHandle, bool bPreserveTexture)
 	assert(false && "Not implemented");
 }
 
+#pragma endregion
+
 RageCompiledGeometry*
 Display::Display::CreateCompiledGeometry()
 {
-	assert(false && "Not implemented");
-	return nullptr;
+	return new CompiledGeometry;
 }
 
 void
 Display::Display::DeleteCompiledGeometry(RageCompiledGeometry* p)
 {
-	assert(false && "Not implemented");
+	assert(p != nullptr);
+	delete p;
 }
-
-#pragma endregion
 
 RageSurface*
 Display::Display::CreateScreenshot()

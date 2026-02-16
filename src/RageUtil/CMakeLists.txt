@@ -69,6 +69,7 @@ list(APPEND SMDATA_RAGE_GRAPHICS_SRC
   "Graphics/Shaders/RageShaderHandler.cpp"
 
   "Graphics/Display/CommandBatcher.cpp"
+  "Graphics/Display/CompiledGeometry.cpp"
   "Graphics/Display/Display.cpp"
   "Graphics/Display/RenderState.cpp"
   "Graphics/RendererVK/RendererVK.cpp"
@@ -110,6 +111,7 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/Display/Display.h"
   "Graphics/Display/Renderer.h"
   "Graphics/Display/Vertex.h"
+  "Graphics/Display/CompiledGeometry.h"
   "Graphics/RendererVK/RendererVK.h"
   "Graphics/RendererVK/VkUtils.h"
   "Graphics/RendererVK/PersistentBuffer.h"

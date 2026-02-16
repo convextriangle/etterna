@@ -1,5 +1,6 @@
 #include "CommandBatcher.h"
 #include <cassert>
+#include "CompiledGeometry.h"
 
 void
 Display::CommandBatcher::InsertRenderStateCommand(RenderState renderState)
@@ -130,21 +131,44 @@ Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
   const RageCompiledGeometry* p,
   int iMeshIndex)
 {
-	// TODO (^_^)
+	assert(drawMode == DrawMode::CompiledGeometry);
+	assert(m_RenderStateBuffer.size() >= 1 &&
+		   "Rendering information must be set before drawing");
 
-	/*assert(drawMode == DrawMode::CompiledGeometry);
-	assert(m_RenderStateBuffer.size() >= 1 && "Rendering information must be set
-	before drawing");
+	const auto geometry = reinterpret_cast<const CompiledGeometry*>(p);
+	const auto& meshInfo = geometry->m_vMeshInfo[iMeshIndex];
 
-	DrawCommand command = { .useSpriteVertex = false,
-							.matrixState = matrixState };
+	m_MatrixStateBuffer.push_back(matrixState);
+	if (meshInfo.m_bNeedsTextureMatrixScale) {
+		m_MatrixStateBuffer.back().texture.m[3][0] = 0;
+		m_MatrixStateBuffer.back().texture.m[3][1] = 0;
+	}
 
-	assert(false && "TODO: fix whatever this RageCompiledGeometry thingy should
-	do");
+	RageVColor whiteVColor = {};
+	whiteVColor.r = UINT8_MAX;
+	whiteVColor.g = UINT8_MAX;
+	whiteVColor.b = UINT8_MAX;
+	whiteVColor.a = UINT8_MAX;
 
-	command.renderStateIndex = m_RenderStateBuffer.size() - 1;
+	const auto previousVertexCount = m_VertexBuffer.size();
+	for (int i = 0; i < meshInfo.iVertexCount; i++) {
+		const auto& vertex = geometry->m_Vertices[meshInfo.iVertexStart + i];
+		m_VertexBuffer.emplace_back(
+		  RageSpriteVertex{
+			.p = vertex.p, .n = vertex.n, .c = whiteVColor, .t = vertex.t },
+		  (uint32_t)m_MatrixStateBuffer.size() - 1,
+		  (uint32_t)m_RenderStateBuffer.size() - 1);
+	}
 
-	m_CommandBuffer.push_back(command);*/
+	for (int i = meshInfo.iTriangleStart;
+		 i < meshInfo.iTriangleStart + meshInfo.iTriangleCount;
+		 i++) {
+		for (int j = 0; j < 3; j++) {
+			m_IndexBuffer.push_back(previousVertexCount +
+									geometry->m_Triangles[i].nVertexIndices[j] -
+									meshInfo.iVertexStart);
+		}
+	}
 }
 
 void
