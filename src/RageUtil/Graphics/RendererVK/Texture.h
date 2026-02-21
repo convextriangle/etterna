@@ -16,7 +16,7 @@ struct Texture
 	};
 	VmaAllocation allocation = nullptr;
 	VmaAllocator allocator = nullptr;
-	VkImage image = nullptr;
+	vk::Image image = {};
 	vk::ImageView view = nullptr;
 	uint32_t width = 0;
 	uint32_t height = 0;

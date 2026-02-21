@@ -12,6 +12,7 @@
 #include <numbers>
 #include <RageUtil/File/RageFileManager.h>
 #include <RageUtil/Misc/RageMath.h>
+#include "RenderTargetVK.h"
 
 constexpr uint64_t Timeout = 1000'000'000;
 
@@ -64,7 +65,7 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 
 	m_Device.resetFences(*m_InFlightFence[m_CurrentFrame]);
 	m_CommandBuffers[m_CurrentFrame].reset();
-	RecordCommands(imageIndex, batcher.m_IndexBuffer.size());
+	RecordCommands(imageIndex, batcher);
 
 	vk::PipelineStageFlags waitDestinationStageMask(
 	  vk::PipelineStageFlagBits::eColorAttachmentOutput);
@@ -129,13 +130,15 @@ RendererVK::CreateTexture(RageSurface* img)
 	imageInfo.usage =
 	  VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
+	VkImage imagePtr = nullptr;
 	VmaAllocationInfo allocInfo = {};
 	ThrowIfFail(vmaCreateImage(m_Allocator,
 							   &imageInfo,
 							   &allocCreateInfo,
-							   &texture.image,
+							   &imagePtr,
 							   &texture.allocation,
 							   &allocInfo));
+	texture.image = imagePtr;
 
 	vk::ImageViewCreateInfo viewInfo;
 	viewInfo.image = texture.image;
@@ -448,7 +451,11 @@ RendererVK::CreateRenderTarget(const RenderTargetParam& param,
 							   int& iTextureWidthOut,
 							   int& iTextureHeightOut)
 {
-	return intptr_t();
+	RenderTargetVK target = {};
+	target.Create(param, iTextureWidthOut, iTextureHeightOut);
+	target.m_Texture = CreateRenderTargetTexture(target.GetParam().iWidth,
+												 target.GetParam().iHeight);
+	return target.m_Texture;
 }
 
 RendererVK::~RendererVK()
@@ -459,6 +466,7 @@ RendererVK::~RendererVK()
 
 	// WHAT
 	vkDeviceWaitIdle(static_cast<VkDevice>(static_cast<vk::Device>(m_Device)));
+	m_DebugMessenger = nullptr;
 }
 
 static VkBool32
@@ -810,13 +818,14 @@ RendererVK::InitCommandBuffers()
 }
 
 void
-RendererVK::TransitionImageLayout(uint32_t imageIndex,
+RendererVK::TransitionImageLayout(vk::Image& image,
 								  vk::ImageLayout oldLayout,
 								  vk::ImageLayout newLayout,
 								  vk::AccessFlags2 srcAccessMask,
 								  vk::AccessFlags2 dstAccessMask,
 								  vk::PipelineStageFlags2 srcStageMask,
-								  vk::PipelineStageFlags2 dstStageMask)
+								  vk::PipelineStageFlags2 dstStageMask,
+								  vk::raii::CommandBuffer& commandBuffer)
 {
 	vk::ImageMemoryBarrier2 barrier{};
 	barrier.srcStageMask = srcStageMask;
@@ -827,7 +836,7 @@ RendererVK::TransitionImageLayout(uint32_t imageIndex,
 	barrier.newLayout = newLayout;
 	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = m_SwapchainImages[imageIndex];
+	barrier.image = image;
 
 	vk::ImageSubresourceRange range{};
 	range.aspectMask = vk::ImageAspectFlagBits::eColor;
@@ -843,7 +852,26 @@ RendererVK::TransitionImageLayout(uint32_t imageIndex,
 	dependencyInfo.imageMemoryBarrierCount = 1;
 	dependencyInfo.pImageMemoryBarriers = &barrier;
 
-	m_CommandBuffers[m_CurrentFrame].pipelineBarrier2(dependencyInfo);
+	commandBuffer.pipelineBarrier2(dependencyInfo);
+}
+
+void
+RendererVK::TransitionImageLayout(uint32_t imageIndex,
+								  vk::ImageLayout oldLayout,
+								  vk::ImageLayout newLayout,
+								  vk::AccessFlags2 srcAccessMask,
+								  vk::AccessFlags2 dstAccessMask,
+								  vk::PipelineStageFlags2 srcStageMask,
+								  vk::PipelineStageFlags2 dstStageMask)
+{
+	TransitionImageLayout(m_SwapchainImages[imageIndex],
+						  oldLayout,
+						  newLayout,
+						  srcAccessMask,
+						  dstAccessMask,
+						  srcStageMask,
+						  dstStageMask,
+						  m_CommandBuffers[m_CurrentFrame]);
 }
 
 void
@@ -864,9 +892,119 @@ RendererVK::InitSyncStructures()
 }
 
 void
-RendererVK::RecordCommands(uint32_t imageIndex, uint32_t indexCount)
+RendererVK::RecordCommands(uint32_t imageIndex,
+						   Display::CommandBatcher& batcher)
 {
 	m_CommandBuffers[m_CurrentFrame].begin({});
+
+	m_CommandBuffers[m_CurrentFrame].bindPipeline(
+	  vk::PipelineBindPoint::eGraphics, *m_GraphicsPipeline);
+
+	m_CommandBuffers[m_CurrentFrame].bindDescriptorSets(
+	  vk::PipelineBindPoint::eGraphics,
+	  *m_PipelineLayout,
+	  0,
+	  { *m_DescriptorSets[m_CurrentFrame] },
+	  nullptr);
+
+	m_CommandBuffers[m_CurrentFrame].bindIndexBuffer(
+	  m_IndexBuffer[m_CurrentFrame].Get(), 0, vk::IndexType::eUint32);
+
+	std::vector<std::pair<int, int>> drawsToScreen;
+	if (batcher.m_RenderTargetCommands.size() &&
+		batcher.m_RenderTargetCommands[0].DrawIndexOffset > 0) {
+		drawsToScreen.emplace_back(
+		  0, batcher.m_RenderTargetCommands[0].DrawIndexOffset);
+	} else if (!batcher.m_RenderTargetCommands.size()) {
+		drawsToScreen.emplace_back(0, batcher.m_IndexBuffer.size());
+	}
+
+	// assume every render target is reset after use
+	assert(batcher.m_RenderTargetCommands.size() % 2 == 0);
+
+	for (int i = 0; i < (int)batcher.m_RenderTargetCommands.size() - 1; i++) {
+		const auto& command = batcher.m_RenderTargetCommands[i];
+		const auto& nextCommand = batcher.m_RenderTargetCommands[i + 1];
+		if (command.RenderTarget == 0) {
+			drawsToScreen.emplace_back(command.DrawIndexOffset,
+									   nextCommand.DrawIndexOffset -
+										 command.DrawIndexOffset);
+			continue;
+		}
+
+		auto& texture = m_Textures[command.RenderTarget];
+		TransitionImageLayout(
+		  texture.image,
+		  vk::ImageLayout::eShaderReadOnlyOptimal,
+		  vk::ImageLayout::eColorAttachmentOptimal,
+		  vk::AccessFlagBits2::eShaderRead,
+		  vk::AccessFlagBits2::eColorAttachmentWrite,
+		  vk::PipelineStageFlagBits2::eFragmentShader,
+		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+		  m_CommandBuffers[m_CurrentFrame]);
+
+		vk::RenderingAttachmentInfo colorInfo{};
+		colorInfo.imageView = texture.view;
+		colorInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+		colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
+		if (command.PreserveTexture) {
+			colorInfo.loadOp = vk::AttachmentLoadOp::eLoad;
+
+		} else {
+			colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
+			colorInfo.clearValue = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 0.0f);
+		}
+		vk::RenderingInfo renderInfo{};
+		renderInfo.renderArea =
+		  vk::Rect2D{ { 0, 0 }, { texture.width, texture.height } };
+		renderInfo.layerCount = 1;
+		renderInfo.colorAttachmentCount = 1;
+		renderInfo.pColorAttachments = &colorInfo;
+
+		m_CommandBuffers[m_CurrentFrame].beginRendering(renderInfo);
+
+		m_CommandBuffers[m_CurrentFrame].setViewport(
+		  0,
+		  vk::Viewport(0.0f,
+					   static_cast<float>(texture.height),
+					   static_cast<float>(texture.width),
+					   -static_cast<float>(texture.height),
+					   0.0f,
+					   1.0f));
+		m_CommandBuffers[m_CurrentFrame].setScissor(
+		  0,
+		  vk::Rect2D(vk::Offset2D(0, 1),
+					 vk::Extent2D(texture.width, texture.height)));
+
+		if (nextCommand.DrawIndexOffset - command.DrawIndexOffset > 0) {
+			m_CommandBuffers[m_CurrentFrame].drawIndexed(
+			  nextCommand.DrawIndexOffset - command.DrawIndexOffset,
+			  1,
+			  command.DrawIndexOffset,
+			  0,
+			  0);
+		}
+
+		m_CommandBuffers[m_CurrentFrame].endRendering();
+
+		TransitionImageLayout(
+		  texture.image,
+		  vk::ImageLayout::eColorAttachmentOptimal,
+		  vk::ImageLayout::eShaderReadOnlyOptimal,
+		  vk::AccessFlagBits2::eColorAttachmentWrite,
+		  vk::AccessFlagBits2::eShaderRead,
+		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+		  vk::PipelineStageFlagBits2::eFragmentShader,
+		  m_CommandBuffers[m_CurrentFrame]);
+	}
+
+	if (batcher.m_RenderTargetCommands.size()) {
+		drawsToScreen.emplace_back(
+		  batcher.m_RenderTargetCommands.back().DrawIndexOffset,
+		  batcher.m_IndexBuffer.size() -
+			batcher.m_RenderTargetCommands.back().DrawIndexOffset);
+	}
+
 	TransitionImageLayout(imageIndex,
 						  vk::ImageLayout::eUndefined,
 						  vk::ImageLayout::eColorAttachmentOptimal,
@@ -892,16 +1030,6 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t indexCount)
 
 	m_CommandBuffers[m_CurrentFrame].beginRendering(renderingInfo);
 
-	m_CommandBuffers[m_CurrentFrame].bindPipeline(
-	  vk::PipelineBindPoint::eGraphics, *m_GraphicsPipeline);
-
-	m_CommandBuffers[m_CurrentFrame].bindDescriptorSets(
-	  vk::PipelineBindPoint::eGraphics,
-	  *m_PipelineLayout,
-	  0,
-	  { *m_DescriptorSets[m_CurrentFrame] },
-	  nullptr);
-
 	m_CommandBuffers[m_CurrentFrame].setViewport(
 	  0,
 	  vk::Viewport(0.0f,
@@ -913,11 +1041,11 @@ RendererVK::RecordCommands(uint32_t imageIndex, uint32_t indexCount)
 	m_CommandBuffers[m_CurrentFrame].setScissor(
 	  0, vk::Rect2D(vk::Offset2D(0, 1), m_SwapchainExtent));
 
-	m_CommandBuffers[m_CurrentFrame].bindIndexBuffer(
-	  m_IndexBuffer[m_CurrentFrame].Get(), 0, vk::IndexType::eUint32);
-
-	if (indexCount > 0) {
-		m_CommandBuffers[m_CurrentFrame].drawIndexed(indexCount, 1, 0, 0, 0);
+	for (auto& [offset, count] : drawsToScreen) {
+		if (count > 0) {
+			m_CommandBuffers[m_CurrentFrame].drawIndexed(
+			  count, 1, offset, 0, 0);
+		}
 	}
 
 	m_CommandBuffers[m_CurrentFrame].endRendering();
@@ -993,8 +1121,7 @@ RendererVK::InitBatchBuffers()
 		VmaAllocationCreateInfo vertexAllocInfo = {};
 		vertexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 		vertexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-		m_VertexBuffer[i].Init(
-		  m_Allocator, vertexBufferInfo, vertexAllocInfo);
+		m_VertexBuffer[i].Init(m_Allocator, vertexBufferInfo, vertexAllocInfo);
 
 		vk::BufferCreateInfo indexBufferInfo{};
 		indexBufferInfo.size = sizeof(uint32_t) * 5 * MaxDrawCount;
@@ -1198,13 +1325,15 @@ RendererVK::CreateRenderTargetTexture(int width, int height)
 	imageInfo.usage =
 	  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
+	VkImage imagePtr = nullptr;
 	VmaAllocationInfo allocInfo = {};
 	ThrowIfFail(vmaCreateImage(m_Allocator,
 							   &imageInfo,
 							   &allocCreateInfo,
-							   &texture.image,
+							   &imagePtr,
 							   &texture.allocation,
 							   &allocInfo));
+	texture.image = imagePtr;
 
 	vk::ImageViewCreateInfo viewInfo;
 	viewInfo.image = texture.image;
@@ -1216,6 +1345,30 @@ RendererVK::CreateRenderTargetTexture(int width, int height)
 	texture.view = (*m_Device).createImageView(viewInfo);
 
 	m_Textures.insert({ currentHandle, texture });
+
+	vk::CommandBufferAllocateInfo bufferInfo = {};
+	bufferInfo.level = vk::CommandBufferLevel::ePrimary;
+	bufferInfo.commandPool = m_CommandPool;
+	bufferInfo.commandBufferCount = 1;
+
+	auto buffers = m_Device.allocateCommandBuffers(bufferInfo);
+	assert(buffers.size() == 1);
+	auto& transitionBuffer = buffers[0];
+
+	TransitionImageLayout(texture.image,
+						  vk::ImageLayout::eUndefined,
+						  vk::ImageLayout::eShaderReadOnlyOptimal,
+						  vk::AccessFlagBits2::eNone,
+						  vk::AccessFlagBits2::eShaderRead,
+						  vk::PipelineStageFlagBits2::eNone,
+						  vk::PipelineStageFlagBits2::eFragmentShader,
+						  transitionBuffer);
+
+	vk::SubmitInfo submitInfo = {};
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &(*transitionBuffer);
+	m_GraphicsQueue.submit({ submitInfo });
+	m_GraphicsQueue.waitIdle();
 
 	return currentHandle;
 }

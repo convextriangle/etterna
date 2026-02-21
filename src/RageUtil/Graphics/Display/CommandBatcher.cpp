@@ -178,4 +178,5 @@ Display::CommandBatcher::Clear()
 	m_IndexBuffer.clear();
 	m_RenderStateBuffer.clear();
 	m_MatrixStateBuffer.clear();
+	m_RenderTargetCommands.clear();
 }

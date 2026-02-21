@@ -104,6 +104,7 @@ class Display : public RageDisplay
     CommandBatcher m_Batcher;
 	RenderState m_RenderState;
 	RenderState m_PreviousRenderState;
+	intptr_t m_CurrentRenderTarget = 0;
 };
 } // namespace Display
 

@@ -100,7 +100,6 @@ Display::Display::TryVideoMode(const VideoModeParams& p, bool& bNewDeviceOut)
 const RageDisplay::RagePixelFormatDesc*
 Display::Display::GetPixelFormatDesc(RagePixelFormat pf) const
 {
-	assert(pf == RagePixelFormat_RGBA8);
 	static auto desc = // silly goose
 	  RagePixelFormatDesc{ 32,
 						   { 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 } };
@@ -267,14 +266,15 @@ Display::Display::CreateRenderTarget(const RenderTargetParam& param,
 intptr_t
 Display::Display::GetRenderTarget()
 {
-	assert(false && "Not implemented");
-	return intptr_t();
+	return m_CurrentRenderTarget;
 }
 
 void
 Display::Display::SetRenderTarget(intptr_t uTexHandle, bool bPreserveTexture)
 {
-	assert(false && "Not implemented");
+	m_Batcher.m_RenderTargetCommands.emplace_back(
+	  uTexHandle, bPreserveTexture, m_Batcher.m_IndexBuffer.size());
+	m_CurrentRenderTarget = uTexHandle;
 }
 
 RageCompiledGeometry*

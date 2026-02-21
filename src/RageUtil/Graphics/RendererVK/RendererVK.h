@@ -10,6 +10,7 @@
 #include <vk_mem_alloc.h>
 #include <VkBootstrap.h>
 #include <array>
+#include <map>
 #include "VkUtils.h"
 #include "Texture.h"
 #include "PersistentBuffer.h"
@@ -78,6 +79,14 @@ class RendererVK : public Display::Renderer
 	std::vector<vk::raii::CommandBuffer> m_CommandBuffers;
 	void InitCommandBuffers();
 
+	void TransitionImageLayout(vk::Image& image,
+							   vk::ImageLayout oldLayout,
+							   vk::ImageLayout newLayout,
+							   vk::AccessFlags2 srcAccessMask,
+							   vk::AccessFlags2 dstAccessMask,
+							   vk::PipelineStageFlags2 srcStageMask,
+							   vk::PipelineStageFlags2 dstStageMask,
+							   vk::raii::CommandBuffer& commandBuffer);
 	void TransitionImageLayout(uint32_t imageIndex,
 							   vk::ImageLayout oldLayout,
 							   vk::ImageLayout newLayout,
@@ -91,7 +100,7 @@ class RendererVK : public Display::Renderer
 	std::vector<vk::raii::Fence> m_InFlightFence;
 	uint32_t m_CurrentFrame = 0;
 	void InitSyncStructures();
-	void RecordCommands(uint32_t imageIndex, uint32_t indexCount);
+	void RecordCommands(uint32_t imageIndex, Display::CommandBatcher& batcher);
 
 	constexpr static size_t FramesInFlight = 3;
 	constexpr static size_t MaxDrawCount = 100'000;
