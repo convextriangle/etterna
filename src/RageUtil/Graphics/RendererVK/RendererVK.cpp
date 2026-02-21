@@ -109,7 +109,7 @@ RendererVK::IsD3DInternal()
 }
 
 intptr_t
-RendererVK::CreateTexture(RageSurface* img)
+RendererVK::CreateTexture(RageSurface* img, bool RGBA8)
 {
 	intptr_t currentHandle = m_TextureCounter++;
 
@@ -143,7 +143,8 @@ RendererVK::CreateTexture(RageSurface* img)
 	vk::ImageViewCreateInfo viewInfo;
 	viewInfo.image = texture.image;
 	viewInfo.viewType = vk::ImageViewType::e2D;
-	viewInfo.format = vk::Format::eR8G8B8A8Unorm;
+	viewInfo.format =
+	  RGBA8 ? vk::Format::eR8G8B8A8Unorm : vk::Format::eB8G8R8A8Unorm;
 	viewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
 	viewInfo.subresourceRange.levelCount = 1;
 	viewInfo.subresourceRange.layerCount = 1;
@@ -189,9 +190,16 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 				static_cast<size_t>(img->h) * img->w * sizeof(uint32_t));
 
 	vk::ImageMemoryBarrier barrier = {};
-	barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
-	barrier.oldLayout = vk::ImageLayout::eUndefined;
-	barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
+	if (texture.initialized) {
+		barrier.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+		barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
+		barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
+		barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+	} else {
+		barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+		barrier.oldLayout = vk::ImageLayout::eUndefined;
+		barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
+	}
 	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.image = texture.image;
@@ -207,7 +215,8 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 							   { barrier });
 
 	vk::BufferImageCopy imageCopy = {};
-	imageCopy.imageExtent = vk::Extent3D{ texture.width, texture.height, 1 };
+	imageCopy.imageExtent =
+	  vk::Extent3D{ (uint32_t)width, (uint32_t)height, 1 };
 	imageCopy.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
 	imageCopy.imageSubresource.mipLevel = 0;
 	imageCopy.imageSubresource.baseArrayLayer = 0;
@@ -235,6 +244,8 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	submitInfo.pCommandBuffers = &(*copyBuffer);
 	m_GraphicsQueue.submit({ submitInfo });
 	m_GraphicsQueue.waitIdle();
+
+	texture.initialized = true;
 }
 
 void
@@ -465,8 +476,7 @@ RendererVK::~RendererVK()
 	}
 
 	// WHAT
-	vkDeviceWaitIdle(static_cast<VkDevice>(static_cast<vk::Device>(m_Device)));
-	m_DebugMessenger = nullptr;
+	//vkDeviceWaitIdle(static_cast<VkDevice>(static_cast<vk::Device>(m_Device)));
 }
 
 static VkBool32
@@ -1294,7 +1304,7 @@ RendererVK::InitTextureSamplers()
 
 	RageSurface* img =
 	  CreateSurface(1, 1, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
-	CreateTexture(img);
+	CreateTexture(img, true);
 }
 
 void

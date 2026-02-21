@@ -24,7 +24,7 @@ class RendererVK : public Display::Renderer
 	void OnRender(const ActualVideoModeParams* p,
 				  Display::CommandBatcher& batcher) override;
 	bool IsD3DInternal() override;
-	intptr_t CreateTexture(RageSurface* img) override;
+	intptr_t CreateTexture(RageSurface* img, bool RGBA8) override;
 	void UpdateTexture(intptr_t textureHandle,
 					   RageSurface* img,
 					   int xOffset,

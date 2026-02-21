@@ -6,6 +6,7 @@
 #include "RageUtil/Graphics/RageDisplay.h"
 #include "Renderer.h"
 #include "RenderState.h"
+#include <functional>
 
 namespace Display
 {
@@ -16,7 +17,7 @@ class Display : public RageDisplay
     static constexpr size_t TexturePixelSize = 4;
     static constexpr size_t MaxTextureSize = 4096;
 
-    Display(std::unique_ptr<Renderer> renderer);
+    Display(std::function<std::unique_ptr<Renderer>()> rendererFactory);
     ~Display() override
     {
     }
@@ -99,6 +100,7 @@ class Display : public RageDisplay
   private:
 	void PushCurrentRenderState();
 
+	std::function<std::unique_ptr<Renderer>()> m_RendererFactory;
     std::unique_ptr<Renderer> m_Renderer;
     std::atomic_bool m_IsInitDone;
     CommandBatcher m_Batcher;

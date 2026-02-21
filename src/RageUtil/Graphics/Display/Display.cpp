@@ -10,8 +10,9 @@
 #error Display::Display is unfinished for non-Windows platforms
 #endif
 
-Display::Display::Display(std::unique_ptr<Renderer> renderer)
-  : m_Renderer(std::move(renderer))
+Display::Display::Display(
+  std::function<std::unique_ptr<Renderer>()> rendererFactory)
+  : m_RendererFactory(rendererFactory)
   , m_RenderState()
 {
 }
@@ -19,6 +20,7 @@ Display::Display::Display(std::unique_ptr<Renderer> renderer)
 std::string
 Display::Display::Init(VideoModeParams&& p, bool bAllowUnacceleratedRenderer)
 {
+	m_Renderer = m_RendererFactory();
 	Locator::getLogger()->info("Display::Display::Init()");
 	Locator::getLogger()->info("Current renderer: UnstableDisplay - {}",
 							   m_Renderer->GetApiDescription());
@@ -84,6 +86,7 @@ Display::Display::TryVideoMode(const VideoModeParams& p, bool& bNewDeviceOut)
 #error Display::Display is unfinished for non-Windows platforms
 #endif
 
+	m_Renderer = m_RendererFactory();
 	m_Renderer->InitializeRenderer(p);
 
 	ResolutionChanged();
@@ -100,16 +103,20 @@ Display::Display::TryVideoMode(const VideoModeParams& p, bool& bNewDeviceOut)
 const RageDisplay::RagePixelFormatDesc*
 Display::Display::GetPixelFormatDesc(RagePixelFormat pf) const
 {
-	static auto desc = // silly goose
+	assert(pf == RagePixelFormat_RGBA8 || pf == RagePixelFormat_BGRA8);
+	static auto rgba8 = 
 	  RagePixelFormatDesc{ 32,
 						   { 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 } };
-	return &desc;
+	static auto bgra8 = 
+	  RagePixelFormatDesc{ 32,
+						   { 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000 } };
+	return pf == RagePixelFormat_RGBA8 ? &rgba8 : &bgra8;
 }
 
 bool
 Display::Display::SupportsTextureFormat(RagePixelFormat pixfmt, bool realtime)
 {
-	return pixfmt == RagePixelFormat_RGBA8;
+	return pixfmt == RagePixelFormat_RGBA8 || pixfmt == RagePixelFormat_BGRA8;
 }
 
 intptr_t
@@ -117,9 +124,9 @@ Display::Display::CreateTexture(RagePixelFormat pixfmt,
 								RageSurface* img,
 								bool bGenerateMipMaps)
 {
-	assert(pixfmt == RagePixelFormat_RGBA8);
+	assert(SupportsTextureFormat(pixfmt));
 
-	return m_Renderer->CreateTexture(img);
+	return m_Renderer->CreateTexture(img, pixfmt == RagePixelFormat_RGBA8);
 }
 
 void

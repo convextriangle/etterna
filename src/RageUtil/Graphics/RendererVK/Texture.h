@@ -20,6 +20,7 @@ struct Texture
 	vk::ImageView view = nullptr;
 	uint32_t width = 0;
 	uint32_t height = 0;
+	bool initialized = false;
 };
 
 #endif

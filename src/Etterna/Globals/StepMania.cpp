@@ -815,7 +815,8 @@ CreateDisplay()
 #endif
 			} else if (CompareNoCase(sRenderer, "unstable_vk") == 0) {
 #if defined(SUPPORT_D3D)
-				pRet = new Display::Display(std::make_unique<RendererVK>());
+				pRet = new Display::Display(
+				  [] { return std::make_unique<RendererVK>(); });
 #endif
 			} else if (CompareNoCase(sRenderer, "null") == 0) {
 				return new RageDisplay_Null;
