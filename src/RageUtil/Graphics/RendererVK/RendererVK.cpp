@@ -961,12 +961,12 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		colorInfo.imageView = texture.view;
 		colorInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
 		colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
-		//if (command.PreserveTexture) {
-			//colorInfo.loadOp = vk::AttachmentLoadOp::eLoad;
-		//} else {
+		if (command.PreserveTexture) {
+			colorInfo.loadOp = vk::AttachmentLoadOp::eLoad;
+		} else {
 			colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
 			colorInfo.clearValue = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 0.0f);
-		//}
+		}
 		vk::RenderingInfo renderInfo{};
 		renderInfo.renderArea =
 		  vk::Rect2D{ { 0, 0 }, { texture.width, texture.height } };
