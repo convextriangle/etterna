@@ -140,6 +140,18 @@ class RageCompiledGeometryNull : public RageCompiledGeometry
 	void Draw(int iMeshIndex) const override {}
 };
 
+intptr_t
+RageDisplay_Null::CreateGraphicsPipeline(const std::string& vertexShaderPath,
+										 const std::string& fragmentShaderPath)
+{
+	return 0;
+}
+
+void
+RageDisplay_Null::SetGraphicsPipeline(intptr_t pipeline, bool persist)
+{
+}
+
 RageCompiledGeometry*
 RageDisplay_Null::CreateCompiledGeometry()
 {

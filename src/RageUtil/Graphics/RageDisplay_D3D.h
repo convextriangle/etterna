@@ -67,6 +67,11 @@ class RageDisplay_D3D : public RageDisplay
 							 const RageColor& specular,
 							 const RageVector3& dir) override;
 
+	intptr_t CreateGraphicsPipeline(
+	  const std::string& vertexShaderPath,
+	  const std::string& fragmentShaderPath) override;
+	void SetGraphicsPipeline(intptr_t pipeline, bool persist) override;
+
 	auto CreateRenderTarget(const RenderTargetParam& param,
 							int& iTextureWidthOut,
 							int& iTextureHeightOut) -> intptr_t override;

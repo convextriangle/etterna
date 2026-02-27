@@ -64,7 +64,10 @@ class Display : public RageDisplay
     void SetLightOff(int index) override;
     void SetLightDirectional(int index, const RageColor &ambient, const RageColor &diffuse, const RageColor &specular,
                              const RageVector3 &dir) override;
-
+	intptr_t CreateGraphicsPipeline(
+	  const std::string& vertexShaderPath,
+	  const std::string& fragmentShaderPath) override;
+	void SetGraphicsPipeline(intptr_t pipeline, bool persist) override;
     intptr_t CreateRenderTarget(const RenderTargetParam &param, int &iTextureWidthOut, int &iTextureHeightOut) override;
     intptr_t GetRenderTarget() override;
     void SetRenderTarget(intptr_t uTexHandle, bool bPreserveTexture) override;

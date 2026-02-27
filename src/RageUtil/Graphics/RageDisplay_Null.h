@@ -86,6 +86,11 @@ class RageDisplay_Null : public RageDisplay
 
 	bool IsD3DInternal() override;
 
+	intptr_t CreateGraphicsPipeline(
+	  const std::string& vertexShaderPath,
+	  const std::string& fragmentShaderPath) override;
+	void SetGraphicsPipeline(intptr_t pipeline, bool persist) override;
+
 	RageCompiledGeometry* CreateCompiledGeometry() override;
 	void DeleteCompiledGeometry(RageCompiledGeometry*) override;
 

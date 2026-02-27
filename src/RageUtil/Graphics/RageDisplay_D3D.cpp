@@ -2032,6 +2032,20 @@ D3DRenderTarget_FramebufferObject::FinishRenderingTo()
 		Locator::getLogger()->warn("Failed to set targetDepth to BackBufferDepth");
 }
 
+intptr_t
+RageDisplay_D3D::CreateGraphicsPipeline(const std::string& vertexShaderPath,
+										const std::string& fragmentShaderPath)
+{
+	ASSERT_M(false, "Supported only on Vulkan");
+	return intptr_t();
+}
+
+void
+RageDisplay_D3D::SetGraphicsPipeline(intptr_t pipeline, bool persist)
+{
+	ASSERT_M(pipeline == 0, "Supported only on Vulkan");
+}
+
 auto
 RageDisplay_D3D::CreateRenderTarget(const RenderTargetParam& param,
 									int& iTextureWidthOut,

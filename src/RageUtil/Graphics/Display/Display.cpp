@@ -104,10 +104,10 @@ const RageDisplay::RagePixelFormatDesc*
 Display::Display::GetPixelFormatDesc(RagePixelFormat pf) const
 {
 	assert(pf == RagePixelFormat_RGBA8 || pf == RagePixelFormat_BGRA8);
-	static auto rgba8 = 
+	static auto rgba8 =
 	  RagePixelFormatDesc{ 32,
 						   { 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 } };
-	static auto bgra8 = 
+	static auto bgra8 =
 	  RagePixelFormatDesc{ 32,
 						   { 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000 } };
 	return pf == RagePixelFormat_RGBA8 ? &rgba8 : &bgra8;
@@ -267,7 +267,8 @@ Display::Display::CreateRenderTarget(const RenderTargetParam& param,
 									 int& iTextureWidthOut,
 									 int& iTextureHeightOut)
 {
-	return m_Renderer->CreateRenderTarget(param, iTextureWidthOut, iTextureHeightOut);
+	return m_Renderer->CreateRenderTarget(
+	  param, iTextureWidthOut, iTextureHeightOut);
 }
 
 intptr_t
@@ -336,6 +337,18 @@ Display::Display::PushCurrentRenderState()
 
 	m_PreviousRenderState = m_RenderState;
 	m_Batcher.InsertRenderStateCommand(m_RenderState);
+}
+
+intptr_t
+Display::Display::CreateGraphicsPipeline(const std::string& vertexShaderPath,
+										 const std::string& fragmentShaderPath)
+{
+	return m_Renderer->CreateGraphicsPipeline(vertexShaderPath, fragmentShaderPath);
+}
+
+void
+Display::Display::SetGraphicsPipeline(intptr_t pipeline, bool persist)
+{
 }
 
 #pragma region Unsupported / old graphics API functions

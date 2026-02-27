@@ -28,8 +28,11 @@ class Renderer
 	virtual void ResolutionChanged() = 0;
 	virtual RageSurface* CreateScreenshot() = 0;
 	virtual intptr_t CreateRenderTarget(const RenderTargetParam& param,
-									 int& iTextureWidthOut,
-									 int& iTextureHeightOut) = 0;
+										int& iTextureWidthOut,
+										int& iTextureHeightOut) = 0;
+	virtual intptr_t CreateGraphicsPipeline(
+	  const std::string& vertexShaderPath,
+	  const std::string& fragmentShaderPath) = 0;
 };
 }
 

@@ -11,9 +11,16 @@
 #include <VkBootstrap.h>
 #include <array>
 #include <map>
+#include <utility>
 #include "VkUtils.h"
 #include "Texture.h"
 #include "PersistentBuffer.h"
+
+struct PipelineInfo
+{
+	vk::raii::PipelineLayout PipelineLayout = nullptr;
+	vk::raii::Pipeline GraphicsPipeline = nullptr;
+};
 
 class RendererVK : public Display::Renderer
 {
@@ -37,7 +44,9 @@ class RendererVK : public Display::Renderer
 	intptr_t CreateRenderTarget(const RenderTargetParam& param,
 								int& iTextureWidthOut,
 								int& iTextureHeightOut) override;
-
+	intptr_t CreateGraphicsPipeline(
+	  const std::string& vertexShaderPath,
+	  const std::string& fragmentShaderPath) override;
 	~RendererVK() override;
 
   private:
@@ -68,9 +77,9 @@ class RendererVK : public Display::Renderer
 	std::vector<vk::raii::ImageView> m_SwapchainImageViews;
 	void InitImageViews();
 
-	vk::raii::PipelineLayout m_PipelineLayout = nullptr;
-	vk::raii::Pipeline m_GraphicsPipeline = nullptr;
+	std::vector<PipelineInfo> m_Pipelines;
 	vk::raii::DescriptorSetLayout m_DescriptorSetLayout = nullptr;
+	std::map<std::pair<std::string, std::string>, intptr_t> m_PipelineLookup;
 	void InitGraphicsPipeline();
 
 	vk::raii::CommandPool m_CommandPool = nullptr;
