@@ -65,9 +65,6 @@ list(APPEND SMDATA_RAGE_GRAPHICS_SRC
   "Graphics/RageTextureManager.cpp"
   "Graphics/RageTextureRenderTarget.cpp"
 
-  "Graphics/Shaders/RageShaderWeakRef.cpp"
-  "Graphics/Shaders/RageShaderHandler.cpp"
-
   "Graphics/Display/CommandBatcher.cpp"
   "Graphics/Display/CompiledGeometry.cpp"
   "Graphics/Display/Display.cpp"
@@ -98,12 +95,6 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/RageTextureID.h"
   "Graphics/RageTextureManager.h"
   "Graphics/RageTextureRenderTarget.h"
-
-  "Graphics/Shaders/RageShader.h"
-  "Graphics/Shaders/RageUniform.h"
-  "Graphics/Shaders/RageUniformCollection.h"
-  "Graphics/Shaders/RageShaderWeakRef.h"
-  "Graphics/Shaders/RageShaderHandler.h"
 
   "Graphics/Display/CommandBatcher.h"
   "Graphics/Display/DrawMode.h"
