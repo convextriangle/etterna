@@ -9,6 +9,19 @@ Display::CommandBatcher::InsertRenderStateCommand(RenderState renderState)
 }
 
 void
+Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
+													 bool persist)
+{
+	assert(!persist && "TODO: implement shader persistence (child actor shader overriding)");
+	if (m_PipelineCommands.size() &&
+		m_PipelineCommands.back().Pipeline == pipeline) {
+		return;
+	}
+
+	m_PipelineCommands.emplace_back(pipeline, m_IndexBuffer.size());
+}
+
+void
 Display::CommandBatcher::InsertSpriteDrawCommand(
   DrawMode drawMode,
   MatrixState&& matrixState,
@@ -179,4 +192,5 @@ Display::CommandBatcher::Clear()
 	m_RenderStateBuffer.clear();
 	m_MatrixStateBuffer.clear();
 	m_RenderTargetCommands.clear();
+	m_PipelineCommands.clear();
 }

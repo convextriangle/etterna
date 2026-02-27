@@ -15,10 +15,17 @@ struct RenderTargetCommand
 	size_t DrawIndexOffset;
 };
 
+struct PipelineChangeCommand
+{
+	intptr_t Pipeline;
+	size_t DrawIndexOffset;
+};
+
 class CommandBatcher
 {
   public:
 	void InsertRenderStateCommand(RenderState renderState);
+	void InsertPipelineChangeCommand(intptr_t pipeline, bool persist);
 	void InsertSpriteDrawCommand(DrawMode drawMode,
 								 MatrixState&& matrixState,
 								 const RageSpriteVertex* vertexData,
@@ -34,6 +41,7 @@ class CommandBatcher
 	std::vector<RenderState> m_RenderStateBuffer;
 	std::vector<MatrixState> m_MatrixStateBuffer;
 	std::vector<RenderTargetCommand> m_RenderTargetCommands;
+	std::vector<PipelineChangeCommand> m_PipelineCommands;
 };
 
 } // namespace Display

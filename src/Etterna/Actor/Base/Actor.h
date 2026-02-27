@@ -218,7 +218,6 @@ class Actor : public MessageSubscriber
 	/** @brief Start the drawing and push the transform on the world matrix
 	 * stack. */
 	virtual void BeginDraw();
-	uint64_t m_ActorId = 0;
 	/**
 	 * @brief Set the global rendering states of this Actor.
 	 *
@@ -809,6 +808,12 @@ class Actor : public MessageSubscriber
 	virtual void SetUpdateRate(float /*unused*/) {}
 	virtual auto GetUpdateRate() -> float { return 1.0F; }
 
+	void SetShaders(const std::string& vertexShaderPath,
+					const std::string& fragmentShaderPath);
+	void ResetShaders() { m_CustomShaders = 0; }
+	bool GetShaderPersistence() const { return m_ShaderPersistence; }
+	bool SetShaderPersistence(bool persist) { m_ShaderPersistence = persist; }
+
 	std::unique_ptr<LuaClass> m_pLuaInstance;
 
   protected:
@@ -940,6 +945,8 @@ class Actor : public MessageSubscriber
 	static std::vector<float> g_vfCurrentBGMBeatPlayer;
 	static std::vector<float> g_vfCurrentBGMBeatPlayerNoOffset;
 
+	intptr_t m_CustomShaders = 0;
+	bool m_ShaderPersistence = false;
   private:
 	// commands
 	std::map<std::string, apActorCommands> m_mapNameToCommands;

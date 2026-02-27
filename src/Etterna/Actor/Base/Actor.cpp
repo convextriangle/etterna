@@ -17,6 +17,7 @@
 #include <typeinfo>
 #include <tuple>
 #include <algorithm>
+#include <RageUtil/File/RageFileManager.h>
 
 static Preference<bool> g_bShowMasks("ShowMasks", false);
 static const float default_effect_period = 1.0f;
@@ -518,11 +519,10 @@ Actor::Draw()
 		if (PartiallyOpaque()) {
 			this->BeginDraw();
 
-			this->m_ActorId =
-			  this->m_ActorId == 0 ? DISPLAY->CreateActorId() : this->m_ActorId;
-			DISPLAY->StartDrawingPrimitives(this->m_ActorId);
+			DISPLAY->SetGraphicsPipeline(m_CustomShaders, m_ShaderPersistence);
 			this->DrawPrimitives();
-			DISPLAY->EndDrawingPrimitives(this->m_ActorId);
+			DISPLAY->SetGraphicsPipeline(0, m_ShaderPersistence);
+
 			this->EndDraw();
 		}
 		this->PostDraw();
@@ -1654,6 +1654,14 @@ Actor::HandleMessage(const Message& msg)
 }
 
 void
+Actor::SetShaders(const std::string& vertexShaderPath,
+				  const std::string& fragmentShaderPath)
+{
+	m_CustomShaders = DISPLAY->CreateGraphicsPipeline(
+	  FILEMAN->ResolvePath(vertexShaderPath), FILEMAN->ResolvePath(fragmentShaderPath));
+}
+
+void
 Actor::PlayCommandNoRecurse(const Message& msg)
 {
 	const auto* pCmd = GetCommand(msg.GetName());
@@ -2733,6 +2741,26 @@ class LunaActor : public Luna<Actor>
 			return 0;
 		return 1;
 	}
+	static int SetShaders(T* p, lua_State* L)
+	{
+		p->SetShaders(SArg(1), SArg(2));
+		COMMON_RETURN_SELF;
+	}
+	static int ResetShaders(T* p, lua_State* L)
+	{
+		p->ResetShaders();
+		COMMON_RETURN_SELF;
+	}
+	static int SetShaderPersistence(T* p, lua_State* L)
+	{
+		p->SetShaderPersistence(BArg(1));
+		COMMON_RETURN_SELF;
+	}
+	static int GetShaderPersistence(T* p, lua_State* L)
+	{
+		lua_pushboolean(L,p->GetShaderPersistence());
+		return 1;
+	}
 	DEFINE_METHOD(GetTrueX, GetTrueX());
 	DEFINE_METHOD(GetTrueY, GetTrueY());
 	DEFINE_METHOD(GetTrueZ, GetTrueZ());
@@ -2932,6 +2960,10 @@ class LunaActor : public Luna<Actor>
 		ADD_METHOD(GetTrueRotationZ);
 		ADD_METHOD(IsVisible);
 		ADD_METHOD(IsOver);
+		ADD_METHOD(SetShaders);
+		ADD_METHOD(ResetShaders);
+		ADD_METHOD(SetShaderPersistence);
+		ADD_METHOD(GetShaderPersistence);
 	}
 };
 

@@ -468,13 +468,6 @@ class RageDisplay
 		return nullptr;
 	} // allocates a surface.  Caller must delete it.
 
-	virtual void StartDrawingPrimitives(uint64_t actorId) {}
-	virtual void EndDrawingPrimitives(uint64_t actorId) {}
-	uint64_t CreateActorId() { return ++m_ActorCount; }
-
-  private:
-	std::atomic_uint64_t m_ActorCount = 0;
-
 protected:
 	virtual void DrawQuadsInternal(const RageSpriteVertex v[],
 								   int iNumVerts) = 0;
