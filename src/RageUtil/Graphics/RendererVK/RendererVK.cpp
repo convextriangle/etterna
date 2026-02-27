@@ -122,7 +122,8 @@ RendererVK::CreateTexture(RageSurface* img, bool RGBA8)
 
 	VkImageCreateInfo imageInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageInfo.format =
+	  RGBA8 ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_B8G8R8A8_UNORM;
 	imageInfo.extent = { texture.width, texture.height, 1 };
 	imageInfo.mipLevels = 1;
 	imageInfo.arrayLayers = 1;
@@ -149,7 +150,7 @@ RendererVK::CreateTexture(RageSurface* img, bool RGBA8)
 	viewInfo.subresourceRange.levelCount = 1;
 	viewInfo.subresourceRange.layerCount = 1;
 	texture.view = (*m_Device).createImageView(viewInfo);
-
+	texture.currentLayout = vk::ImageLayout::eUndefined;
 	m_Textures.insert({ currentHandle, texture });
 
 	UpdateTexture(currentHandle, img, 0, 0, img->w, img->h);
@@ -246,6 +247,7 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	m_GraphicsQueue.waitIdle();
 
 	texture.initialized = true;
+	texture.currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 }
 
 void
@@ -476,7 +478,7 @@ RendererVK::~RendererVK()
 	}
 
 	// WHAT
-	//vkDeviceWaitIdle(static_cast<VkDevice>(static_cast<vk::Device>(m_Device)));
+	// vkDeviceWaitIdle(static_cast<VkDevice>(static_cast<vk::Device>(m_Device)));
 }
 
 static VkBool32
@@ -945,13 +947,14 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		auto& texture = m_Textures[command.RenderTarget];
 		TransitionImageLayout(
 		  texture.image,
-		  vk::ImageLayout::eShaderReadOnlyOptimal,
+		  texture.currentLayout,
 		  vk::ImageLayout::eColorAttachmentOptimal,
 		  vk::AccessFlagBits2::eShaderRead,
 		  vk::AccessFlagBits2::eColorAttachmentWrite,
 		  vk::PipelineStageFlagBits2::eFragmentShader,
 		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 		  m_CommandBuffers[m_CurrentFrame]);
+		texture.currentLayout = vk::ImageLayout::eColorAttachmentOptimal;
 
 		vk::RenderingAttachmentInfo colorInfo{};
 		colorInfo.imageView = texture.view;
@@ -999,13 +1002,14 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 
 		TransitionImageLayout(
 		  texture.image,
-		  vk::ImageLayout::eColorAttachmentOptimal,
+		  texture.currentLayout,
 		  vk::ImageLayout::eShaderReadOnlyOptimal,
 		  vk::AccessFlagBits2::eColorAttachmentWrite,
 		  vk::AccessFlagBits2::eShaderRead,
 		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 		  vk::PipelineStageFlagBits2::eFragmentShader,
 		  m_CommandBuffers[m_CurrentFrame]);
+		texture.currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 	}
 
 	if (batcher.m_RenderTargetCommands.size()) {
@@ -1131,6 +1135,7 @@ RendererVK::InitBatchBuffers()
 		VmaAllocationCreateInfo vertexAllocInfo = {};
 		vertexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 		vertexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		vertexAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_VertexBuffer[i].Init(m_Allocator, vertexBufferInfo, vertexAllocInfo);
 
 		vk::BufferCreateInfo indexBufferInfo{};
@@ -1139,6 +1144,7 @@ RendererVK::InitBatchBuffers()
 		VmaAllocationCreateInfo indexAllocInfo = {};
 		indexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 		indexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		indexAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_IndexBuffer[i].Init(m_Allocator, indexBufferInfo, indexAllocInfo);
 
 		vk::BufferCreateInfo matrixBufferInfo{};
@@ -1148,6 +1154,7 @@ RendererVK::InitBatchBuffers()
 		VmaAllocationCreateInfo matrixAllocInfo = {};
 		matrixAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 		matrixAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		matrixAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_MatrixStateBuffer[i].Init(
 		  m_Allocator, matrixBufferInfo, matrixAllocInfo);
 
@@ -1353,32 +1360,9 @@ RendererVK::CreateRenderTargetTexture(int width, int height)
 	viewInfo.subresourceRange.levelCount = 1;
 	viewInfo.subresourceRange.layerCount = 1;
 	texture.view = (*m_Device).createImageView(viewInfo);
+	texture.currentLayout = vk::ImageLayout::eUndefined;
 
 	m_Textures.insert({ currentHandle, texture });
-
-	vk::CommandBufferAllocateInfo bufferInfo = {};
-	bufferInfo.level = vk::CommandBufferLevel::ePrimary;
-	bufferInfo.commandPool = m_CommandPool;
-	bufferInfo.commandBufferCount = 1;
-
-	auto buffers = m_Device.allocateCommandBuffers(bufferInfo);
-	assert(buffers.size() == 1);
-	auto& transitionBuffer = buffers[0];
-
-	TransitionImageLayout(texture.image,
-						  vk::ImageLayout::eUndefined,
-						  vk::ImageLayout::eShaderReadOnlyOptimal,
-						  vk::AccessFlagBits2::eNone,
-						  vk::AccessFlagBits2::eShaderRead,
-						  vk::PipelineStageFlagBits2::eNone,
-						  vk::PipelineStageFlagBits2::eFragmentShader,
-						  transitionBuffer);
-
-	vk::SubmitInfo submitInfo = {};
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &(*transitionBuffer);
-	m_GraphicsQueue.submit({ submitInfo });
-	m_GraphicsQueue.waitIdle();
 
 	return currentHandle;
 }

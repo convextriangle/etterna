@@ -58,7 +58,7 @@ class RendererVK : public Display::Renderer
 	vk::Extent2D m_SwapchainExtent;
 	std::vector<vk::Image> m_SwapchainImages;
 
-	constexpr static vk::Format ImageFormat = vk::Format::eB8G8R8A8Unorm;
+	constexpr static vk::Format ImageFormat = vk::Format::eR8G8B8A8Unorm;
 
 	bool m_SwapchainIsInvalid = false;
 	void InitSwapchain(const VideoModeParams& p);
