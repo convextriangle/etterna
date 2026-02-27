@@ -745,8 +745,9 @@ RendererVK::InitGraphicsPipeline()
 	colorBlendAttachment.dstColorBlendFactor =
 	  vk::BlendFactor::eOneMinusSrcAlpha;
 	colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
-	colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-	colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eZero;
+	colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eSrcAlpha;
+	colorBlendAttachment.dstAlphaBlendFactor =
+	  vk::BlendFactor::eOneMinusSrcAlpha;
 	colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
 	colorBlendAttachment.colorWriteMask =
 	  vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
@@ -960,13 +961,12 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		colorInfo.imageView = texture.view;
 		colorInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
 		colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
-		if (command.PreserveTexture) {
-			colorInfo.loadOp = vk::AttachmentLoadOp::eLoad;
-
-		} else {
+		//if (command.PreserveTexture) {
+			//colorInfo.loadOp = vk::AttachmentLoadOp::eLoad;
+		//} else {
 			colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
 			colorInfo.clearValue = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 0.0f);
-		}
+		//}
 		vk::RenderingInfo renderInfo{};
 		renderInfo.renderArea =
 		  vk::Rect2D{ { 0, 0 }, { texture.width, texture.height } };
@@ -986,7 +986,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 					   1.0f));
 		m_CommandBuffers[m_CurrentFrame].setScissor(
 		  0,
-		  vk::Rect2D(vk::Offset2D(0, 1),
+		  vk::Rect2D(vk::Offset2D(0, 0),
 					 vk::Extent2D(texture.width, texture.height)));
 
 		if (nextCommand.DrawIndexOffset - command.DrawIndexOffset > 0) {
