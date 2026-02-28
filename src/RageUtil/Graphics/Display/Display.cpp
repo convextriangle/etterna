@@ -349,6 +349,7 @@ Display::Display::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 void
 Display::Display::SetGraphicsPipeline(intptr_t pipeline, bool persist)
 {
+	m_Batcher.InsertPipelineChangeCommand(pipeline, persist);
 }
 
 #pragma region Unsupported / old graphics API functions

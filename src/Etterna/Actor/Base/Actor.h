@@ -812,7 +812,7 @@ class Actor : public MessageSubscriber
 					const std::string& fragmentShaderPath);
 	void ResetShaders() { m_CustomShaders = 0; }
 	bool GetShaderPersistence() const { return m_ShaderPersistence; }
-	bool SetShaderPersistence(bool persist) { m_ShaderPersistence = persist; }
+	void SetShaderPersistence(bool persist) { m_ShaderPersistence = persist; }
 
 	std::unique_ptr<LuaClass> m_pLuaInstance;
 

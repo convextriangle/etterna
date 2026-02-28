@@ -794,20 +794,65 @@ void
 RendererVK::RecordCommands(uint32_t imageIndex,
 						   Display::CommandBatcher& batcher)
 {
-	m_CommandBuffers[m_CurrentFrame].begin({});
+	auto& buffer = m_CommandBuffers[m_CurrentFrame];
+	buffer.begin({});
 
-	m_CommandBuffers[m_CurrentFrame].bindPipeline(
-	  vk::PipelineBindPoint::eGraphics, *m_Pipelines[0].GraphicsPipeline);
+	buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+							  *m_Pipelines[0].PipelineLayout,
+							  0,
+							  { *m_DescriptorSets[m_CurrentFrame] },
+							  nullptr);
 
-	m_CommandBuffers[m_CurrentFrame].bindDescriptorSets(
-	  vk::PipelineBindPoint::eGraphics,
-	  *m_Pipelines[0].PipelineLayout,
-	  0,
-	  { *m_DescriptorSets[m_CurrentFrame] },
-	  nullptr);
-
-	m_CommandBuffers[m_CurrentFrame].bindIndexBuffer(
+	buffer.bindIndexBuffer(
 	  m_IndexBuffer[m_CurrentFrame].Get(), 0, vk::IndexType::eUint32);
+
+	size_t pipelineCommand = 0;
+	intptr_t currentPipeline = 0;
+
+	// in case there's a pipeline change at the very start
+	while (pipelineCommand < batcher.m_PipelineCommands.size() &&
+		   batcher.m_PipelineCommands[pipelineCommand].DrawIndexOffset == 0) {
+		currentPipeline = batcher.m_PipelineCommands[pipelineCommand].Pipeline;
+		++pipelineCommand;
+	}
+	intptr_t previousPipeline = -1;
+
+	auto draw = [&](int start, int count) {
+		if (count == 0)
+			return;
+		int end = start + count;
+		int pos = start;
+		while (pos < end) {
+			int nextChange = end;
+			if (pipelineCommand < batcher.m_PipelineCommands.size()) {
+				int nextOffset =
+				  batcher.m_PipelineCommands[pipelineCommand].DrawIndexOffset;
+				if (nextOffset >= pos && nextOffset < nextChange) {
+					nextChange = nextOffset;
+				}
+			}
+
+			while (
+			  pipelineCommand < batcher.m_PipelineCommands.size() &&
+			  batcher.m_PipelineCommands[pipelineCommand].DrawIndexOffset ==
+				pos) {
+				currentPipeline =
+				  batcher.m_PipelineCommands[pipelineCommand].Pipeline;
+				++pipelineCommand;
+			}
+
+			if (pos < nextChange) {
+				if (currentPipeline != previousPipeline) {
+					auto& pipeline = m_Pipelines[currentPipeline];
+					buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
+										pipeline.GraphicsPipeline);
+					previousPipeline = currentPipeline;
+				}
+				buffer.drawIndexed(nextChange - pos, 1, pos, 0, 0);
+				pos = nextChange;
+			}
+		}
+	};
 
 	std::vector<std::pair<int, int>> drawsToScreen;
 	if (batcher.m_RenderTargetCommands.size() &&
@@ -840,7 +885,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		  vk::AccessFlagBits2::eColorAttachmentWrite,
 		  vk::PipelineStageFlagBits2::eFragmentShader,
 		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-		  m_CommandBuffers[m_CurrentFrame]);
+		  buffer);
 		texture.currentLayout = vk::ImageLayout::eColorAttachmentOptimal;
 
 		vk::RenderingAttachmentInfo colorInfo{};
@@ -860,31 +905,24 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		renderInfo.colorAttachmentCount = 1;
 		renderInfo.pColorAttachments = &colorInfo;
 
-		m_CommandBuffers[m_CurrentFrame].beginRendering(renderInfo);
+		buffer.beginRendering(renderInfo);
 
-		m_CommandBuffers[m_CurrentFrame].setViewport(
-		  0,
-		  vk::Viewport(0.0f,
-					   static_cast<float>(texture.height),
-					   static_cast<float>(texture.width),
-					   -static_cast<float>(texture.height),
-					   0.0f,
-					   1.0f));
-		m_CommandBuffers[m_CurrentFrame].setScissor(
+		buffer.setViewport(0,
+						   vk::Viewport(0.0f,
+										static_cast<float>(texture.height),
+										static_cast<float>(texture.width),
+										-static_cast<float>(texture.height),
+										0.0f,
+										1.0f));
+		buffer.setScissor(
 		  0,
 		  vk::Rect2D(vk::Offset2D(0, 0),
 					 vk::Extent2D(texture.width, texture.height)));
 
-		if (nextCommand.DrawIndexOffset - command.DrawIndexOffset > 0) {
-			m_CommandBuffers[m_CurrentFrame].drawIndexed(
-			  nextCommand.DrawIndexOffset - command.DrawIndexOffset,
-			  1,
-			  command.DrawIndexOffset,
-			  0,
-			  0);
-		}
+		draw(command.DrawIndexOffset,
+			 nextCommand.DrawIndexOffset - command.DrawIndexOffset);
 
-		m_CommandBuffers[m_CurrentFrame].endRendering();
+		buffer.endRendering();
 
 		TransitionImageLayout(
 		  texture.image,
@@ -894,7 +932,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		  vk::AccessFlagBits2::eShaderRead,
 		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 		  vk::PipelineStageFlagBits2::eFragmentShader,
-		  m_CommandBuffers[m_CurrentFrame]);
+		  buffer);
 		texture.currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 	}
 
@@ -928,9 +966,9 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 	renderingInfo.colorAttachmentCount = 1;
 	renderingInfo.pColorAttachments = &attachmentInfo;
 
-	m_CommandBuffers[m_CurrentFrame].beginRendering(renderingInfo);
+	buffer.beginRendering(renderingInfo);
 
-	m_CommandBuffers[m_CurrentFrame].setViewport(
+	buffer.setViewport(
 	  0,
 	  vk::Viewport(0.0f,
 				   static_cast<float>(m_SwapchainExtent.height),
@@ -938,17 +976,13 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 				   -static_cast<float>(m_SwapchainExtent.height),
 				   0.0f,
 				   1.0f));
-	m_CommandBuffers[m_CurrentFrame].setScissor(
-	  0, vk::Rect2D(vk::Offset2D(0, 1), m_SwapchainExtent));
+	buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), m_SwapchainExtent));
 
 	for (auto& [offset, count] : drawsToScreen) {
-		if (count > 0) {
-			m_CommandBuffers[m_CurrentFrame].drawIndexed(
-			  count, 1, offset, 0, 0);
-		}
+		draw(offset, count);
 	}
 
-	m_CommandBuffers[m_CurrentFrame].endRendering();
+	buffer.endRendering();
 
 	TransitionImageLayout(imageIndex,
 						  vk::ImageLayout::eColorAttachmentOptimal,
@@ -957,7 +991,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 						  {},
 						  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 						  vk::PipelineStageFlagBits2::eBottomOfPipe);
-	m_CommandBuffers[m_CurrentFrame].end();
+	buffer.end();
 }
 
 void
