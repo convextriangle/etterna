@@ -11,6 +11,7 @@
 #include <VkBootstrap.h>
 #include <array>
 #include <map>
+#include <unordered_set>
 #include <utility>
 #include "VkUtils.h"
 #include "Texture.h"
@@ -126,14 +127,13 @@ class RendererVK : public Display::Renderer
 	void UpdateBatchBuffers(Display::CommandBatcher& batcher);
 
 	std::unordered_map<intptr_t, Texture> m_Textures;
-	std::set<intptr_t> m_EmptyTextureSlots;
+	std::unordered_set<intptr_t> m_EmptyTextureSlots;
 	int GetMaxTextureSize();
 	int GetMaxTextureCount();
 	void DestroyTexture(Texture& texture);
 
 	std::array<vk::raii::Sampler, Texture::PossibleSamplerCount> m_Samplers;
-	std::vector<intptr_t> m_TextureUpdates;
-	std::vector<vk::DescriptorImageInfo> m_TextureInfo;
+	std::array<bool, FramesInFlight> m_PendingTextureUpdates;
 	void InitTextures();
 	void ResolutionChanged() override;
 

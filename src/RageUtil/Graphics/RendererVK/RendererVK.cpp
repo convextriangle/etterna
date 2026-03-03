@@ -38,6 +38,7 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 	InitBatchBuffers();
 	InitCommandBuffers();
 	InitSyncStructures();
+	InitTextures();
 }
 
 /// ----------------------------------------
@@ -155,6 +156,10 @@ RendererVK::CreateTexture(RageSurface* img, bool RGBA8)
 	m_Textures.insert({ currentHandle, texture });
 
 	UpdateTexture(currentHandle, img, 0, 0, img->w, img->h);
+
+	for (int i = 0; i < FramesInFlight; i++) {
+		m_PendingTextureUpdates[i] = true;
+	}
 	return currentHandle;
 }
 
@@ -254,12 +259,15 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 void
 RendererVK::DeleteTexture(intptr_t handle)
 {
-	assert(handle != 0);
 	m_GraphicsQueue.waitIdle();
 
 	DestroyTexture(m_Textures[handle]);
 	m_Textures.erase(handle);
 	m_EmptyTextureSlots.insert(handle);
+
+	for (int i = 0; i < FramesInFlight; i++) {
+		m_PendingTextureUpdates[i] = true;
+	}
 }
 
 void
@@ -533,15 +541,16 @@ RendererVK::InitVulkanState()
 	VkPhysicalDeviceVulkan13Features vk13Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES
 	};
-	vk13Features.dynamicRendering = true;
-	vk13Features.synchronization2 = true;
+	vk13Features.dynamicRendering = vk::True;
+	vk13Features.synchronization2 = vk::True;
 
 	VkPhysicalDeviceVulkan12Features vk12Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
 	};
-	vk12Features.bufferDeviceAddress = true;
-	vk12Features.descriptorIndexing = true;
-	vk12Features.runtimeDescriptorArray = true;
+	vk12Features.bufferDeviceAddress = vk::True;
+	vk12Features.descriptorIndexing = vk::True;
+	vk12Features.runtimeDescriptorArray = vk::True;
+	vk12Features.shaderSampledImageArrayNonUniformIndexing = vk::True;
 
 	VkPhysicalDeviceVulkan11Features vk11Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES
@@ -1018,7 +1027,8 @@ RendererVK::InitBatchBuffers()
 	poolSizes[1].type = vk::DescriptorType::eSampledImage;
 	poolSizes[1].descriptorCount = GetMaxTextureCount() * FramesInFlight;
 	poolSizes[2].type = vk::DescriptorType::eSampler;
-	poolSizes[2].descriptorCount = Texture::PossibleSamplerCount * FramesInFlight;
+	poolSizes[2].descriptorCount =
+	  Texture::PossibleSamplerCount * FramesInFlight;
 
 	vk::DescriptorPoolCreateInfo poolInfo = {};
 	poolInfo.poolSizeCount = 3;
@@ -1117,56 +1127,31 @@ void
 RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 {
 	if (!batcher.m_VertexBuffer.empty()) {
-		for (auto& info : textureInfo) {
-			info.sampler = m_Samplers[0];
-			info.imageView = m_Textures[0].view;
-			info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-		}
+		if (m_PendingTextureUpdates[m_CurrentFrame]) {
+			m_PendingTextureUpdates[m_CurrentFrame] = false;
 
-		for (auto& vertex : batcher.m_VertexBuffer) {
-			const auto& renderState =
-			  batcher.m_RenderStateBuffer[vertex.TextureIndex];
+			std::vector<vk::DescriptorImageInfo> textureInfo(
+			  GetMaxTextureCount());
+			for (int i = 0; i < textureInfo.size(); i++) {
+				textureInfo[i].imageLayout =
+				  vk::ImageLayout::eShaderReadOnlyOptimal;
 
-			if (!renderState.textureHandle) {
-				vertex.TextureIndex = 0;
-				continue;
+				if (m_EmptyTextureSlots.contains(i)) {
+					textureInfo[i].imageView = m_Textures[0].view;
+				} else {
+					textureInfo[i].imageView = m_Textures[i].view;
+				}
 			}
 
-			const uint8_t textureSettings =
-			  ((uint8_t)renderState.textureWrapping
-			   << (Texture::Wrapping - 1)) |
-			  ((uint8_t)renderState.textureFiltering
-			   << (Texture::Filtering - 1));
+			vk::WriteDescriptorSet writeDescriptor = {};
+			writeDescriptor.dstSet = m_DescriptorSets[m_CurrentFrame];
+			writeDescriptor.dstBinding = 2;
+			writeDescriptor.descriptorCount = textureInfo.size();
+			writeDescriptor.descriptorType = vk::DescriptorType::eSampledImage;
+			writeDescriptor.pImageInfo = textureInfo.data();
 
-			auto it = textureLocation.find(
-			  { textureSettings, renderState.textureHandle });
-			if (it != textureLocation.end()) {
-				vertex.TextureIndex = it->second;
-			} else {
-				assert(textureLocation.size() < Texture::MaxSlots);
-				textureInfo[textureLocation.size()].sampler =
-				  m_Samplers[textureSettings];
-				textureInfo[textureLocation.size()].imageView =
-				  m_Textures[renderState.textureHandle].view;
-
-				vertex.TextureIndex = textureLocation.size() + 1;
-				textureLocation.emplace_hint(
-				  it,
-				  std::make_pair(
-					std::make_pair(textureSettings, renderState.textureHandle),
-					vertex.TextureIndex));
-			}
+			m_Device.updateDescriptorSets({ writeDescriptor }, {});
 		}
-
-		vk::WriteDescriptorSet writeDescriptor = {};
-		writeDescriptor.dstSet = m_DescriptorSets[m_CurrentFrame];
-		writeDescriptor.dstBinding = 2;
-		writeDescriptor.descriptorCount = Texture::MaxSlots;
-		writeDescriptor.descriptorType =
-		  vk::DescriptorType::eCombinedImageSampler;
-		writeDescriptor.pImageInfo = textureInfo.data();
-
-		m_Device.updateDescriptorSets({ writeDescriptor }, {});
 
 		std::memcpy(m_VertexBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_VertexBuffer.data(),
@@ -1224,6 +1209,8 @@ RendererVK::InitTextures()
 	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
 	samplerInfo.compareEnable = vk::False;
 	samplerInfo.compareOp = vk::CompareOp::eAlways;
+	std::array<vk::DescriptorImageInfo, Texture::PossibleSamplerCount>
+	  samplerImageInfo;
 
 	for (size_t i = 0; i < m_Samplers.size(); i++) {
 		samplerInfo.magFilter =
@@ -1236,19 +1223,28 @@ RendererVK::InitTextures()
 		samplerInfo.addressModeV = (i & Texture::Wrapping)
 									 ? vk::SamplerAddressMode::eRepeat
 									 : vk::SamplerAddressMode::eClampToBorder;
-		samplerInfo.addressModeW = (i & Texture::Wrapping)
-									 ? vk::SamplerAddressMode::eRepeat
-									 : vk::SamplerAddressMode::eClampToBorder;
 		m_Samplers[i] = vk::raii::Sampler(m_Device, samplerInfo);
+		samplerImageInfo[i].sampler = m_Samplers[i];
+	}
+
+	for (int i = 0; i < FramesInFlight; i++) {
+		vk::WriteDescriptorSet writeDescriptor = {};
+		writeDescriptor.dstSet = m_DescriptorSets[i];
+		writeDescriptor.dstBinding = 3;
+		writeDescriptor.descriptorCount = Texture::PossibleSamplerCount;
+		writeDescriptor.descriptorType = vk::DescriptorType::eSampler;
+		writeDescriptor.pImageInfo = samplerImageInfo.data();
+
+		m_Device.updateDescriptorSets({ writeDescriptor }, nullptr);
+	}
+
+	for (int i = 0; i < GetMaxTextureCount(); i++) {
+		m_EmptyTextureSlots.insert(i);
 	}
 
 	RageSurface* img =
 	  CreateSurface(1, 1, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
 	CreateTexture(img, true);
-
-	for (int i = 1; i < GetMaxTextureCount(); i++) {
-		m_EmptyTextureSlots.insert(i);
-	}
 }
 
 void
