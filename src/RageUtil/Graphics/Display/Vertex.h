@@ -14,6 +14,7 @@ struct Vertex
     RageSpriteVertex InnerData;
     uint32_t MatrixIndex;
     uint32_t TextureIndex;
+	uint32_t SamplerIndex;
 };
 
 } // namespace Display

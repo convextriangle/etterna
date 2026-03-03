@@ -12,7 +12,7 @@ struct Texture
 		Wrapping = 0b01,
 		Filtering = 0b10,
 		PossibleSamplerCount = 4,
-		MaxSlots = 64
+		MaxTextures = 65536,
 	};
 	VmaAllocation allocation = nullptr;
 	VmaAllocator allocator = nullptr;

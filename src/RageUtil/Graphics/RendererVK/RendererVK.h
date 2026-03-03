@@ -125,13 +125,16 @@ class RendererVK : public Display::Renderer
 	void InitBatchBuffers();
 	void UpdateBatchBuffers(Display::CommandBatcher& batcher);
 
-	intptr_t m_TextureCounter = 0;
 	std::unordered_map<intptr_t, Texture> m_Textures;
+	std::set<intptr_t> m_EmptyTextureSlots;
 	int GetMaxTextureSize();
+	int GetMaxTextureCount();
 	void DestroyTexture(Texture& texture);
 
 	std::array<vk::raii::Sampler, Texture::PossibleSamplerCount> m_Samplers;
-	void InitTextureSamplers();
+	std::vector<intptr_t> m_TextureUpdates;
+	std::vector<vk::DescriptorImageInfo> m_TextureInfo;
+	void InitTextures();
 	void ResolutionChanged() override;
 
 	intptr_t CreateRenderTargetTexture(int width, int height);

@@ -38,7 +38,6 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 	InitBatchBuffers();
 	InitCommandBuffers();
 	InitSyncStructures();
-	InitTextureSamplers();
 }
 
 /// ----------------------------------------
@@ -111,7 +110,9 @@ RendererVK::IsD3DInternal()
 intptr_t
 RendererVK::CreateTexture(RageSurface* img, bool RGBA8)
 {
-	intptr_t currentHandle = m_TextureCounter++;
+	assert(m_EmptyTextureSlots.size());
+	intptr_t currentHandle = *m_EmptyTextureSlots.begin();
+	m_EmptyTextureSlots.erase(currentHandle);
 
 	Texture texture = {};
 	texture.width = power_of_two(img->w);
@@ -258,6 +259,7 @@ RendererVK::DeleteTexture(intptr_t handle)
 
 	DestroyTexture(m_Textures[handle]);
 	m_Textures.erase(handle);
+	m_EmptyTextureSlots.insert(handle);
 }
 
 void
@@ -1010,14 +1012,16 @@ RendererVK::InitBatchBuffers()
 	textureInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
 	m_TextureBuffer.Init(m_Allocator, textureInfo, textureAllocInfo);
 
-	vk::DescriptorPoolSize poolSizes[2] = {};
+	vk::DescriptorPoolSize poolSizes[3] = {};
 	poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
 	poolSizes[0].descriptorCount = 2 * FramesInFlight;
-	poolSizes[1].type = vk::DescriptorType::eCombinedImageSampler;
-	poolSizes[1].descriptorCount = Texture::MaxSlots * FramesInFlight;
+	poolSizes[1].type = vk::DescriptorType::eSampledImage;
+	poolSizes[1].descriptorCount = GetMaxTextureCount() * FramesInFlight;
+	poolSizes[2].type = vk::DescriptorType::eSampler;
+	poolSizes[2].descriptorCount = Texture::PossibleSamplerCount * FramesInFlight;
 
 	vk::DescriptorPoolCreateInfo poolInfo = {};
-	poolInfo.poolSizeCount = 2;
+	poolInfo.poolSizeCount = 3;
 	poolInfo.pPoolSizes = poolSizes;
 	poolInfo.maxSets = FramesInFlight;
 	m_DescriptorPool = vk::raii::DescriptorPool(m_Device, poolInfo);
@@ -1031,11 +1035,14 @@ RendererVK::InitBatchBuffers()
 									   vk::DescriptorType::eStorageBuffer,
 									   1,
 									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(
-		  2,
-		  vk::DescriptorType::eCombinedImageSampler,
-		  Texture::MaxSlots,
-		  vk::ShaderStageFlagBits::eFragment)
+		vk::DescriptorSetLayoutBinding(2,
+									   vk::DescriptorType::eSampledImage,
+									   GetMaxTextureCount(),
+									   vk::ShaderStageFlagBits::eFragment),
+		vk::DescriptorSetLayoutBinding(3,
+									   vk::DescriptorType::eSampler,
+									   Texture::PossibleSamplerCount,
+									   vk::ShaderStageFlagBits::eFragment)
 	};
 
 	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
@@ -1110,9 +1117,6 @@ void
 RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 {
 	if (!batcher.m_VertexBuffer.empty()) {
-		std::map<std::pair<uint8_t, intptr_t>, int> textureLocation;
-		std::array<vk::DescriptorImageInfo, Texture::MaxSlots> textureInfo;
-
 		for (auto& info : textureInfo) {
 			info.sampler = m_Samplers[0];
 			info.imageView = m_Textures[0].view;
@@ -1188,6 +1192,15 @@ RendererVK::GetMaxTextureSize()
 	  4096u, m_PhysicalDevice.getProperties().limits.maxImageDimension2D);
 }
 
+int
+RendererVK::GetMaxTextureCount()
+{
+	return std::min(
+	  static_cast<size_t>(Texture::MaxTextures),
+	  m_PhysicalDevice.getProperties().limits.maxDescriptorSetSampledImages /
+		FramesInFlight);
+}
+
 void
 RendererVK::DestroyTexture(Texture& texture)
 {
@@ -1202,7 +1215,7 @@ RendererVK::DestroyTexture(Texture& texture)
 }
 
 void
-RendererVK::InitTextureSamplers()
+RendererVK::InitTextures()
 {
 	vk::PhysicalDeviceProperties properties = m_PhysicalDevice.getProperties();
 	vk::SamplerCreateInfo samplerInfo = {};
@@ -1232,6 +1245,10 @@ RendererVK::InitTextureSamplers()
 	RageSurface* img =
 	  CreateSurface(1, 1, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
 	CreateTexture(img, true);
+
+	for (int i = 1; i < GetMaxTextureCount(); i++) {
+		m_EmptyTextureSlots.insert(i);
+	}
 }
 
 void
@@ -1243,7 +1260,9 @@ RendererVK::ResolutionChanged()
 intptr_t
 RendererVK::CreateRenderTargetTexture(int width, int height)
 {
-	intptr_t currentHandle = m_TextureCounter++;
+	assert(m_EmptyTextureSlots.size());
+	intptr_t currentHandle = *m_EmptyTextureSlots.begin();
+	m_EmptyTextureSlots.erase(currentHandle);
 
 	Texture texture = {};
 	texture.width = power_of_two(width);
@@ -1376,11 +1395,14 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 									   vk::DescriptorType::eStorageBuffer,
 									   1,
 									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(
-		  2,
-		  vk::DescriptorType::eCombinedImageSampler,
-		  Texture::MaxSlots,
-		  vk::ShaderStageFlagBits::eFragment)
+		vk::DescriptorSetLayoutBinding(2,
+									   vk::DescriptorType::eSampledImage,
+									   GetMaxTextureCount(),
+									   vk::ShaderStageFlagBits::eFragment),
+		vk::DescriptorSetLayoutBinding(3,
+									   vk::DescriptorType::eSampler,
+									   Texture::PossibleSamplerCount,
+									   vk::ShaderStageFlagBits::eFragment)
 	};
 
 	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);

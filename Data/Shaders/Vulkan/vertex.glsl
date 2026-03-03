@@ -8,6 +8,7 @@ struct Vertex {
     float uv[2];
     uint matrixIndex;
     uint textureIndex;
+    uint samplerIndex;
 };
 
 layout(std430, set = 0, binding = 0) readonly buffer VertexBuffer {
@@ -27,7 +28,8 @@ layout(std430, set = 0, binding = 1) readonly buffer MatrixStateBuffer {
 
 layout(location = 0) out vec4 vertexColor;
 layout(location = 1) out uint textureIndex;
-layout(location = 2) out vec2 vertexUV;
+layout(location = 2) out uint samplerIndex;
+layout(location = 3) out vec2 vertexUV;
 
 vec2 unpackVec2(float array[2]){
     return vec2(array[0], array[1]);
@@ -52,6 +54,7 @@ void main() {
     
     vertexColor = unpackColor(currentVertex.color);
     textureIndex = currentVertex.textureIndex;
+    samplerIndex = currentVertex.samplerIndex;
 
     uint matrixIndex = currentVertex.matrixIndex;
     

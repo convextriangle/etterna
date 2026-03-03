@@ -12,13 +12,22 @@ void
 Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
 													 bool persist)
 {
-	assert(!persist && "TODO: implement shader persistence (child actor shader overriding)");
+	assert(
+	  !persist &&
+	  "TODO: implement shader persistence (child actor shader overriding)");
 	if (m_PipelineCommands.size() &&
 		m_PipelineCommands.back().Pipeline == pipeline) {
 		return;
 	}
 
 	m_PipelineCommands.emplace_back(pipeline, m_IndexBuffer.size());
+}
+
+uint32_t
+GetSamplerFlagsFromRenderState(const Display::RenderState& state)
+{
+	return (uint8_t)state.textureWrapping |
+		   ((uint8_t)state.textureFiltering << 1);
 }
 
 void
@@ -42,9 +51,11 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 	m_MatrixStateBuffer.push_back(matrixState);
 	const auto previousVertexCount = m_VertexBuffer.size();
 	for (int i = 0; i < vertexCount; i++) {
-		m_VertexBuffer.emplace_back(vertexData[i],
-									(uint32_t)m_MatrixStateBuffer.size() - 1,
-									(uint32_t)m_RenderStateBuffer.size() - 1);
+		m_VertexBuffer.emplace_back(
+		  vertexData[i],
+		  (uint32_t)m_MatrixStateBuffer.size() - 1,
+		  (uint32_t)m_RenderStateBuffer.back().textureHandle,
+		  GetSamplerFlagsFromRenderState(m_RenderStateBuffer.back()));
 	}
 
 	switch (drawMode) {
@@ -170,7 +181,8 @@ Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
 		  RageSpriteVertex{
 			.p = vertex.p, .n = vertex.n, .c = whiteVColor, .t = vertex.t },
 		  (uint32_t)m_MatrixStateBuffer.size() - 1,
-		  (uint32_t)m_RenderStateBuffer.size() - 1);
+		  (uint32_t)m_RenderStateBuffer.back().textureHandle,
+		  GetSamplerFlagsFromRenderState(m_RenderStateBuffer.back()));
 	}
 
 	for (int i = meshInfo.iTriangleStart;
