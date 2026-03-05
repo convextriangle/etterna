@@ -487,9 +487,6 @@ RendererVK::~RendererVK()
 	for (auto& [handle, texture] : m_Textures) {
 		DestroyTexture(texture);
 	}
-
-	// meow
-	m_Device.waitIdle();
 }
 
 static VkBool32
