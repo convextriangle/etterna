@@ -12,6 +12,7 @@
 #include <numbers>
 #include <RageUtil/File/RageFileManager.h>
 #include <RageUtil/Misc/RageMath.h>
+#include <vulkan/vulkan_beta.h>
 #include "RenderTargetVK.h"
 
 constexpr uint64_t Timeout = 1000'000'000;
@@ -487,8 +488,8 @@ RendererVK::~RendererVK()
 		DestroyTexture(texture);
 	}
 
-	// WHAT
-	// vkDeviceWaitIdle(static_cast<VkDevice>(static_cast<vk::Device>(m_Device)));
+	// meow
+	m_Device.waitIdle();
 }
 
 static VkBool32
@@ -521,6 +522,9 @@ RendererVK::InitVulkanState()
 #endif
 		.require_api_version(1, 3, 0)
 		.enable_extension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
+		.enable_extension(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)
+		.enable_extension(
+		  VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)
 		.build();
 	if (!instanceResult) {
 		Fail();
@@ -561,7 +565,6 @@ RendererVK::InitVulkanState()
 	vkFeatures.samplerAnisotropy = vk::True;
 	vkFeatures.multiDrawIndirect = vk::True;
 	vkFeatures.logicOp = vk::True;
-	vkFeatures.drawIndirectFirstInstance = vk::True;
 
 	vkb::PhysicalDeviceSelector selector(*instanceResult);
 	auto physicalDeviceResult =
@@ -571,6 +574,9 @@ RendererVK::InitVulkanState()
 		.set_required_features_11(vk11Features)
 		.set_required_features(vkFeatures)
 		.set_surface(static_cast<vk::SurfaceKHR>(m_Surface))
+#ifdef __APPLE__
+		.add_required_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
+#endif
 		.select();
 	if (!physicalDeviceResult) {
 		Fail();
@@ -620,8 +626,7 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 		for (size_t i = 0; i < formats.size(); i++) {
 			bool spaceOk =
 			  formats[i].colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear;
-			bool formatOk = (formats[i].format == vk::Format::eR8G8B8A8Unorm)
-			  /* ||			(formats[i].format == vk::Format::eB8G8R8A8Unorm)*/;
+			bool formatOk = (formats[i].format == vk::Format::eR8G8B8A8Unorm);
 			if (spaceOk && formatOk) {
 				format = formats[i];
 				break;
@@ -629,7 +634,7 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 		}
 
 		if (format.format == vk::Format::eUndefined) {
-			throw std::runtime_error(":(");
+			Fail();
 		}
 	}
 
