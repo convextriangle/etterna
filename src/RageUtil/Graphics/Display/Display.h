@@ -13,7 +13,6 @@ namespace Display
 class Display : public RageDisplay
 {
   public:
-    static constexpr size_t FrameCount = 2;
     static constexpr size_t TexturePixelSize = 4;
     static constexpr size_t MaxTextureSize = 4096;
 
