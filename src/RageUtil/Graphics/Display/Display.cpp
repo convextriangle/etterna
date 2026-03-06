@@ -55,8 +55,6 @@ Display::Display::BeginFrame()
 	m_RenderState.textureFiltering = true;
 	m_RenderState.textureWrapping = false;
 
-	PushCurrentRenderState();
-
 	return m_IsInitDone && RageDisplay::BeginFrame();
 }
 
@@ -196,68 +194,63 @@ Display::Display::SetTextureFiltering(TextureUnit tu, bool b)
 void
 Display::Display::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
 {
-	PushCurrentRenderState();
-
 	m_Batcher.InsertSpriteDrawCommand(
-	  DrawMode::Quads, GetCurrentMatrixState(), v, iNumVerts);
+	  DrawMode::Quads, GetCurrentMatrixState(), v, iNumVerts, m_RenderState);
 }
 
 void
 Display::Display::DrawQuadStripInternal(const RageSpriteVertex v[],
 										int iNumVerts)
 {
-	PushCurrentRenderState();
-
-	m_Batcher.InsertSpriteDrawCommand(
-	  DrawMode::QuadStrip, GetCurrentMatrixState(), v, iNumVerts);
+	m_Batcher.InsertSpriteDrawCommand(DrawMode::QuadStrip,
+									  GetCurrentMatrixState(),
+									  v,
+									  iNumVerts,
+									  m_RenderState);
 }
 
 void
 Display::Display::DrawFanInternal(const RageSpriteVertex v[], int iNumVerts)
 {
-	PushCurrentRenderState();
-
 	m_Batcher.InsertSpriteDrawCommand(
-	  DrawMode::Fan, GetCurrentMatrixState(), v, iNumVerts);
+	  DrawMode::Fan, GetCurrentMatrixState(), v, iNumVerts, m_RenderState);
 }
 
 void
 Display::Display::DrawStripInternal(const RageSpriteVertex v[], int iNumVerts)
 {
-	PushCurrentRenderState();
-
 	m_Batcher.InsertSpriteDrawCommand(
-	  DrawMode::Strip, GetCurrentMatrixState(), v, iNumVerts);
+	  DrawMode::Strip, GetCurrentMatrixState(), v, iNumVerts, m_RenderState);
 }
 
 void
 Display::Display::DrawTrianglesInternal(const RageSpriteVertex v[],
 										int iNumVerts)
 {
-	PushCurrentRenderState();
-
-	m_Batcher.InsertSpriteDrawCommand(
-	  DrawMode::Triangles, GetCurrentMatrixState(), v, iNumVerts);
+	m_Batcher.InsertSpriteDrawCommand(DrawMode::Triangles,
+									  GetCurrentMatrixState(),
+									  v,
+									  iNumVerts,
+									  m_RenderState);
 }
 
 void
 Display::Display::DrawSymmetricQuadStripInternal(const RageSpriteVertex v[],
 												 int iNumVerts)
 {
-	PushCurrentRenderState();
-
-	m_Batcher.InsertSpriteDrawCommand(
-	  DrawMode::SymmetricQuadStrip, GetCurrentMatrixState(), v, iNumVerts);
+	m_Batcher.InsertSpriteDrawCommand(DrawMode::SymmetricQuadStrip,
+									  GetCurrentMatrixState(),
+									  v,
+									  iNumVerts,
+									  m_RenderState);
 }
 
 void
 Display::Display::DrawCompiledGeometryInternal(const RageCompiledGeometry* p,
 											   int iMeshIndex)
 {
-	PushCurrentRenderState();
-
 	m_Batcher.InsertCompiledGeometryDrawCommand(
-	  DrawMode::CompiledGeometry, GetCurrentMatrixState(), p, iMeshIndex);
+	  GetCurrentMatrixState(), p, iMeshIndex, m_RenderState);
 }
 
 #pragma endregion
@@ -328,22 +321,12 @@ Display::Display::GetCurrentMatrixState()
 	return m;
 }
 
-void
-Display::Display::PushCurrentRenderState()
-{
-	if (m_RenderState == m_PreviousRenderState) {
-		return;
-	}
-
-	m_PreviousRenderState = m_RenderState;
-	m_Batcher.InsertRenderStateCommand(m_RenderState);
-}
-
 intptr_t
 Display::Display::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 										 const std::string& fragmentShaderPath)
 {
-	return m_Renderer->CreateGraphicsPipeline(vertexShaderPath, fragmentShaderPath);
+	return m_Renderer->CreateGraphicsPipeline(vertexShaderPath,
+											  fragmentShaderPath);
 }
 
 void

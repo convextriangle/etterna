@@ -3,12 +3,6 @@
 #include "CompiledGeometry.h"
 
 void
-Display::CommandBatcher::InsertRenderStateCommand(RenderState renderState)
-{
-	m_RenderStateBuffer.push_back(renderState);
-}
-
-void
 Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
 													 bool persist)
 {
@@ -35,7 +29,8 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
   DrawMode drawMode,
   MatrixState&& matrixState,
   const RageSpriteVertex* vertexData,
-  int vertexCount)
+  int vertexCount,
+  const RenderState& renderState)
 {
 	assert(drawMode != DrawMode::Invalid);
 	assert(drawMode != DrawMode::CompiledGeometry);
@@ -54,8 +49,8 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 		m_VertexBuffer.emplace_back(
 		  vertexData[i],
 		  (uint32_t)m_MatrixStateBuffer.size() - 1,
-		  (uint32_t)m_RenderStateBuffer.back().textureHandle,
-		  GetSamplerFlagsFromRenderState(m_RenderStateBuffer.back()));
+		  (uint32_t)renderState.textureHandle,
+		  GetSamplerFlagsFromRenderState(renderState));
 	}
 
 	switch (drawMode) {
@@ -150,15 +145,11 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 
 void
 Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
-  DrawMode drawMode,
   MatrixState&& matrixState,
   const RageCompiledGeometry* p,
-  int iMeshIndex)
+  int iMeshIndex,
+  const RenderState& renderState)
 {
-	assert(drawMode == DrawMode::CompiledGeometry);
-	assert(m_RenderStateBuffer.size() >= 1 &&
-		   "Rendering information must be set before drawing");
-
 	const auto geometry = reinterpret_cast<const CompiledGeometry*>(p);
 	const auto& meshInfo = geometry->m_vMeshInfo[iMeshIndex];
 
@@ -181,8 +172,8 @@ Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
 		  RageSpriteVertex{
 			.p = vertex.p, .n = vertex.n, .c = whiteVColor, .t = vertex.t },
 		  (uint32_t)m_MatrixStateBuffer.size() - 1,
-		  (uint32_t)m_RenderStateBuffer.back().textureHandle,
-		  GetSamplerFlagsFromRenderState(m_RenderStateBuffer.back()));
+		  (uint32_t)renderState.textureHandle,
+		  GetSamplerFlagsFromRenderState(renderState));
 	}
 
 	for (int i = meshInfo.iTriangleStart;
@@ -201,7 +192,6 @@ Display::CommandBatcher::Clear()
 {
 	m_VertexBuffer.clear();
 	m_IndexBuffer.clear();
-	m_RenderStateBuffer.clear();
 	m_MatrixStateBuffer.clear();
 	m_RenderTargetCommands.clear();
 	m_PipelineCommands.clear();

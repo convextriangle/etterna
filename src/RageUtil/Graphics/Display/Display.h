@@ -100,14 +100,11 @@ class Display : public RageDisplay
 	MatrixState GetCurrentMatrixState();
 
   private:
-	void PushCurrentRenderState();
-
 	std::function<std::unique_ptr<Renderer>()> m_RendererFactory;
     std::unique_ptr<Renderer> m_Renderer;
     std::atomic_bool m_IsInitDone;
     CommandBatcher m_Batcher;
 	RenderState m_RenderState;
-	RenderState m_PreviousRenderState;
 	intptr_t m_CurrentRenderTarget = 0;
 };
 } // namespace Display
