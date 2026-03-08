@@ -42,96 +42,131 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 	//    so just convert to a triangle list
 	// -- unrolled loops look funny though
 	m_MatrixStateBuffer.push_back(matrixState);
-	const auto previousVertexCount = m_VertexBuffer.size();
-	for (int i = 0; i < vertexCount; i++) {
-		m_VertexBuffer.emplace_back(
-		  vertexData[i],
-		  (uint32_t)m_MatrixStateBuffer.size() - 1,
-		  (uint32_t)renderState.textureHandle,
-		  GetSamplerFlagsFromRenderState(renderState));
-	}
+	m_DrawSettingsBuffer.emplace_back(
+	  m_VertexBuffer.size(),
+	  (uint32_t)m_MatrixStateBuffer.size() - 1,
+	  (uint32_t)renderState.textureHandle,
+	  GetSamplerFlagsFromRenderState(renderState));
 
+	const auto previousVertexCount = m_VertexBuffer.size();
+	m_VertexBuffer.resize(previousVertexCount + vertexCount);
+	std::memcpy(&m_VertexBuffer[previousVertexCount],
+				vertexData,
+				sizeof(RageSpriteVertex) * vertexCount);
+
+	size_t prevCount = m_IndexBuffer.size();
 	switch (drawMode) {
 		case DrawMode::Triangles: {
+			m_IndexBuffer.resize(prevCount + vertexCount);
 			for (size_t i = 0; i < vertexCount / 3; i++) {
-				m_IndexBuffer.push_back(previousVertexCount + 3 * i);
-				m_IndexBuffer.push_back(previousVertexCount + 3 * i + 1);
-				m_IndexBuffer.push_back(previousVertexCount + 3 * i + 2);
+				m_IndexBuffer[prevCount + 3 * i] = previousVertexCount + 3 * i;
+				m_IndexBuffer[prevCount + 3 * i + 1] =
+				  previousVertexCount + 3 * i + 1;
+				m_IndexBuffer[prevCount + 3 * i + 2] =
+				  previousVertexCount + 3 * i + 2;
 			}
 			break;
 		}
 		case DrawMode::Quads: {
+			m_IndexBuffer.resize(prevCount + 6 * vertexCount / 4);
 			for (size_t i = 0; i < vertexCount / 4; i++) {
-				m_IndexBuffer.push_back(previousVertexCount + i * 4 + 0);
-				m_IndexBuffer.push_back(previousVertexCount + i * 4 + 1);
-				m_IndexBuffer.push_back(previousVertexCount + i * 4 + 2);
-
-				m_IndexBuffer.push_back(previousVertexCount + i * 4 + 2);
-				m_IndexBuffer.push_back(previousVertexCount + i * 4 + 3);
-				m_IndexBuffer.push_back(previousVertexCount + i * 4 + 0);
+				m_IndexBuffer[prevCount + i * 6 + 0] =
+				  previousVertexCount + i * 4 + 0;
+				m_IndexBuffer[prevCount + i * 6 + 1] =
+				  previousVertexCount + i * 4 + 1;
+				m_IndexBuffer[prevCount + i * 6 + 2] =
+				  previousVertexCount + i * 4 + 2;
+				m_IndexBuffer[prevCount + i * 6 + 3] =
+				  previousVertexCount + i * 4 + 2;
+				m_IndexBuffer[prevCount + i * 6 + 4] =
+				  previousVertexCount + i * 4 + 3;
+				m_IndexBuffer[prevCount + i * 6 + 5] =
+				  previousVertexCount + i * 4 + 0;
 			}
 
 			break;
 		}
 		case DrawMode::QuadStrip: {
+			m_IndexBuffer.resize(prevCount + 6 * (vertexCount - 2) / 2);
 			for (size_t i = 0; i < (vertexCount - 2) / 2; i++) {
-				m_IndexBuffer.push_back(previousVertexCount + i * 2 + 0);
-				m_IndexBuffer.push_back(previousVertexCount + i * 2 + 1);
-				m_IndexBuffer.push_back(previousVertexCount + i * 2 + 2);
-
-				m_IndexBuffer.push_back(previousVertexCount + i * 2 + 1);
-				m_IndexBuffer.push_back(previousVertexCount + i * 2 + 2);
-				m_IndexBuffer.push_back(previousVertexCount + i * 2 + 3);
+				m_IndexBuffer[prevCount + i * 6 + 0] =
+				  previousVertexCount + i * 2 + 0;
+				m_IndexBuffer[prevCount + i * 6 + 1] =
+				  previousVertexCount + i * 2 + 1;
+				m_IndexBuffer[prevCount + i * 6 + 2] =
+				  previousVertexCount + i * 2 + 2;
+				m_IndexBuffer[prevCount + i * 6 + 3] =
+				  previousVertexCount + i * 2 + 1;
+				m_IndexBuffer[prevCount + i * 6 + 4] =
+				  previousVertexCount + i * 2 + 2;
+				m_IndexBuffer[prevCount + i * 6 + 5] =
+				  previousVertexCount + i * 2 + 3;
 			}
 
 			break;
 		}
 		case DrawMode::Fan: {
 			assert(vertexCount >= 3);
-
+			m_IndexBuffer.resize(prevCount + 3 * (vertexCount - 2));
 			for (size_t i = 1; i < vertexCount - 1; i++) {
-				m_IndexBuffer.push_back(previousVertexCount);
-				m_IndexBuffer.push_back(previousVertexCount + i);
-				m_IndexBuffer.push_back(previousVertexCount + i + 1);
+				m_IndexBuffer[prevCount + 3 * i] = previousVertexCount;
+				m_IndexBuffer[prevCount + 3 * i + 1] = previousVertexCount + i;
+				m_IndexBuffer[prevCount + 3 * i + 2] =
+				  previousVertexCount + i + 1;
 			}
 
 			break;
 		}
 		case DrawMode::Strip: {
 			assert(vertexCount >= 3);
+			m_IndexBuffer.resize(prevCount + 3 * (vertexCount - 2));
 
 			for (size_t i = 0; i < vertexCount - 2; i++) {
 				if (i % 2 == 0) {
-					m_IndexBuffer.push_back(previousVertexCount + i);
-					m_IndexBuffer.push_back(previousVertexCount + i + 1);
-					m_IndexBuffer.push_back(previousVertexCount + i + 2);
+					m_IndexBuffer[prevCount + 3 * i] = previousVertexCount + i;
+					m_IndexBuffer[prevCount + 3 * i + 1] =
+					  previousVertexCount + i + 1;
+					m_IndexBuffer[prevCount + 3 * i + 2] =
+					  previousVertexCount + i + 2;
 				} else {
-					m_IndexBuffer.push_back(previousVertexCount + i + 1);
-					m_IndexBuffer.push_back(previousVertexCount + i);
-					m_IndexBuffer.push_back(previousVertexCount + i + 2);
+					m_IndexBuffer[prevCount + 3 * i] =
+					  previousVertexCount + i + 1;
+					m_IndexBuffer[prevCount + 3 * i + 1] =
+					  previousVertexCount + i;
+					m_IndexBuffer[prevCount + 3 * i + 2] =
+					  previousVertexCount + i + 2;
 				}
 			}
 
 			break;
 		}
 		case DrawMode::SymmetricQuadStrip: {
-
+			m_IndexBuffer.resize(prevCount + 12 * (vertexCount - 3) / 3);
 			for (size_t i = 0; i < (vertexCount - 3) / 3; i++) {
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 1);
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 3);
-				m_IndexBuffer.push_back(previousVertexCount + i + 3 + 0);
-
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 1);
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 4);
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 3);
-
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 1);
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 5);
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 4);
-
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 1);
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 2);
-				m_IndexBuffer.push_back(previousVertexCount + i * 3 + 5);
+				m_IndexBuffer[prevCount + i * 12 + 0] =
+				  previousVertexCount + i * 3 + 1;
+				m_IndexBuffer[prevCount + i * 12 + 1] =
+				  previousVertexCount + i * 3 + 3;
+				m_IndexBuffer[prevCount + i * 12 + 2] =
+				  previousVertexCount + i * 3 + 0;
+				m_IndexBuffer[prevCount + i * 12 + 3] =
+				  previousVertexCount + i * 3 + 1;
+				m_IndexBuffer[prevCount + i * 12 + 4] =
+				  previousVertexCount + i * 3 + 4;
+				m_IndexBuffer[prevCount + i * 12 + 5] =
+				  previousVertexCount + i * 3 + 3;
+				m_IndexBuffer[prevCount + i * 12 + 6] =
+				  previousVertexCount + i * 3 + 1;
+				m_IndexBuffer[prevCount + i * 12 + 7] =
+				  previousVertexCount + i * 3 + 5;
+				m_IndexBuffer[prevCount + i * 12 + 8] =
+				  previousVertexCount + i * 3 + 4;
+				m_IndexBuffer[prevCount + i * 12 + 9] =
+				  previousVertexCount + i * 3 + 1;
+				m_IndexBuffer[prevCount + i * 12 + 10] =
+				  previousVertexCount + i * 3 + 2;
+				m_IndexBuffer[prevCount + i * 12 + 11] =
+				  previousVertexCount + i * 3 + 5;
 			}
 
 			break;
@@ -157,6 +192,12 @@ Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
 		m_MatrixStateBuffer.back().texture.m[3][1] = 0;
 	}
 
+	m_DrawSettingsBuffer.emplace_back(
+	  m_VertexBuffer.size(),
+	  (uint32_t)m_MatrixStateBuffer.size() - 1,
+	  (uint32_t)renderState.textureHandle,
+	  GetSamplerFlagsFromRenderState(renderState));
+
 	RageVColor whiteVColor = {};
 	whiteVColor.r = UINT8_MAX;
 	whiteVColor.g = UINT8_MAX;
@@ -166,12 +207,7 @@ Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
 	const auto previousVertexCount = m_VertexBuffer.size();
 	for (int i = 0; i < meshInfo.iVertexCount; i++) {
 		const auto& vertex = geometry->m_Vertices[meshInfo.iVertexStart + i];
-		m_VertexBuffer.emplace_back(
-		  RageSpriteVertex{
-			.p = vertex.p, .n = vertex.n, .c = whiteVColor, .t = vertex.t },
-		  (uint32_t)m_MatrixStateBuffer.size() - 1,
-		  (uint32_t)renderState.textureHandle,
-		  GetSamplerFlagsFromRenderState(renderState));
+		m_VertexBuffer.emplace_back(vertex.p, vertex.n, whiteVColor, vertex.t);
 	}
 
 	for (int i = meshInfo.iTriangleStart;
@@ -189,6 +225,7 @@ void
 Display::CommandBatcher::Clear()
 {
 	m_VertexBuffer.clear();
+	m_DrawSettingsBuffer.clear();
 	m_IndexBuffer.clear();
 	m_MatrixStateBuffer.clear();
 	m_RenderTargetCommands.clear();

@@ -6,9 +6,6 @@ struct Vertex {
     float normal[3];
     uint color;
     float uv[2];
-    uint matrixIndex;
-    uint textureIndex;
-    uint samplerIndex;
 };
 
 layout(std430, set = 0, binding = 0) readonly buffer VertexBuffer {
@@ -24,6 +21,19 @@ struct MatrixState {
 
 layout(std430, set = 0, binding = 1) readonly buffer MatrixStateBuffer {
     MatrixState matrices[];
+};
+
+struct DrawSettings
+{
+    uint FirstVertexIndex;
+	uint MatrixIndex;
+	uint TextureIndex;
+	uint SamplerIndex;
+};
+
+layout(std430, set = 0, binding = 2) readonly buffer DrawSettingsBuffer {
+    uint SettingsCount;
+    DrawSettings settingsBuffer[];
 };
 
 layout(location = 0) out vec4 vertexColor;
@@ -53,11 +63,27 @@ void main() {
     Vertex currentVertex = vertices[gl_VertexIndex];
     
     vertexColor = unpackColor(currentVertex.color);
-    textureIndex = currentVertex.textureIndex;
-    samplerIndex = currentVertex.samplerIndex;
+    uint settingsId = 0;
+    if (SettingsCount > 0) {
+        uint low = 0;
+        uint high = SettingsCount - 1;
+        while (low < high) {
+            uint mid = (low + high + 1) >> 1;
+            if (settingsBuffer[mid].FirstVertexIndex <= gl_VertexIndex) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+        settingsId = low;
+    }
 
-    uint matrixIndex = currentVertex.matrixIndex;
-    
+    DrawSettings settings = settingsBuffer[settingsId];
+
+    textureIndex = settings.TextureIndex;
+    samplerIndex = settings.SamplerIndex;
+
+    uint matrixIndex = settings.MatrixIndex;
     mat4 world = matrices[matrixIndex].world;
     mat4 view = matrices[matrixIndex].view;
     mat4 proj = matrices[matrixIndex].projection;

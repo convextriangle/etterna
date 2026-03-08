@@ -863,6 +863,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 										pipeline.GraphicsPipeline);
 					previousPipeline = currentPipeline;
 				}
+
 				buffer.drawIndexed(nextChange - pos, 1, pos, 0, 0);
 				pos = nextChange;
 			}
@@ -1050,10 +1051,14 @@ RendererVK::InitBatchBuffers()
 									   1,
 									   vk::ShaderStageFlagBits::eVertex),
 		vk::DescriptorSetLayoutBinding(2,
+									   vk::DescriptorType::eStorageBuffer,
+									   1,
+									   vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(3,
 									   vk::DescriptorType::eSampledImage,
 									   GetMaxTextureCount(),
 									   vk::ShaderStageFlagBits::eFragment),
-		vk::DescriptorSetLayoutBinding(3,
+		vk::DescriptorSetLayoutBinding(4,
 									   vk::DescriptorType::eSampler,
 									   Texture::PossibleSamplerCount,
 									   vk::ShaderStageFlagBits::eFragment)
@@ -1071,13 +1076,24 @@ RendererVK::InitBatchBuffers()
 
 	for (int i = 0; i < FramesInFlight; i++) {
 		vk::BufferCreateInfo vertexBufferInfo{};
-		vertexBufferInfo.size = sizeof(Display::Vertex) * MaxDrawCount;
+		vertexBufferInfo.size = sizeof(RageSpriteVertex) * MaxDrawCount;
 		vertexBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
 		VmaAllocationCreateInfo vertexAllocInfo = {};
 		vertexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 		vertexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		vertexAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_VertexBuffer[i].Init(m_Allocator, vertexBufferInfo, vertexAllocInfo);
+
+		vk::BufferCreateInfo drawSettingsInfo{};
+		drawSettingsInfo.size = sizeof(uint32_t) + sizeof(Display::DrawSettings) * MaxDrawCount;
+		drawSettingsInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
+		VmaAllocationCreateInfo drawSettingsAllocInfo = {};
+		drawSettingsAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		drawSettingsAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		drawSettingsAllocInfo.requiredFlags =
+		  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		m_DrawSettingsBuffer[i].Init(
+		  m_Allocator, drawSettingsInfo, drawSettingsAllocInfo);
 
 		vk::BufferCreateInfo indexBufferInfo{};
 		indexBufferInfo.size = sizeof(uint32_t) * 5 * MaxDrawCount;
@@ -1091,7 +1107,6 @@ RendererVK::InitBatchBuffers()
 		vk::BufferCreateInfo matrixBufferInfo{};
 		matrixBufferInfo.size = sizeof(Display::MatrixState) * MaxDrawCount;
 		matrixBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
-
 		VmaAllocationCreateInfo matrixAllocInfo = {};
 		matrixAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 		matrixAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -1103,6 +1118,8 @@ RendererVK::InitBatchBuffers()
 		  m_VertexBuffer[i].Get(), 0, VK_WHOLE_SIZE);
 		vk::DescriptorBufferInfo matrixInfo(
 		  m_MatrixStateBuffer[i].Get(), 0, VK_WHOLE_SIZE);
+		vk::DescriptorBufferInfo settingsInfo(
+		  m_DrawSettingsBuffer[i].Get(), 0, VK_WHOLE_SIZE);
 
 		std::vector<vk::WriteDescriptorSet> writes = {
 			vk::WriteDescriptorSet(m_DescriptorSets[i],
@@ -1120,6 +1137,14 @@ RendererVK::InitBatchBuffers()
 								   vk::DescriptorType::eStorageBuffer,
 								   nullptr,
 								   &matrixInfo,
+								   nullptr),
+			vk::WriteDescriptorSet(m_DescriptorSets[i],
+								   2,
+								   0,
+								   1,
+								   vk::DescriptorType::eStorageBuffer,
+								   nullptr,
+								   &settingsInfo,
 								   nullptr)
 		};
 
@@ -1149,7 +1174,7 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 
 			vk::WriteDescriptorSet writeDescriptor = {};
 			writeDescriptor.dstSet = m_DescriptorSets[m_CurrentFrame];
-			writeDescriptor.dstBinding = 2;
+			writeDescriptor.dstBinding = 3;
 			writeDescriptor.descriptorCount = textureInfo.size();
 			writeDescriptor.descriptorType = vk::DescriptorType::eSampledImage;
 			writeDescriptor.pImageInfo = textureInfo.data();
@@ -1159,11 +1184,23 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 
 		std::memcpy(m_VertexBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_VertexBuffer.data(),
-					sizeof(Display::Vertex) * batcher.m_VertexBuffer.size());
+					sizeof(RageSpriteVertex) * batcher.m_VertexBuffer.size());
 
 		std::memcpy(m_IndexBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_IndexBuffer.data(),
 					sizeof(uint32_t) * batcher.m_IndexBuffer.size());
+
+		uint8_t* settingsBuffer =
+		  (uint8_t*)m_DrawSettingsBuffer[m_CurrentFrame].GetMappedData();
+
+		uint32_t settingsCount = batcher.m_DrawSettingsBuffer.size();
+		std::memcpy(settingsBuffer, &settingsCount, sizeof(uint32_t));
+		settingsBuffer += sizeof(uint32_t);
+
+		std::memcpy(settingsBuffer,
+					batcher.m_DrawSettingsBuffer.data(),
+					sizeof(Display::DrawSettings) *
+					  batcher.m_DrawSettingsBuffer.size());
 	}
 
 	if (!batcher.m_MatrixStateBuffer.empty()) {
@@ -1234,7 +1271,7 @@ RendererVK::InitTextures()
 	for (int i = 0; i < FramesInFlight; i++) {
 		vk::WriteDescriptorSet writeDescriptor = {};
 		writeDescriptor.dstSet = m_DescriptorSets[i];
-		writeDescriptor.dstBinding = 3;
+		writeDescriptor.dstBinding = 4;
 		writeDescriptor.descriptorCount = Texture::PossibleSamplerCount;
 		writeDescriptor.descriptorType = vk::DescriptorType::eSampler;
 		writeDescriptor.pImageInfo = samplerImageInfo.data();
@@ -1396,10 +1433,14 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 									   1,
 									   vk::ShaderStageFlagBits::eVertex),
 		vk::DescriptorSetLayoutBinding(2,
+									   vk::DescriptorType::eStorageBuffer,
+									   1,
+									   vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(3,
 									   vk::DescriptorType::eSampledImage,
 									   GetMaxTextureCount(),
 									   vk::ShaderStageFlagBits::eFragment),
-		vk::DescriptorSetLayoutBinding(3,
+		vk::DescriptorSetLayoutBinding(4,
 									   vk::DescriptorType::eSampler,
 									   Texture::PossibleSamplerCount,
 									   vk::ShaderStageFlagBits::eFragment)
