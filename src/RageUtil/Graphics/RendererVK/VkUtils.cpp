@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include "Core/Services/Locator.hpp"
+#include <Etterna/Globals/global.h>
 
 void
 ThrowIfFail(VkResult result, const std::source_location location)
@@ -54,7 +55,7 @@ CompileShader(const std::string& sourceName,
 		auto message = std::format("Vulkan GLSL shader compilation failed: {}",
 								   result.GetErrorMessage());
 		Locator::getLogger()->error(message);
-		throw std::runtime_error(message);
+		sm_crash(message.c_str());
 	}
 
 	return { result.begin(), result.end() };

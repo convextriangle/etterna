@@ -519,9 +519,11 @@ RendererVK::InitVulkanState()
 #endif
 		.require_api_version(1, 3, 0)
 		.enable_extension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
+#ifdef __APPLE__
 		.enable_extension(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)
 		.enable_extension(
 		  VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)
+#endif
 		.build();
 	if (!instanceResult) {
 		Fail();

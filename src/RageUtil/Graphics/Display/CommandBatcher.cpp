@@ -34,8 +34,6 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 {
 	assert(drawMode != DrawMode::Invalid);
 	assert(drawMode != DrawMode::CompiledGeometry);
-	assert(m_RenderStateBuffer.size() >= 1 &&
-		   "Rendering information must be set before drawing");
 
 	// -- changing draw mode in the middle of the queue would likely require
 	// switching pipeline state objects
