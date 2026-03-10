@@ -101,8 +101,9 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/Display/RenderState.h"
   "Graphics/Display/Display.h"
   "Graphics/Display/Renderer.h"
-  "Graphics/Display/Vertex.h"
   "Graphics/Display/CompiledGeometry.h"
+  "Graphics/Display/RenderNode.h"
+
   "Graphics/RendererVK/RendererVK.h"
   "Graphics/RendererVK/VkUtils.h"
   "Graphics/RendererVK/PersistentBuffer.h"

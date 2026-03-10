@@ -273,8 +273,7 @@ Display::Display::GetRenderTarget()
 void
 Display::Display::SetRenderTarget(intptr_t uTexHandle, bool bPreserveTexture)
 {
-	m_Batcher.m_RenderTargetCommands.emplace_back(
-	  uTexHandle, bPreserveTexture, m_Batcher.m_IndexBuffer.size());
+	m_Batcher.InsertRenderTargetCommand(uTexHandle, bPreserveTexture);
 	m_CurrentRenderTarget = uTexHandle;
 }
 

@@ -34,6 +34,7 @@ class CommandBatcher
 {
   public:
 	void InsertPipelineChangeCommand(intptr_t pipeline, bool persist);
+	void InsertRenderTargetCommand(intptr_t renderTarget, bool preserveTexture);
 	void InsertSpriteDrawCommand(DrawMode drawMode,
 								 MatrixState&& matrixState,
 								 const RageSpriteVertex* vertexData,

@@ -17,6 +17,14 @@ Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
 	m_PipelineCommands.emplace_back(pipeline, m_IndexBuffer.size());
 }
 
+void
+Display::CommandBatcher::InsertRenderTargetCommand(intptr_t renderTarget,
+												   bool preserveTexture)
+{
+	m_RenderTargetCommands.emplace_back(
+	  renderTarget, preserveTexture, m_IndexBuffer.size());
+}
+
 uint32_t
 GetSamplerFlagsFromRenderState(const Display::RenderState& state)
 {
