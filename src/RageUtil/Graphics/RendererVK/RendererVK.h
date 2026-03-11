@@ -2,10 +2,23 @@
 #define RENDERER_VULKAN_H
 
 #include "RageUtil/Graphics/Display/Renderer.h"
+#include "Core/Services/Locator.hpp"
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
 #endif
+#ifdef _DEBUG || DEBUG
+#define VMA_DEBUG_LOG
+#define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
+#define VMA_DEBUG_LOG_FORMAT(format, ...)                                      \
+	do {                                                                       \
+		char buffer[256];                                                      \
+		snprintf(buffer, sizeof(buffer), format, __VA_ARGS__);                 \
+		std::string str(buffer);                                               \
+		Locator::getLogger()->warn("VulkanMemoryAllocator: " + str);           \
+	} while (false)
+#endif
+
 #include <vulkan/vulkan_raii.hpp>
 #include <vk_mem_alloc.h>
 #include <VkBootstrap.h>
@@ -97,13 +110,6 @@ class RendererVK : public Display::Renderer
 							   vk::PipelineStageFlags2 srcStageMask,
 							   vk::PipelineStageFlags2 dstStageMask,
 							   vk::raii::CommandBuffer& commandBuffer);
-	void TransitionImageLayout(uint32_t imageIndex,
-							   vk::ImageLayout oldLayout,
-							   vk::ImageLayout newLayout,
-							   vk::AccessFlags2 srcAccessMask,
-							   vk::AccessFlags2 dstAccessMask,
-							   vk::PipelineStageFlags2 srcStageMask,
-							   vk::PipelineStageFlags2 dstStageMask);
 
 	std::vector<vk::raii::Semaphore> m_PresentCompleteSemaphore;
 	std::vector<vk::raii::Semaphore> m_RenderFinishedSemaphore;

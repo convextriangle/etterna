@@ -18,8 +18,6 @@ struct PersistentBuffer
 	vk::Buffer Get() const;
 
 	void* GetMappedData() const;
-
-	~PersistentBuffer();
 };
 
 #endif

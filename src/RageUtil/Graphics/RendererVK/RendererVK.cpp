@@ -7,8 +7,6 @@
 
 // no penguin (For Now (TM))
 #include "archutils/Win32/GraphicsWindow.h"
-#include "Core/Services/Locator.hpp"
-#include <format>
 #include <numbers>
 #include <RageUtil/File/RageFileManager.h>
 #include <RageUtil/Misc/RageMath.h>
@@ -484,8 +482,53 @@ RendererVK::CreateRenderTarget(const RenderTargetParam& param,
 
 RendererVK::~RendererVK()
 {
+	if (m_Device != nullptr) {
+		m_Device.waitIdle();
+	}
+
 	for (auto& [handle, texture] : m_Textures) {
 		DestroyTexture(texture);
+	}
+
+	if (m_TextureBuffer.buffer != VK_NULL_HANDLE) {
+		vmaDestroyBuffer(
+		  m_Allocator, m_TextureBuffer.buffer, m_TextureBuffer.allocation);
+		m_TextureBuffer.buffer = VK_NULL_HANDLE;
+	}
+
+	for (int i = 0; i < FramesInFlight; i++) {
+		if (m_VertexBuffer[i].buffer != VK_NULL_HANDLE) {
+			vmaDestroyBuffer(m_Allocator,
+							 m_VertexBuffer[i].buffer,
+							 m_VertexBuffer[i].allocation);
+			m_VertexBuffer[i].buffer = VK_NULL_HANDLE;
+		}
+		if (m_IndexBuffer[i].buffer != VK_NULL_HANDLE) {
+			vmaDestroyBuffer(m_Allocator,
+							 m_IndexBuffer[i].buffer,
+							 m_IndexBuffer[i].allocation);
+			m_IndexBuffer[i].buffer = VK_NULL_HANDLE;
+		}
+		if (m_MatrixStateBuffer[i].buffer != VK_NULL_HANDLE) {
+			vmaDestroyBuffer(m_Allocator,
+							 m_MatrixStateBuffer[i].buffer,
+							 m_MatrixStateBuffer[i].allocation);
+			m_MatrixStateBuffer[i].buffer = VK_NULL_HANDLE;
+		}
+		if (m_DrawSettingsBuffer[i].buffer != VK_NULL_HANDLE) {
+			vmaDestroyBuffer(m_Allocator,
+							 m_DrawSettingsBuffer[i].buffer,
+							 m_DrawSettingsBuffer[i].allocation);
+			m_DrawSettingsBuffer[i].buffer = VK_NULL_HANDLE;
+		}
+	}
+
+	// likely the only thing that needs to be cleaned up manually (because
+	// descriptor pool should exist on descriptor sets' deletion)
+	m_DescriptorSets.clear();
+
+	if (m_Allocator != nullptr) {
+		vmaDestroyAllocator(m_Allocator);
 	}
 }
 
@@ -770,25 +813,6 @@ RendererVK::TransitionImageLayout(vk::Image& image,
 }
 
 void
-RendererVK::TransitionImageLayout(uint32_t imageIndex,
-								  vk::ImageLayout oldLayout,
-								  vk::ImageLayout newLayout,
-								  vk::AccessFlags2 srcAccessMask,
-								  vk::AccessFlags2 dstAccessMask,
-								  vk::PipelineStageFlags2 srcStageMask,
-								  vk::PipelineStageFlags2 dstStageMask)
-{
-	TransitionImageLayout(m_SwapchainImages[imageIndex],
-						  oldLayout,
-						  newLayout,
-						  srcAccessMask,
-						  dstAccessMask,
-						  srcStageMask,
-						  dstStageMask,
-						  m_CommandBuffers[m_CurrentFrame]);
-}
-
-void
 RendererVK::InitSyncStructures()
 {
 	m_PresentCompleteSemaphore.clear();
@@ -959,13 +983,15 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 			batcher.m_RenderTargetCommands.back().DrawIndexOffset);
 	}
 
-	TransitionImageLayout(imageIndex,
+	TransitionImageLayout(m_SwapchainImages[imageIndex],
 						  vk::ImageLayout::eUndefined,
 						  vk::ImageLayout::eColorAttachmentOptimal,
 						  {},
 						  vk::AccessFlagBits2::eColorAttachmentWrite,
 						  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-						  vk::PipelineStageFlagBits2::eColorAttachmentOutput);
+						  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+						  m_CommandBuffers[m_CurrentFrame]);
+
 	vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
 
 	vk::RenderingAttachmentInfo attachmentInfo{};
@@ -1000,13 +1026,14 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 
 	buffer.endRendering();
 
-	TransitionImageLayout(imageIndex,
+	TransitionImageLayout(m_SwapchainImages[imageIndex],
 						  vk::ImageLayout::eColorAttachmentOptimal,
 						  vk::ImageLayout::ePresentSrcKHR,
 						  vk::AccessFlagBits2::eColorAttachmentWrite,
 						  {},
 						  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-						  vk::PipelineStageFlagBits2::eBottomOfPipe);
+						  vk::PipelineStageFlagBits2::eBottomOfPipe,
+						  m_CommandBuffers[m_CurrentFrame]);
 	buffer.end();
 }
 
@@ -1028,7 +1055,7 @@ RendererVK::InitBatchBuffers()
 
 	vk::DescriptorPoolSize poolSizes[3] = {};
 	poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
-	poolSizes[0].descriptorCount = 2 * FramesInFlight;
+	poolSizes[0].descriptorCount = 3 * FramesInFlight;
 	poolSizes[1].type = vk::DescriptorType::eSampledImage;
 	poolSizes[1].descriptorCount = GetMaxTextureCount() * FramesInFlight;
 	poolSizes[2].type = vk::DescriptorType::eSampler;
@@ -1036,6 +1063,7 @@ RendererVK::InitBatchBuffers()
 	  Texture::PossibleSamplerCount * FramesInFlight;
 
 	vk::DescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
 	poolInfo.poolSizeCount = 3;
 	poolInfo.pPoolSizes = poolSizes;
 	poolInfo.maxSets = FramesInFlight;
@@ -1085,7 +1113,8 @@ RendererVK::InitBatchBuffers()
 		m_VertexBuffer[i].Init(m_Allocator, vertexBufferInfo, vertexAllocInfo);
 
 		vk::BufferCreateInfo drawSettingsInfo{};
-		drawSettingsInfo.size = sizeof(uint32_t) + sizeof(Display::DrawSettings) * MaxDrawCount;
+		drawSettingsInfo.size =
+		  sizeof(uint32_t) + sizeof(Display::DrawSettings) * MaxDrawCount;
 		drawSettingsInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
 		VmaAllocationCreateInfo drawSettingsAllocInfo = {};
 		drawSettingsAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;

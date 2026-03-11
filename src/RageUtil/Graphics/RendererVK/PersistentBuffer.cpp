@@ -27,10 +27,3 @@ PersistentBuffer::GetMappedData() const
 {
 	return allocInfo.pMappedData;
 }
-
-PersistentBuffer::~PersistentBuffer()
-{
-	if (buffer != VK_NULL_HANDLE && allocation != VK_NULL_HANDLE) {
-		vmaDestroyBuffer(allocator, buffer, allocation);
-	}
-}
