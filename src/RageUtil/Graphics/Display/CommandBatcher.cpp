@@ -1,6 +1,7 @@
 #include "CommandBatcher.h"
-#include <cassert>
 #include "CompiledGeometry.h"
+#include <cassert>
+#include <algorithm>
 
 void
 Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
@@ -279,6 +280,7 @@ Display::CommandBatcher::HandleDrawCommand(int indexOffset,
 	auto rtNodes = m_RenderTargetLookup.equal_range(renderState.textureHandle);
 	for (auto i = rtNodes.first; i != rtNodes.second; i++) {
 		m_RenderNodes.back().Dependencies.push_back(i->second);
+		m_NodeDependents.insert({ i->second, m_RenderNodes.size() - 1 });
 	}
 }
 
@@ -300,31 +302,45 @@ Display::CommandBatcher::Clear()
 	m_CurrentPipeline = {};
 
 	m_SortedNodes.clear();
-	m_VisitedNodes.clear();
+	m_NodeDistances.clear();
+	m_NodeDependents.clear();
+	assert(m_NodeQueue.empty());
 }
 
 void
 Display::CommandBatcher::SortRenderNodes()
 {
-	m_VisitedNodes.resize(m_RenderNodes.size());
+	// MAYBE: do a check if it's actually an acyclic graph?
+	for (int i = 0; i < m_RenderNodes.size(); i++) {
+		m_SortedNodes.emplace_back(i, UINT64_MAX);
+	}
+
 	for (size_t i = 0; i < m_RenderNodes.size(); i++) {
-		if (!m_VisitedNodes[i]) {
-			RenderNodeSearch(i);
+		if (m_RenderNodes[i].Dependencies.size() == 0) {
+			m_NodeQueue.push(i);
+			m_SortedNodes[i].second = 0;
 		}
 	}
 
-	std::reverse(m_SortedNodes.begin(), m_SortedNodes.end());
-}
+	while (!m_NodeQueue.empty()) {
+		auto currentNode = m_NodeQueue.front();
+		m_NodeQueue.pop();
 
-void
-Display::CommandBatcher::RenderNodeSearch(size_t nodeIndex)
-{
-	m_VisitedNodes[nodeIndex] = true;
-	for (auto& next : m_RenderNodes[nodeIndex].Dependencies) {
-		if (!m_VisitedNodes[next]) {
-			RenderNodeSearch(nodeIndex);
+		auto next = m_NodeDependents.equal_range(currentNode);
+		for (auto i = next.first; i != next.second; i++) {
+			if (m_SortedNodes[i->second].second == UINT64_MAX) {
+				m_SortedNodes[i->second].second =
+				  m_SortedNodes[currentNode].second + 1;
+				m_NodeQueue.push(i->second);
+			}
 		}
 	}
 
-	m_SortedNodes.push_back(nodeIndex);
+	std::stable_sort(m_SortedNodes.begin(),
+			  m_SortedNodes.end(),
+			  [](const std::pair<size_t, size_t>& lhs,
+				 const std::pair<size_t, size_t>& rhs) {
+				  return lhs.second < rhs.second;
+			  });
 }
+

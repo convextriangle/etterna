@@ -38,7 +38,6 @@ class CommandBatcher
 	void HandleDrawCommand(int indexOffset, int indexCount, const RenderState& renderState);
 	void Clear();
 	void SortRenderNodes();
-	void RenderNodeSearch(size_t nodeIndex);
 
 	std::vector<RageSpriteVertex> m_VertexBuffer;
 	std::vector<DrawSettings> m_DrawSettingsBuffer;
@@ -47,8 +46,11 @@ class CommandBatcher
 	std::vector<RenderNode> m_RenderNodes;
 	std::multimap<intptr_t, size_t> m_RenderTargetLookup;
 	std::stack<PipelineSettings> m_PipelineStack;
-	std::vector<size_t> m_SortedNodes;
-	std::vector<bool> m_VisitedNodes;
+
+	std::vector<std::pair<size_t, size_t>> m_SortedNodes;
+	std::multimap<size_t, size_t> m_NodeDependents;
+	std::queue<size_t> m_NodeQueue;
+
 	PipelineSettings m_CurrentPipeline = {};
 };
 
