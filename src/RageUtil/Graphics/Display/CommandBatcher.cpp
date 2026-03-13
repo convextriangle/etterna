@@ -4,25 +4,44 @@
 
 void
 Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
+													 intptr_t vertexShaderInfo,
+													 intptr_t fragShaderInfo,
 													 bool persist)
 {
-	assert(
-	  !persist &&
-	  "TODO: implement shader persistence (child actor shader overriding)");
-	if (m_PipelineCommands.size() &&
-		m_PipelineCommands.back().Pipeline == pipeline) {
-		return;
+	PipelineSettings settings = {};
+	if (persist) {
+		if (pipeline) {
+			m_PipelineStack.emplace(pipeline, vertexShaderInfo, fragShaderInfo);
+		} else {
+			m_PipelineStack.pop();
+		}
+		settings = m_PipelineStack.top();
+	} else {
+		if (m_PipelineStack.size()) {
+			return;
+		}
+		settings = { pipeline, vertexShaderInfo, fragShaderInfo };
 	}
 
-	m_PipelineCommands.emplace_back(pipeline, m_IndexBuffer.size());
+	if (!m_RenderNodes.size()) {
+		m_RenderNodes.emplace_back();
+	}
+
+	m_RenderNodes.back().DrawCalls.emplace_back(
+	  settings, m_IndexBuffer.size(), 0);
+
+	m_CurrentPipeline = settings;
 }
 
 void
 Display::CommandBatcher::InsertRenderTargetCommand(intptr_t renderTarget,
 												   bool preserveTexture)
 {
-	m_RenderTargetCommands.emplace_back(
-	  renderTarget, preserveTexture, m_IndexBuffer.size());
+	m_RenderNodes.emplace_back(renderTarget,
+							   preserveTexture,
+							   std::vector<DrawCall>(),
+							   std::set<size_t>());
+	m_RenderTargetLookup.insert({ renderTarget, m_RenderNodes.size() - 1 });
 }
 
 uint32_t
@@ -62,7 +81,7 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 				vertexData,
 				sizeof(RageSpriteVertex) * vertexCount);
 
-	size_t prevCount = m_IndexBuffer.size();
+	const auto prevCount = m_IndexBuffer.size();
 	switch (drawMode) {
 		case DrawMode::Triangles: {
 			m_IndexBuffer.resize(prevCount + vertexCount);
@@ -180,8 +199,10 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 			break;
 		}
 		default:
-			break;
+			throw std::runtime_error("Unknown draw command type");
 	}
+
+	HandleDrawCommand(prevCount, m_IndexBuffer.size() - prevCount, renderState);
 }
 
 void
@@ -218,6 +239,8 @@ Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
 		m_VertexBuffer.emplace_back(vertex.p, vertex.n, whiteVColor, vertex.t);
 	}
 
+	const auto prevIndexCount = m_IndexBuffer.size();
+
 	for (int i = meshInfo.iTriangleStart;
 		 i < meshInfo.iTriangleStart + meshInfo.iTriangleCount;
 		 i++) {
@@ -226,6 +249,36 @@ Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
 									geometry->m_Triangles[i].nVertexIndices[j] -
 									meshInfo.iVertexStart);
 		}
+	}
+
+	HandleDrawCommand(
+	  prevIndexCount, m_IndexBuffer.size() - prevIndexCount, renderState);
+}
+
+void
+Display::CommandBatcher::HandleDrawCommand(int indexOffset,
+										   int indexCount,
+										   const RenderState& renderState)
+{
+	assert(m_RenderNodes.size());
+	assert(m_RenderNodes.back().DrawCalls.size());
+
+	auto& call = m_RenderNodes.back().DrawCalls.back();
+
+	// if we previously filled in a different draw call, we should create a new
+	// one
+	if (call.IndexCount != 0 && call.IndexOffset != 0 &&
+		call.IndexCount + call.IndexOffset != indexOffset) {
+		m_RenderNodes.back().DrawCalls.emplace_back(
+		  m_CurrentPipeline, indexOffset, 0);
+		call = m_RenderNodes.back().DrawCalls.back();
+	}
+
+	call.IndexOffset += indexCount;
+
+	auto rtNodes = m_RenderTargetLookup.equal_range(renderState.textureHandle);
+	for (auto i = rtNodes.first; i != rtNodes.second; i++) {
+		m_RenderNodes.back().Dependencies.push_back(i->second);
 	}
 }
 
@@ -236,6 +289,42 @@ Display::CommandBatcher::Clear()
 	m_DrawSettingsBuffer.clear();
 	m_IndexBuffer.clear();
 	m_MatrixStateBuffer.clear();
-	m_RenderTargetCommands.clear();
-	m_PipelineCommands.clear();
+	m_RenderNodes.clear();
+	m_RenderTargetLookup.clear();
+
+	// std::stack has no .clear() :|
+	while (m_PipelineStack.size()) {
+		m_PipelineStack.pop();
+	}
+
+	m_CurrentPipeline = {};
+
+	m_SortedNodes.clear();
+	m_VisitedNodes.clear();
+}
+
+void
+Display::CommandBatcher::SortRenderNodes()
+{
+	m_VisitedNodes.resize(m_RenderNodes.size());
+	for (size_t i = 0; i < m_RenderNodes.size(); i++) {
+		if (!m_VisitedNodes[i]) {
+			RenderNodeSearch(i);
+		}
+	}
+
+	std::reverse(m_SortedNodes.begin(), m_SortedNodes.end());
+}
+
+void
+Display::CommandBatcher::RenderNodeSearch(size_t nodeIndex)
+{
+	m_VisitedNodes[nodeIndex] = true;
+	for (auto& next : m_RenderNodes[nodeIndex].Dependencies) {
+		if (!m_VisitedNodes[next]) {
+			RenderNodeSearch(nodeIndex);
+		}
+	}
+
+	m_SortedNodes.push_back(nodeIndex);
 }

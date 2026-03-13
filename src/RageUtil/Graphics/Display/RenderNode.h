@@ -5,9 +5,16 @@
 #include <vector>
 #include <set>
 
-struct DrawCall
+struct PipelineSettings
 {
 	intptr_t GraphicsPipeline = 0;
+	intptr_t VertexShaderArg = 0;
+	intptr_t FragShaderArg = 0;
+};
+
+struct DrawCall
+{
+	PipelineSettings Settings = {};
 	size_t IndexOffset = 0;
 	size_t IndexCount = 0;
 };
@@ -17,7 +24,7 @@ struct RenderNode
 	intptr_t RenderTarget = 0;
 	bool PreserveRenderTarget = false;
 	std::vector<DrawCall> DrawCalls;
-	std::set<size_t> Dependencies;
+	std::vector<size_t> Dependencies;
 };
 
 #endif
