@@ -1449,9 +1449,9 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	std::array<vk::PushConstantRange, 2> pushConstants = {};
 	pushConstants[0].size = sizeof(intptr_t);
 	pushConstants[0].stageFlags = vk::ShaderStageFlagBits::eVertex;
-	pushConstants[0].offset = sizeof(intptr_t);
-	pushConstants[0].size = sizeof(intptr_t);
-	pushConstants[0].stageFlags = vk::ShaderStageFlagBits::eFragment;
+	pushConstants[1].offset = sizeof(intptr_t);
+	pushConstants[1].size = sizeof(intptr_t);
+	pushConstants[1].stageFlags = vk::ShaderStageFlagBits::eFragment;
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {};
 	pipelineLayoutInfo.setLayoutCount = 1;
