@@ -26,6 +26,7 @@
 #include <map>
 #include <unordered_set>
 #include <utility>
+#include <optional>
 #include "VkUtils.h"
 #include "Texture.h"
 #include "PersistentBuffer.h"
@@ -95,6 +96,7 @@ class RendererVK : public Display::Renderer
 	vk::raii::DescriptorSetLayout m_DescriptorSetLayout = nullptr;
 	std::map<std::pair<std::string, std::string>, intptr_t> m_PipelineLookup;
 	void InitGraphicsPipeline();
+	std::vector<vk::DescriptorSetLayoutBinding> GetDescriptorBindings();
 
 	vk::raii::CommandPool m_CommandPool = nullptr;
 	void InitCommandPool();
@@ -102,7 +104,8 @@ class RendererVK : public Display::Renderer
 	std::vector<vk::raii::CommandBuffer> m_CommandBuffers;
 	void InitCommandBuffers();
 
-	void TransitionImageLayout(vk::Image& image,
+	std::optional<vk::ImageMemoryBarrier2> TransitionImageLayout(
+	  vk::Image& image,
 							   vk::ImageLayout oldLayout,
 							   vk::ImageLayout newLayout,
 							   vk::AccessFlags2 srcAccessMask,

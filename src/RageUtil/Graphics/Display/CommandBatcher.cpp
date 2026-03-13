@@ -28,8 +28,15 @@ Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
 		m_RenderNodes.emplace_back();
 	}
 
-	m_RenderNodes.back().DrawCalls.emplace_back(
-	  settings, m_IndexBuffer.size(), 0);
+	if (!m_CurrentPipeline.has_value() ||
+		std::tie(pipeline, vertexShaderInfo, fragShaderInfo) !=
+		  std::tie(m_CurrentPipeline->GraphicsPipeline,
+				   m_CurrentPipeline->VertexShaderArg,
+				   m_CurrentPipeline->FragShaderArg) ||
+		!m_RenderNodes.back().DrawCalls.size()) {
+		m_RenderNodes.back().DrawCalls.emplace_back(
+		  settings, m_IndexBuffer.size(), 0);
+	}
 
 	m_CurrentPipeline = settings;
 }
@@ -41,7 +48,7 @@ Display::CommandBatcher::InsertRenderTargetCommand(intptr_t renderTarget,
 	m_RenderNodes.emplace_back(renderTarget,
 							   preserveTexture,
 							   std::vector<DrawCall>(),
-							   std::set<size_t>());
+							   std::vector<size_t>());
 	m_RenderTargetLookup.insert({ renderTarget, m_RenderNodes.size() - 1 });
 }
 
@@ -135,7 +142,7 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 		}
 		case DrawMode::Fan: {
 			assert(vertexCount >= 3);
-			m_IndexBuffer.resize(prevCount + 3 * (vertexCount - 2));
+			m_IndexBuffer.resize(prevCount + 3 * (vertexCount - 1));
 			for (size_t i = 1; i < vertexCount - 1; i++) {
 				m_IndexBuffer[prevCount + 3 * i] = previousVertexCount;
 				m_IndexBuffer[prevCount + 3 * i + 1] = previousVertexCount + i;
@@ -261,8 +268,14 @@ Display::CommandBatcher::HandleDrawCommand(int indexOffset,
 										   int indexCount,
 										   const RenderState& renderState)
 {
-	assert(m_RenderNodes.size());
-	assert(m_RenderNodes.back().DrawCalls.size());
+	assert(m_CurrentPipeline.has_value());
+	if (!m_RenderNodes.size() || !m_RenderNodes.back().DrawCalls.size()) {
+		InsertPipelineChangeCommand(m_CurrentPipeline->GraphicsPipeline,
+									m_CurrentPipeline->VertexShaderArg,
+									m_CurrentPipeline->FragShaderArg,
+									false);
+	}
+	assert(indexCount > 0);
 
 	auto& call = m_RenderNodes.back().DrawCalls.back();
 
@@ -271,11 +284,11 @@ Display::CommandBatcher::HandleDrawCommand(int indexOffset,
 	if (call.IndexCount != 0 && call.IndexOffset != 0 &&
 		call.IndexCount + call.IndexOffset != indexOffset) {
 		m_RenderNodes.back().DrawCalls.emplace_back(
-		  m_CurrentPipeline, indexOffset, 0);
+		  *m_CurrentPipeline, indexOffset, 0);
 		call = m_RenderNodes.back().DrawCalls.back();
 	}
 
-	call.IndexOffset += indexCount;
+	call.IndexCount += indexCount;
 
 	auto rtNodes = m_RenderTargetLookup.equal_range(renderState.textureHandle);
 	for (auto i = rtNodes.first; i != rtNodes.second; i++) {
@@ -299,10 +312,9 @@ Display::CommandBatcher::Clear()
 		m_PipelineStack.pop();
 	}
 
-	m_CurrentPipeline = {};
+	m_CurrentPipeline = std::nullopt;
 
 	m_SortedNodes.clear();
-	m_NodeDistances.clear();
 	m_NodeDependents.clear();
 	assert(m_NodeQueue.empty());
 }
@@ -337,10 +349,9 @@ Display::CommandBatcher::SortRenderNodes()
 	}
 
 	std::stable_sort(m_SortedNodes.begin(),
-			  m_SortedNodes.end(),
-			  [](const std::pair<size_t, size_t>& lhs,
-				 const std::pair<size_t, size_t>& rhs) {
-				  return lhs.second < rhs.second;
-			  });
+					 m_SortedNodes.end(),
+					 [](const std::pair<size_t, size_t>& lhs,
+						const std::pair<size_t, size_t>& rhs) {
+						 return lhs.second < rhs.second;
+					 });
 }
-

@@ -5,6 +5,7 @@
 #include <stack>
 #include <string>
 #include <map>
+#include <optional>
 #include "DrawMode.h"
 #include "MatrixState.h"
 #include "RenderState.h"
@@ -51,7 +52,7 @@ class CommandBatcher
 	std::multimap<size_t, size_t> m_NodeDependents;
 	std::queue<size_t> m_NodeQueue;
 
-	PipelineSettings m_CurrentPipeline = {};
+	std::optional<PipelineSettings> m_CurrentPipeline = std::nullopt;
 };
 
 } // namespace Display

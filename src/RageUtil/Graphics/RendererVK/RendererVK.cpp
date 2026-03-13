@@ -752,6 +752,34 @@ RendererVK::InitGraphicsPipeline()
 	  FILEMAN->ResolvePath("Data/Shaders/Vulkan/fragment.glsl"));
 }
 
+std::vector<vk::DescriptorSetLayoutBinding>
+RendererVK::GetDescriptorBindings()
+{
+	return { vk::DescriptorSetLayoutBinding(0,
+											vk::DescriptorType::eStorageBuffer,
+											1,
+											vk::ShaderStageFlagBits::eVertex),
+			 vk::DescriptorSetLayoutBinding(1,
+											vk::DescriptorType::eStorageBuffer,
+											1,
+											vk::ShaderStageFlagBits::eVertex),
+			 vk::DescriptorSetLayoutBinding(2,
+											vk::DescriptorType::eStorageBuffer,
+											1,
+											vk::ShaderStageFlagBits::eVertex),
+			 // technically someone might want to access textures in vertex
+			 // shader, so switch to vk::ShaderStageFlagBits::eAllGraphics?
+			 vk::DescriptorSetLayoutBinding(3,
+											vk::DescriptorType::eSampledImage,
+											GetMaxTextureCount(),
+											vk::ShaderStageFlagBits::eFragment),
+			 vk::DescriptorSetLayoutBinding(
+			   4,
+			   vk::DescriptorType::eSampler,
+			   Texture::PossibleSamplerCount,
+			   vk::ShaderStageFlagBits::eFragment) };
+}
+
 void
 RendererVK::InitCommandPool()
 {
@@ -774,7 +802,7 @@ RendererVK::InitCommandBuffers()
 	m_CommandBuffers = vk::raii::CommandBuffers(m_Device, allocInfo);
 }
 
-void
+std::optional<vk::ImageMemoryBarrier2>
 RendererVK::TransitionImageLayout(vk::Image& image,
 								  vk::ImageLayout oldLayout,
 								  vk::ImageLayout newLayout,
@@ -784,6 +812,10 @@ RendererVK::TransitionImageLayout(vk::Image& image,
 								  vk::PipelineStageFlags2 dstStageMask,
 								  vk::raii::CommandBuffer& commandBuffer)
 {
+	if (oldLayout == newLayout) {
+		return std::nullopt;
+	}
+
 	vk::ImageMemoryBarrier2 barrier{};
 	barrier.srcStageMask = srcStageMask;
 	barrier.srcAccessMask = srcAccessMask;
@@ -804,12 +836,7 @@ RendererVK::TransitionImageLayout(vk::Image& image,
 
 	barrier.subresourceRange = range;
 
-	vk::DependencyInfo dependencyInfo{};
-	dependencyInfo.dependencyFlags = {};
-	dependencyInfo.imageMemoryBarrierCount = 1;
-	dependencyInfo.pImageMemoryBarriers = &barrier;
-
-	commandBuffer.pipelineBarrier2(dependencyInfo);
+	return barrier;
 }
 
 void
@@ -845,195 +872,173 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 	buffer.bindIndexBuffer(
 	  m_IndexBuffer[m_CurrentFrame].Get(), 0, vk::IndexType::eUint32);
 
-	size_t pipelineCommand = 0;
-	intptr_t currentPipeline = 0;
+	size_t currentNode = 0;
+	intptr_t currentPipeline = -1;
 
-	// in case there's a pipeline change at the very start
-	while (pipelineCommand < batcher.m_PipelineCommands.size() &&
-		   batcher.m_PipelineCommands[pipelineCommand].DrawIndexOffset == 0) {
-		currentPipeline = batcher.m_PipelineCommands[pipelineCommand].Pipeline;
-		++pipelineCommand;
-	}
-	intptr_t previousPipeline = -1;
+	for (size_t depth = 0; batcher.m_SortedNodes.size() &&
+						   depth <= batcher.m_SortedNodes.back().second;
+		 depth++) {
+		std::vector<vk::ImageMemoryBarrier2> barriers;
 
-	auto draw = [&](int start, int count) {
-		if (count == 0)
-			return;
-		int end = start + count;
-		int pos = start;
-		while (pos < end) {
-			int nextChange = end;
-			if (pipelineCommand < batcher.m_PipelineCommands.size()) {
-				int nextOffset =
-				  batcher.m_PipelineCommands[pipelineCommand].DrawIndexOffset;
-				if (nextOffset >= pos && nextOffset < nextChange) {
-					nextChange = nextOffset;
-				}
+		for (size_t i = currentNode; i < batcher.m_SortedNodes.size() &&
+									 batcher.m_SortedNodes[i].second == depth;
+			 i++) {
+			auto& node = batcher.m_RenderNodes[i];
+			bool swapchain = node.RenderTarget == 0;
+			auto& image = swapchain ? m_SwapchainImages[imageIndex]
+									: m_Textures[node.RenderTarget].image;
+			auto oldLayout = swapchain
+							   ? vk::ImageLayout::eUndefined
+							   : m_Textures[node.RenderTarget].currentLayout;
+			auto oldAccessMask = swapchain
+								   ? vk::AccessFlags2()
+								   : vk::AccessFlagBits2::eColorAttachmentWrite;
+			auto oldStageMask =
+			  swapchain ? vk::PipelineStageFlagBits2::eColorAttachmentOutput
+						: vk::PipelineStageFlagBits2::eFragmentShader;
+
+			auto barrier = TransitionImageLayout(
+			  image,
+			  oldLayout,
+			  vk::ImageLayout::eColorAttachmentOptimal,
+			  oldAccessMask,
+			  vk::AccessFlagBits2::eColorAttachmentWrite,
+			  oldStageMask,
+			  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			  buffer);
+
+			if (!swapchain) {
+				m_Textures[node.RenderTarget].currentLayout =
+				  vk::ImageLayout::eColorAttachmentOptimal;
 			}
 
-			while (
-			  pipelineCommand < batcher.m_PipelineCommands.size() &&
-			  batcher.m_PipelineCommands[pipelineCommand].DrawIndexOffset ==
-				pos) {
-				currentPipeline =
-				  batcher.m_PipelineCommands[pipelineCommand].Pipeline;
-				++pipelineCommand;
+			if (barrier.has_value()) {
+				barriers.push_back(*barrier);
+			}
+		}
+
+		vk::DependencyInfo deps = {};
+		deps.imageMemoryBarrierCount = barriers.size();
+		deps.pImageMemoryBarriers = barriers.data();
+		buffer.pipelineBarrier2(deps);
+		barriers.clear();
+
+		for (size_t i = currentNode; i < batcher.m_SortedNodes.size() &&
+									 batcher.m_SortedNodes[i].second == depth;
+			 i++) {
+			auto& node = batcher.m_RenderNodes[i];
+			bool swapchain = node.RenderTarget == 0;
+			auto extent =
+			  swapchain ? m_SwapchainExtent
+						: vk::Extent2D(m_Textures[node.RenderTarget].width,
+									   m_Textures[node.RenderTarget].height);
+
+			buffer.setViewport(0,
+							   vk::Viewport(0.0f,
+											static_cast<float>(extent.height),
+											static_cast<float>(extent.width),
+											-static_cast<float>(extent.height),
+											0.0f,
+											1.0f));
+			buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
+
+			vk::RenderingAttachmentInfo colorInfo{};
+			colorInfo.imageView = swapchain
+									? m_SwapchainImageViews[imageIndex]
+									: m_Textures[node.RenderTarget].view;
+			colorInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+			colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
+
+			if (node.PreserveRenderTarget) {
+				colorInfo.loadOp = vk::AttachmentLoadOp::eLoad;
+			} else {
+				colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
+				colorInfo.clearValue =
+				  vk::ClearColorValue(0.0f, 0.0f, 0.0f, 0.0f);
 			}
 
-			if (pos < nextChange) {
-				if (currentPipeline != previousPipeline) {
+			vk::RenderingInfo renderInfo{};
+			renderInfo.renderArea = vk::Rect2D{ { 0, 0 }, extent };
+			renderInfo.layerCount = 1;
+			renderInfo.colorAttachmentCount = 1;
+			renderInfo.pColorAttachments = &colorInfo;
+
+			buffer.beginRendering(renderInfo);
+
+			for (auto& call : node.DrawCalls) {
+				if (call.Settings.GraphicsPipeline != currentPipeline) {
+					currentPipeline = call.Settings.GraphicsPipeline;
+
 					auto& pipeline = m_Pipelines[currentPipeline];
 					buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
 										pipeline.GraphicsPipeline);
-					previousPipeline = currentPipeline;
 				}
 
-				buffer.drawIndexed(nextChange - pos, 1, pos, 0, 0);
-				pos = nextChange;
+				// TODO: make push constants useful by adding a shader custom
+				// arg buffer and pointing Settings.*Arg at its buffer device
+				// address
+
+				if (call.Settings.VertexShaderArg != 0) {
+					buffer.pushConstants<intptr_t>(
+					  m_Pipelines[0].PipelineLayout,
+					  vk::ShaderStageFlagBits::eVertex,
+					  0,
+					  { call.Settings.VertexShaderArg });
+				}
+				if (call.Settings.FragShaderArg != 0) {
+					buffer.pushConstants<intptr_t>(
+					  m_Pipelines[0].PipelineLayout,
+					  vk::ShaderStageFlagBits::eFragment,
+					  sizeof(intptr_t),
+					  { call.Settings.FragShaderArg });
+				}
+
+				buffer.drawIndexed(call.IndexCount, 1, call.IndexOffset, 0, 0);
+			}
+
+			buffer.endRendering();
+		}
+
+		for (size_t& i = currentNode; i < batcher.m_SortedNodes.size() &&
+									  batcher.m_SortedNodes[i].second == depth;
+			 i++) {
+			auto& node = batcher.m_RenderNodes[i];
+			bool swapchain = node.RenderTarget == 0;
+
+			auto& image = swapchain ? m_SwapchainImages[imageIndex]
+									: m_Textures[node.RenderTarget].image;
+			auto oldLayout = swapchain
+							   ? vk::ImageLayout::eColorAttachmentOptimal
+							   : m_Textures[node.RenderTarget].currentLayout;
+			auto newLayout = swapchain
+							   ? vk::ImageLayout::ePresentSrcKHR
+							   : vk::ImageLayout::eShaderReadOnlyOptimal;
+			auto newAccessMask =
+			  swapchain ? vk::AccessFlags2() : vk::AccessFlagBits2::eShaderRead;
+			auto newStageMask = swapchain
+								  ? vk::PipelineStageFlagBits2::eBottomOfPipe
+								  : vk::PipelineStageFlagBits2::eFragmentShader;
+
+			auto barrier = TransitionImageLayout(
+			  image,
+			  oldLayout,
+			  newLayout,
+			  vk::AccessFlagBits2::eColorAttachmentWrite,
+			  newAccessMask,
+			  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			  newStageMask,
+			  buffer);
+
+			if (barrier.has_value()) {
+				barriers.push_back(*barrier);
 			}
 		}
-	};
 
-	std::vector<std::pair<int, int>> drawsToScreen;
-	if (batcher.m_RenderTargetCommands.size() &&
-		batcher.m_RenderTargetCommands[0].DrawIndexOffset > 0) {
-		drawsToScreen.emplace_back(
-		  0, batcher.m_RenderTargetCommands[0].DrawIndexOffset);
-	} else if (!batcher.m_RenderTargetCommands.size()) {
-		drawsToScreen.emplace_back(0, batcher.m_IndexBuffer.size());
+		deps.imageMemoryBarrierCount = barriers.size();
+		deps.pImageMemoryBarriers = barriers.data();
+		buffer.pipelineBarrier2(deps);
 	}
 
-	// assume every render target is reset after use
-	assert(batcher.m_RenderTargetCommands.size() % 2 == 0);
-
-	for (int i = 0; i < (int)batcher.m_RenderTargetCommands.size() - 1; i++) {
-		const auto& command = batcher.m_RenderTargetCommands[i];
-		const auto& nextCommand = batcher.m_RenderTargetCommands[i + 1];
-		if (command.RenderTarget == 0) {
-			drawsToScreen.emplace_back(command.DrawIndexOffset,
-									   nextCommand.DrawIndexOffset -
-										 command.DrawIndexOffset);
-			continue;
-		}
-
-		auto& texture = m_Textures[command.RenderTarget];
-		TransitionImageLayout(
-		  texture.image,
-		  texture.currentLayout,
-		  vk::ImageLayout::eColorAttachmentOptimal,
-		  vk::AccessFlagBits2::eShaderRead,
-		  vk::AccessFlagBits2::eColorAttachmentWrite,
-		  vk::PipelineStageFlagBits2::eFragmentShader,
-		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-		  buffer);
-		texture.currentLayout = vk::ImageLayout::eColorAttachmentOptimal;
-
-		vk::RenderingAttachmentInfo colorInfo{};
-		colorInfo.imageView = texture.view;
-		colorInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-		colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
-		if (command.PreserveTexture) {
-			colorInfo.loadOp = vk::AttachmentLoadOp::eLoad;
-		} else {
-			colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
-			colorInfo.clearValue = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 0.0f);
-		}
-		vk::RenderingInfo renderInfo{};
-		renderInfo.renderArea =
-		  vk::Rect2D{ { 0, 0 }, { texture.width, texture.height } };
-		renderInfo.layerCount = 1;
-		renderInfo.colorAttachmentCount = 1;
-		renderInfo.pColorAttachments = &colorInfo;
-
-		buffer.beginRendering(renderInfo);
-
-		buffer.setViewport(0,
-						   vk::Viewport(0.0f,
-										static_cast<float>(texture.height),
-										static_cast<float>(texture.width),
-										-static_cast<float>(texture.height),
-										0.0f,
-										1.0f));
-		buffer.setScissor(
-		  0,
-		  vk::Rect2D(vk::Offset2D(0, 0),
-					 vk::Extent2D(texture.width, texture.height)));
-
-		draw(command.DrawIndexOffset,
-			 nextCommand.DrawIndexOffset - command.DrawIndexOffset);
-
-		buffer.endRendering();
-
-		TransitionImageLayout(
-		  texture.image,
-		  texture.currentLayout,
-		  vk::ImageLayout::eShaderReadOnlyOptimal,
-		  vk::AccessFlagBits2::eColorAttachmentWrite,
-		  vk::AccessFlagBits2::eShaderRead,
-		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-		  vk::PipelineStageFlagBits2::eFragmentShader,
-		  buffer);
-		texture.currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-	}
-
-	if (batcher.m_RenderTargetCommands.size()) {
-		drawsToScreen.emplace_back(
-		  batcher.m_RenderTargetCommands.back().DrawIndexOffset,
-		  batcher.m_IndexBuffer.size() -
-			batcher.m_RenderTargetCommands.back().DrawIndexOffset);
-	}
-
-	TransitionImageLayout(m_SwapchainImages[imageIndex],
-						  vk::ImageLayout::eUndefined,
-						  vk::ImageLayout::eColorAttachmentOptimal,
-						  {},
-						  vk::AccessFlagBits2::eColorAttachmentWrite,
-						  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-						  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-						  m_CommandBuffers[m_CurrentFrame]);
-
-	vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
-
-	vk::RenderingAttachmentInfo attachmentInfo{};
-	attachmentInfo.imageView = m_SwapchainImageViews[imageIndex];
-	attachmentInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-	attachmentInfo.loadOp = vk::AttachmentLoadOp::eClear;
-	attachmentInfo.storeOp = vk::AttachmentStoreOp::eStore;
-	attachmentInfo.clearValue = clearColor;
-
-	vk::RenderingInfo renderingInfo{};
-	renderingInfo.renderArea = { .offset = { 0, 0 },
-								 .extent = m_SwapchainExtent };
-	renderingInfo.layerCount = 1;
-	renderingInfo.colorAttachmentCount = 1;
-	renderingInfo.pColorAttachments = &attachmentInfo;
-
-	buffer.beginRendering(renderingInfo);
-
-	buffer.setViewport(
-	  0,
-	  vk::Viewport(0.0f,
-				   static_cast<float>(m_SwapchainExtent.height),
-				   static_cast<float>(m_SwapchainExtent.width),
-				   -static_cast<float>(m_SwapchainExtent.height),
-				   0.0f,
-				   1.0f));
-	buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), m_SwapchainExtent));
-
-	for (auto& [offset, count] : drawsToScreen) {
-		draw(offset, count);
-	}
-
-	buffer.endRendering();
-
-	TransitionImageLayout(m_SwapchainImages[imageIndex],
-						  vk::ImageLayout::eColorAttachmentOptimal,
-						  vk::ImageLayout::ePresentSrcKHR,
-						  vk::AccessFlagBits2::eColorAttachmentWrite,
-						  {},
-						  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-						  vk::PipelineStageFlagBits2::eBottomOfPipe,
-						  m_CommandBuffers[m_CurrentFrame]);
 	buffer.end();
 }
 
@@ -1069,30 +1074,10 @@ RendererVK::InitBatchBuffers()
 	poolInfo.maxSets = FramesInFlight;
 	m_DescriptorPool = vk::raii::DescriptorPool(m_Device, poolInfo);
 
-	std::vector<vk::DescriptorSetLayoutBinding> bindings = {
-		vk::DescriptorSetLayoutBinding(0,
-									   vk::DescriptorType::eStorageBuffer,
-									   1,
-									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(1,
-									   vk::DescriptorType::eStorageBuffer,
-									   1,
-									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(2,
-									   vk::DescriptorType::eStorageBuffer,
-									   1,
-									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(3,
-									   vk::DescriptorType::eSampledImage,
-									   GetMaxTextureCount(),
-									   vk::ShaderStageFlagBits::eFragment),
-		vk::DescriptorSetLayoutBinding(4,
-									   vk::DescriptorType::eSampler,
-									   Texture::PossibleSamplerCount,
-									   vk::ShaderStageFlagBits::eFragment)
-	};
-
+	std::vector<vk::DescriptorSetLayoutBinding> bindings =
+	  GetDescriptorBindings();
 	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
+
 	m_DescriptorSetLayout = vk::raii::DescriptorSetLayout(m_Device, layoutInfo);
 
 	std::vector<vk::DescriptorSetLayout> layouts(FramesInFlight,
@@ -1452,39 +1437,27 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	colorBlending.attachmentCount = 1;
 	colorBlending.pAttachments = &colorBlendAttachment;
 
-	std::vector<vk::DescriptorSetLayoutBinding> bindings = {
-		vk::DescriptorSetLayoutBinding(0,
-									   vk::DescriptorType::eStorageBuffer,
-									   1,
-									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(1,
-									   vk::DescriptorType::eStorageBuffer,
-									   1,
-									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(2,
-									   vk::DescriptorType::eStorageBuffer,
-									   1,
-									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(3,
-									   vk::DescriptorType::eSampledImage,
-									   GetMaxTextureCount(),
-									   vk::ShaderStageFlagBits::eFragment),
-		vk::DescriptorSetLayoutBinding(4,
-									   vk::DescriptorType::eSampler,
-									   Texture::PossibleSamplerCount,
-									   vk::ShaderStageFlagBits::eFragment)
-	};
-
-	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
 	if (m_DescriptorSetLayout == nullptr) {
+		std::vector<vk::DescriptorSetLayoutBinding> bindings =
+		  GetDescriptorBindings();
+		vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
+
 		m_DescriptorSetLayout =
 		  vk::raii::DescriptorSetLayout(m_Device, layoutInfo);
 	}
 
+	std::array<vk::PushConstantRange, 2> pushConstants = {};
+	pushConstants[0].size = sizeof(intptr_t);
+	pushConstants[0].stageFlags = vk::ShaderStageFlagBits::eVertex;
+	pushConstants[0].offset = sizeof(intptr_t);
+	pushConstants[0].size = sizeof(intptr_t);
+	pushConstants[0].stageFlags = vk::ShaderStageFlagBits::eFragment;
+
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {};
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &*m_DescriptorSetLayout;
-	pipelineLayoutInfo.pushConstantRangeCount = 0;
+	pipelineLayoutInfo.pushConstantRangeCount = 2;
+	pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
 
 	info.PipelineLayout =
 	  vk::raii::PipelineLayout(m_Device, pipelineLayoutInfo);

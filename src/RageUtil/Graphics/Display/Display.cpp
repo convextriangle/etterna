@@ -61,6 +61,7 @@ Display::Display::BeginFrame()
 void
 Display::Display::EndFrame()
 {
+	m_Batcher.SortRenderNodes();
 	m_Renderer->OnRender(GetActualVideoModeParams(), m_Batcher);
 	RageDisplay::EndFrame();
 }
@@ -331,7 +332,7 @@ Display::Display::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 void
 Display::Display::SetGraphicsPipeline(intptr_t pipeline, bool persist)
 {
-	m_Batcher.InsertPipelineChangeCommand(pipeline, persist);
+	m_Batcher.InsertPipelineChangeCommand(pipeline, 0, 0, persist);
 }
 
 #pragma region Unsupported / old graphics API functions
