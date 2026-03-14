@@ -213,7 +213,9 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	barrier.subresourceRange.baseMipLevel = 0;
 	barrier.subresourceRange.levelCount = 1;
 	barrier.subresourceRange.layerCount = 1;
-	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eHost,
+	copyBuffer.pipelineBarrier(texture.initialized
+								 ? vk::PipelineStageFlagBits::eFragmentShader
+								 : vk::PipelineStageFlagBits::eHost,
 							   vk::PipelineStageFlagBits::eTransfer,
 							   {},
 							   {},
@@ -802,7 +804,7 @@ RendererVK::InitCommandBuffers()
 	m_CommandBuffers = vk::raii::CommandBuffers(m_Device, allocInfo);
 }
 
-std::optional<vk::ImageMemoryBarrier2>
+void
 RendererVK::TransitionImageLayout(vk::Image& image,
 								  vk::ImageLayout oldLayout,
 								  vk::ImageLayout newLayout,
@@ -813,7 +815,7 @@ RendererVK::TransitionImageLayout(vk::Image& image,
 								  vk::raii::CommandBuffer& commandBuffer)
 {
 	if (oldLayout == newLayout) {
-		return std::nullopt;
+		return;
 	}
 
 	vk::ImageMemoryBarrier2 barrier{};
@@ -836,7 +838,12 @@ RendererVK::TransitionImageLayout(vk::Image& image,
 
 	barrier.subresourceRange = range;
 
-	return barrier;
+	vk::DependencyInfo dependencyInfo{};
+	dependencyInfo.dependencyFlags = {};
+	dependencyInfo.imageMemoryBarrierCount = 1;
+	dependencyInfo.pImageMemoryBarriers = &barrier;
+
+	commandBuffer.pipelineBarrier2(dependencyInfo);
 }
 
 void
@@ -849,10 +856,12 @@ RendererVK::InitSyncStructures()
 	for (size_t i = 0; i < FramesInFlight; i++) {
 		m_PresentCompleteSemaphore.emplace_back(m_Device,
 												vk::SemaphoreCreateInfo());
-		m_RenderFinishedSemaphore.emplace_back(m_Device,
-											   vk::SemaphoreCreateInfo());
 		m_InFlightFence.emplace_back(
 		  m_Device, vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+	}
+	for (size_t i = 0; i < m_SwapchainImages.size(); i++) {
+		m_RenderFinishedSemaphore.emplace_back(m_Device,
+											   vk::SemaphoreCreateInfo());
 	}
 }
 
@@ -868,175 +877,117 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 							  0,
 							  { *m_DescriptorSets[m_CurrentFrame] },
 							  nullptr);
-
 	buffer.bindIndexBuffer(
 	  m_IndexBuffer[m_CurrentFrame].Get(), 0, vk::IndexType::eUint32);
 
-	size_t currentNode = 0;
 	intptr_t currentPipeline = -1;
 
-	for (size_t depth = 0; batcher.m_SortedNodes.size() &&
-						   depth <= batcher.m_SortedNodes.back().second;
-		 depth++) {
-		std::vector<vk::ImageMemoryBarrier2> barriers;
+	for (auto& node : batcher.m_RenderNodes) {
+		bool swapchain = node.RenderTarget == 0;
 
-		for (size_t i = currentNode; i < batcher.m_SortedNodes.size() &&
-									 batcher.m_SortedNodes[i].second == depth;
-			 i++) {
-			auto& node = batcher.m_RenderNodes[i];
-			bool swapchain = node.RenderTarget == 0;
-			auto& image = swapchain ? m_SwapchainImages[imageIndex]
-									: m_Textures[node.RenderTarget].image;
-			auto oldLayout = swapchain
-							   ? vk::ImageLayout::eUndefined
-							   : m_Textures[node.RenderTarget].currentLayout;
-			auto oldAccessMask = swapchain
-								   ? vk::AccessFlags2()
-								   : vk::AccessFlagBits2::eColorAttachmentWrite;
-			auto oldStageMask =
-			  swapchain ? vk::PipelineStageFlagBits2::eColorAttachmentOutput
-						: vk::PipelineStageFlagBits2::eFragmentShader;
-
-			auto barrier = TransitionImageLayout(
-			  image,
-			  oldLayout,
-			  vk::ImageLayout::eColorAttachmentOptimal,
-			  oldAccessMask,
-			  vk::AccessFlagBits2::eColorAttachmentWrite,
-			  oldStageMask,
-			  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-			  buffer);
-
-			if (!swapchain) {
-				m_Textures[node.RenderTarget].currentLayout =
-				  vk::ImageLayout::eColorAttachmentOptimal;
-			}
-
-			if (barrier.has_value()) {
-				barriers.push_back(*barrier);
-			}
-		}
-
-		vk::DependencyInfo deps = {};
-		deps.imageMemoryBarrierCount = barriers.size();
-		deps.pImageMemoryBarriers = barriers.data();
-		buffer.pipelineBarrier2(deps);
-		barriers.clear();
-
-		for (size_t i = currentNode; i < batcher.m_SortedNodes.size() &&
-									 batcher.m_SortedNodes[i].second == depth;
-			 i++) {
-			auto& node = batcher.m_RenderNodes[i];
-			bool swapchain = node.RenderTarget == 0;
-			auto extent =
-			  swapchain ? m_SwapchainExtent
+		auto image = swapchain ? m_SwapchainImages[imageIndex]
+							   : m_Textures[node.RenderTarget].image;
+		auto view = swapchain ? m_SwapchainImageViews[imageIndex]
+							  : m_Textures[node.RenderTarget].view;
+		auto extent = swapchain
+						? m_SwapchainExtent
 						: vk::Extent2D(m_Textures[node.RenderTarget].width,
 									   m_Textures[node.RenderTarget].height);
 
-			buffer.setViewport(0,
-							   vk::Viewport(0.0f,
-											static_cast<float>(extent.height),
-											static_cast<float>(extent.width),
-											-static_cast<float>(extent.height),
-											0.0f,
-											1.0f));
-			buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
+		TransitionImageLayout(
+		  image,
+		  swapchain ? vk::ImageLayout::eUndefined
+					: m_Textures[node.RenderTarget].currentLayout,
+		  vk::ImageLayout::eColorAttachmentOptimal,
+		  swapchain ? vk::AccessFlags2() : vk::AccessFlagBits2::eShaderRead,
+		  vk::AccessFlagBits2::eColorAttachmentWrite |
+			vk::AccessFlagBits2::eColorAttachmentRead,
+		  swapchain ? vk::PipelineStageFlagBits2::eColorAttachmentOutput
+					: vk::PipelineStageFlagBits2::eFragmentShader,
+		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+		  buffer);
 
-			vk::RenderingAttachmentInfo colorInfo{};
-			colorInfo.imageView = swapchain
-									? m_SwapchainImageViews[imageIndex]
-									: m_Textures[node.RenderTarget].view;
-			colorInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-			colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
-
-			if (node.PreserveRenderTarget) {
-				colorInfo.loadOp = vk::AttachmentLoadOp::eLoad;
-			} else {
-				colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
-				colorInfo.clearValue =
-				  vk::ClearColorValue(0.0f, 0.0f, 0.0f, 0.0f);
-			}
-
-			vk::RenderingInfo renderInfo{};
-			renderInfo.renderArea = vk::Rect2D{ { 0, 0 }, extent };
-			renderInfo.layerCount = 1;
-			renderInfo.colorAttachmentCount = 1;
-			renderInfo.pColorAttachments = &colorInfo;
-
-			buffer.beginRendering(renderInfo);
-
-			for (auto& call : node.DrawCalls) {
-				if (call.Settings.GraphicsPipeline != currentPipeline) {
-					currentPipeline = call.Settings.GraphicsPipeline;
-
-					auto& pipeline = m_Pipelines[currentPipeline];
-					buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
-										pipeline.GraphicsPipeline);
-				}
-
-				// TODO: make push constants useful by adding a shader custom
-				// arg buffer and pointing Settings.*Arg at its buffer device
-				// address
-
-				if (call.Settings.VertexShaderArg != 0) {
-					buffer.pushConstants<intptr_t>(
-					  m_Pipelines[0].PipelineLayout,
-					  vk::ShaderStageFlagBits::eVertex,
-					  0,
-					  { call.Settings.VertexShaderArg });
-				}
-				if (call.Settings.FragShaderArg != 0) {
-					buffer.pushConstants<intptr_t>(
-					  m_Pipelines[0].PipelineLayout,
-					  vk::ShaderStageFlagBits::eFragment,
-					  sizeof(intptr_t),
-					  { call.Settings.FragShaderArg });
-				}
-
-				buffer.drawIndexed(call.IndexCount, 1, call.IndexOffset, 0, 0);
-			}
-
-			buffer.endRendering();
+		if (!swapchain) {
+			m_Textures[node.RenderTarget].currentLayout =
+			  vk::ImageLayout::eColorAttachmentOptimal;
 		}
 
-		for (size_t& i = currentNode; i < batcher.m_SortedNodes.size() &&
-									  batcher.m_SortedNodes[i].second == depth;
-			 i++) {
-			auto& node = batcher.m_RenderNodes[i];
-			bool swapchain = node.RenderTarget == 0;
+		vk::RenderingAttachmentInfo colorInfo{};
+		colorInfo.imageView = view;
+		colorInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+		colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
+		if (node.PreserveRenderTarget && !swapchain) {
+			colorInfo.loadOp = vk::AttachmentLoadOp::eLoad;
+		} else {
+			colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
+			colorInfo.clearValue = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 0.0f);
+		}
+		vk::RenderingInfo renderInfo{};
+		renderInfo.renderArea =
+		  vk::Rect2D{ { 0, 0 }, { extent.width, extent.height } };
+		renderInfo.layerCount = 1;
+		renderInfo.colorAttachmentCount = 1;
+		renderInfo.pColorAttachments = &colorInfo;
 
-			auto& image = swapchain ? m_SwapchainImages[imageIndex]
-									: m_Textures[node.RenderTarget].image;
-			auto oldLayout = swapchain
-							   ? vk::ImageLayout::eColorAttachmentOptimal
-							   : m_Textures[node.RenderTarget].currentLayout;
-			auto newLayout = swapchain
-							   ? vk::ImageLayout::ePresentSrcKHR
-							   : vk::ImageLayout::eShaderReadOnlyOptimal;
-			auto newAccessMask =
-			  swapchain ? vk::AccessFlags2() : vk::AccessFlagBits2::eShaderRead;
-			auto newStageMask = swapchain
-								  ? vk::PipelineStageFlagBits2::eBottomOfPipe
-								  : vk::PipelineStageFlagBits2::eFragmentShader;
+		buffer.setViewport(0,
+						   vk::Viewport(0.0f,
+										static_cast<float>(extent.height),
+										static_cast<float>(extent.width),
+										-static_cast<float>(extent.height),
+										0.0f,
+										1.0f));
+		buffer.setScissor(
+		  0,
+		  vk::Rect2D(vk::Offset2D(0, 0),
+					 vk::Extent2D(extent.width, extent.height)));
 
-			auto barrier = TransitionImageLayout(
-			  image,
-			  oldLayout,
-			  newLayout,
-			  vk::AccessFlagBits2::eColorAttachmentWrite,
-			  newAccessMask,
-			  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-			  newStageMask,
-			  buffer);
+		buffer.beginRendering(renderInfo);
 
-			if (barrier.has_value()) {
-				barriers.push_back(*barrier);
+		for (auto& call : node.DrawCalls) {
+			if (call.Settings.GraphicsPipeline != currentPipeline) {
+				currentPipeline = call.Settings.GraphicsPipeline;
+				buffer.bindPipeline(
+				  vk::PipelineBindPoint::eGraphics,
+				  m_Pipelines[currentPipeline].GraphicsPipeline);
 			}
+
+			if (call.Settings.VertexShaderArg != 0) {
+				buffer.pushConstants<intptr_t>(
+				  *m_Pipelines[0].PipelineLayout,
+				  vk::ShaderStageFlagBits::eVertex,
+				  0,
+				  { call.Settings.VertexShaderArg });
+			}
+			if (call.Settings.FragShaderArg != 0) {
+				buffer.pushConstants<intptr_t>(
+				  *m_Pipelines[0].PipelineLayout,
+				  vk::ShaderStageFlagBits::eFragment,
+				  sizeof(intptr_t),
+				  { call.Settings.FragShaderArg });
+			}
+
+			buffer.drawIndexed(call.IndexCount, 1, call.IndexOffset, 0, 0);
 		}
 
-		deps.imageMemoryBarrierCount = barriers.size();
-		deps.pImageMemoryBarriers = barriers.data();
-		buffer.pipelineBarrier2(deps);
+		buffer.endRendering();
+
+		TransitionImageLayout(
+		  image,
+		  swapchain ? vk::ImageLayout::eColorAttachmentOptimal
+					: m_Textures[node.RenderTarget].currentLayout,
+		  swapchain ? vk::ImageLayout::ePresentSrcKHR
+					: vk::ImageLayout::eShaderReadOnlyOptimal,
+		  vk::AccessFlagBits2::eColorAttachmentWrite,
+		  swapchain ? vk::AccessFlags2() : vk::AccessFlagBits2::eShaderRead,
+		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+		  swapchain ? vk::PipelineStageFlagBits2::eBottomOfPipe
+					: vk::PipelineStageFlagBits2::eFragmentShader,
+		  buffer);
+
+		if (!swapchain) {
+			m_Textures[node.RenderTarget].currentLayout =
+			  vk::ImageLayout::eShaderReadOnlyOptimal;
+		}
 	}
 
 	buffer.end();

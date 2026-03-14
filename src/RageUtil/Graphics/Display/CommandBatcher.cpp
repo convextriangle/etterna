@@ -26,15 +26,18 @@ Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
 
 	if (!m_RenderNodes.size()) {
 		m_RenderNodes.emplace_back();
+		m_RenderNodes.back().DrawCalls.emplace_back(
+		  settings, m_IndexBuffer.size(), 0);
+		m_CurrentNodeIndex = 0;
+		m_SwapchainNodeIndex = 0;
+		m_CurrentPipeline = settings;
 	}
 
-	if (!m_CurrentPipeline.has_value() ||
-		std::tie(pipeline, vertexShaderInfo, fragShaderInfo) !=
+	if (std::tie(pipeline, vertexShaderInfo, fragShaderInfo) !=
 		  std::tie(m_CurrentPipeline->GraphicsPipeline,
 				   m_CurrentPipeline->VertexShaderArg,
-				   m_CurrentPipeline->FragShaderArg) ||
-		!m_RenderNodes.back().DrawCalls.size()) {
-		m_RenderNodes.back().DrawCalls.emplace_back(
+				   m_CurrentPipeline->FragShaderArg)) {
+		m_RenderNodes[m_CurrentNodeIndex].DrawCalls.emplace_back(
 		  settings, m_IndexBuffer.size(), 0);
 	}
 
@@ -45,11 +48,22 @@ void
 Display::CommandBatcher::InsertRenderTargetCommand(intptr_t renderTarget,
 												   bool preserveTexture)
 {
-	m_RenderNodes.emplace_back(renderTarget,
-							   preserveTexture,
-							   std::vector<DrawCall>(),
-							   std::vector<size_t>());
-	m_RenderTargetLookup.insert({ renderTarget, m_RenderNodes.size() - 1 });
+	if (renderTarget == 0) {
+		if (!m_SwapchainNodeIndex.has_value()) {
+			m_RenderNodes.emplace_back(renderTarget,
+									   preserveTexture,
+									   std::vector<DrawCall>());
+			m_SwapchainNodeIndex = m_RenderNodes.size() - 1;
+		}
+		m_CurrentNodeIndex = *m_SwapchainNodeIndex;
+		m_RenderNodes[m_CurrentNodeIndex].PreserveRenderTarget =
+		  preserveTexture;
+	} else {
+		m_RenderNodes.emplace_back(renderTarget,
+								   preserveTexture,
+								   std::vector<DrawCall>());
+		m_CurrentNodeIndex = m_RenderNodes.size() - 1;
+	}
 }
 
 uint32_t
@@ -268,33 +282,31 @@ Display::CommandBatcher::HandleDrawCommand(int indexOffset,
 										   int indexCount,
 										   const RenderState& renderState)
 {
-	assert(m_CurrentPipeline.has_value());
-	if (!m_RenderNodes.size() || !m_RenderNodes.back().DrawCalls.size()) {
-		InsertPipelineChangeCommand(m_CurrentPipeline->GraphicsPipeline,
-									m_CurrentPipeline->VertexShaderArg,
-									m_CurrentPipeline->FragShaderArg,
-									false);
-	}
 	assert(indexCount > 0);
+	assert(m_CurrentPipeline.has_value());
+	if (!m_RenderNodes.size()) {
+		m_RenderNodes.emplace_back(0, false, std::vector<DrawCall>());
+		m_CurrentNodeIndex = 0;
+	}
 
-	auto& call = m_RenderNodes.back().DrawCalls.back();
+	auto& node = m_RenderNodes[m_CurrentNodeIndex];
+	if (!node.DrawCalls.size()) {
+		node.DrawCalls.emplace_back(
+		  *m_CurrentPipeline, m_IndexBuffer.size(), 0);
+	}
+
+	auto& call = node.DrawCalls.back();
 
 	// if we previously filled in a different draw call, we should create a new
 	// one
-	if (call.IndexCount != 0 && call.IndexOffset != 0 &&
+	if (call.IndexCount != 0 &&
 		call.IndexCount + call.IndexOffset != indexOffset) {
-		m_RenderNodes.back().DrawCalls.emplace_back(
+		node.DrawCalls.emplace_back(
 		  *m_CurrentPipeline, indexOffset, 0);
-		call = m_RenderNodes.back().DrawCalls.back();
+		call = node.DrawCalls.back();
 	}
 
 	call.IndexCount += indexCount;
-
-	auto rtNodes = m_RenderTargetLookup.equal_range(renderState.textureHandle);
-	for (auto i = rtNodes.first; i != rtNodes.second; i++) {
-		m_RenderNodes.back().Dependencies.push_back(i->second);
-		m_NodeDependents.insert({ i->second, m_RenderNodes.size() - 1 });
-	}
 }
 
 void
@@ -305,7 +317,6 @@ Display::CommandBatcher::Clear()
 	m_IndexBuffer.clear();
 	m_MatrixStateBuffer.clear();
 	m_RenderNodes.clear();
-	m_RenderTargetLookup.clear();
 
 	// std::stack has no .clear() :|
 	while (m_PipelineStack.size()) {
@@ -313,6 +324,8 @@ Display::CommandBatcher::Clear()
 	}
 
 	m_CurrentPipeline = std::nullopt;
+	m_SwapchainNodeIndex = std::nullopt;
+	m_CurrentNodeIndex = 0;
 
 	m_SortedNodes.clear();
 	m_NodeDependents.clear();
@@ -320,38 +333,13 @@ Display::CommandBatcher::Clear()
 }
 
 void
-Display::CommandBatcher::SortRenderNodes()
+Display::CommandBatcher::FixRenderNodeOrder()
 {
-	// MAYBE: do a check if it's actually an acyclic graph?
-	for (int i = 0; i < m_RenderNodes.size(); i++) {
-		m_SortedNodes.emplace_back(i, UINT64_MAX);
+	if (!m_RenderNodes.size()) {
+		return;
 	}
 
-	for (size_t i = 0; i < m_RenderNodes.size(); i++) {
-		if (m_RenderNodes[i].Dependencies.size() == 0) {
-			m_NodeQueue.push(i);
-			m_SortedNodes[i].second = 0;
-		}
-	}
-
-	while (!m_NodeQueue.empty()) {
-		auto currentNode = m_NodeQueue.front();
-		m_NodeQueue.pop();
-
-		auto next = m_NodeDependents.equal_range(currentNode);
-		for (auto i = next.first; i != next.second; i++) {
-			if (m_SortedNodes[i->second].second == UINT64_MAX) {
-				m_SortedNodes[i->second].second =
-				  m_SortedNodes[currentNode].second + 1;
-				m_NodeQueue.push(i->second);
-			}
-		}
-	}
-
-	std::stable_sort(m_SortedNodes.begin(),
-					 m_SortedNodes.end(),
-					 [](const std::pair<size_t, size_t>& lhs,
-						const std::pair<size_t, size_t>& rhs) {
-						 return lhs.second < rhs.second;
-					 });
+	auto node = m_RenderNodes[*m_SwapchainNodeIndex];
+	m_RenderNodes.erase(m_RenderNodes.begin() + *m_SwapchainNodeIndex);
+	m_RenderNodes.push_back(node);
 }

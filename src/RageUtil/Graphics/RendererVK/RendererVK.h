@@ -104,7 +104,7 @@ class RendererVK : public Display::Renderer
 	std::vector<vk::raii::CommandBuffer> m_CommandBuffers;
 	void InitCommandBuffers();
 
-	std::optional<vk::ImageMemoryBarrier2> TransitionImageLayout(
+	void TransitionImageLayout(
 	  vk::Image& image,
 							   vk::ImageLayout oldLayout,
 							   vk::ImageLayout newLayout,

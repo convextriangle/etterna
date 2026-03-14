@@ -61,7 +61,7 @@ Display::Display::BeginFrame()
 void
 Display::Display::EndFrame()
 {
-	m_Batcher.SortRenderNodes();
+	m_Batcher.FixRenderNodeOrder();
 	m_Renderer->OnRender(GetActualVideoModeParams(), m_Batcher);
 	RageDisplay::EndFrame();
 }

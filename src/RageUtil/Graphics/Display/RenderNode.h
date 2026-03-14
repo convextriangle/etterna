@@ -24,7 +24,6 @@ struct RenderNode
 	intptr_t RenderTarget = 0;
 	bool PreserveRenderTarget = false;
 	std::vector<DrawCall> DrawCalls;
-	std::vector<size_t> Dependencies;
 };
 
 #endif
