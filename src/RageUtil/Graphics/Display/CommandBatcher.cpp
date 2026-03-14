@@ -25,15 +25,11 @@ Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
 	}
 
 	if (!m_RenderNodes.size()) {
-		m_RenderNodes.emplace_back();
-		m_RenderNodes.back().DrawCalls.emplace_back(
-		  settings, m_IndexBuffer.size(), 0);
-		m_CurrentNodeIndex = 0;
-		m_SwapchainNodeIndex = 0;
-		m_CurrentPipeline = settings;
+		InsertRenderTargetCommand(0, false);
 	}
 
-	if (std::tie(pipeline, vertexShaderInfo, fragShaderInfo) !=
+	if (!m_CurrentPipeline.has_value() ||
+		std::tie(pipeline, vertexShaderInfo, fragShaderInfo) !=
 		  std::tie(m_CurrentPipeline->GraphicsPipeline,
 				   m_CurrentPipeline->VertexShaderArg,
 				   m_CurrentPipeline->FragShaderArg)) {
@@ -50,18 +46,16 @@ Display::CommandBatcher::InsertRenderTargetCommand(intptr_t renderTarget,
 {
 	if (renderTarget == 0) {
 		if (!m_SwapchainNodeIndex.has_value()) {
-			m_RenderNodes.emplace_back(renderTarget,
-									   preserveTexture,
-									   std::vector<DrawCall>());
+			m_RenderNodes.emplace_back(
+			  renderTarget, preserveTexture, std::vector<DrawCall>());
 			m_SwapchainNodeIndex = m_RenderNodes.size() - 1;
 		}
 		m_CurrentNodeIndex = *m_SwapchainNodeIndex;
 		m_RenderNodes[m_CurrentNodeIndex].PreserveRenderTarget =
 		  preserveTexture;
 	} else {
-		m_RenderNodes.emplace_back(renderTarget,
-								   preserveTexture,
-								   std::vector<DrawCall>());
+		m_RenderNodes.emplace_back(
+		  renderTarget, preserveTexture, std::vector<DrawCall>());
 		m_CurrentNodeIndex = m_RenderNodes.size() - 1;
 	}
 }
@@ -285,14 +279,12 @@ Display::CommandBatcher::HandleDrawCommand(int indexOffset,
 	assert(indexCount > 0);
 	assert(m_CurrentPipeline.has_value());
 	if (!m_RenderNodes.size()) {
-		m_RenderNodes.emplace_back(0, false, std::vector<DrawCall>());
-		m_CurrentNodeIndex = 0;
+		InsertRenderTargetCommand(0, false);
 	}
 
 	auto& node = m_RenderNodes[m_CurrentNodeIndex];
 	if (!node.DrawCalls.size()) {
-		node.DrawCalls.emplace_back(
-		  *m_CurrentPipeline, m_IndexBuffer.size(), 0);
+		node.DrawCalls.emplace_back(*m_CurrentPipeline, indexOffset, 0);
 	}
 
 	auto& call = node.DrawCalls.back();
@@ -301,12 +293,13 @@ Display::CommandBatcher::HandleDrawCommand(int indexOffset,
 	// one
 	if (call.IndexCount != 0 &&
 		call.IndexCount + call.IndexOffset != indexOffset) {
-		node.DrawCalls.emplace_back(
-		  *m_CurrentPipeline, indexOffset, 0);
+		node.DrawCalls.emplace_back(*m_CurrentPipeline, indexOffset, 0);
 		call = node.DrawCalls.back();
 	}
 
 	call.IndexCount += indexCount;
+	assert(&call == &node.DrawCalls.back());
+	assert(node.DrawCalls.back().IndexCount != 0);
 }
 
 void
