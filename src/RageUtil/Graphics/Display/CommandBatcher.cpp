@@ -284,21 +284,27 @@ Display::CommandBatcher::HandleDrawCommand(int indexOffset,
 
 	auto& node = m_RenderNodes[m_CurrentNodeIndex];
 	if (!node.DrawCalls.size()) {
-		node.DrawCalls.emplace_back(*m_CurrentPipeline, indexOffset, 0);
+		m_RenderNodes[m_CurrentNodeIndex].DrawCalls.emplace_back(
+		  *m_CurrentPipeline, indexOffset, 0);
 	}
-
-	auto& call = node.DrawCalls.back();
 
 	// if we previously filled in a different draw call, we should create a new
 	// one
-	if (call.IndexCount != 0 &&
-		call.IndexCount + call.IndexOffset != indexOffset) {
+
+	// why does this not work when i replace
+	// node.DrawCalls[node.DrawCalls.size() - 1] with a reference to
+	// node.DrawCalls.back()???
+
+	if (node.DrawCalls[node.DrawCalls.size() - 1].IndexCount != 0 &&
+		node.DrawCalls[node.DrawCalls.size() - 1].IndexCount +
+			node.DrawCalls[node.DrawCalls.size() - 1].IndexOffset !=
+		  indexOffset) {
 		node.DrawCalls.emplace_back(*m_CurrentPipeline, indexOffset, 0);
-		call = node.DrawCalls.back();
 	}
 
-	call.IndexCount += indexCount;
-	assert(&call == &node.DrawCalls.back());
+	node.DrawCalls[node.DrawCalls.size() - 1].IndexCount += indexCount;
+
+	// insane edgecase from earlier
 	assert(node.DrawCalls.back().IndexCount != 0);
 }
 
