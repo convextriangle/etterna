@@ -75,7 +75,7 @@ target_link_libraries(vorbis ogg)
 
 add_subdirectory(vk-bootstrap)
 add_subdirectory(VulkanMemoryAllocator)
-add_subdirectory(shaderc)
+add_subdirectory(glslang)
 
 # Only enable crashpad if the user wants it.
 if(WITH_CRASHPAD)
@@ -93,7 +93,7 @@ list(APPEND EXT_TARGETS
     zlib libmad pcre
     ogg vorbis glfw
     fmt 
-    vk-bootstrap VulkanMemoryAllocator shaderc)
+    vk-bootstrap VulkanMemoryAllocator glslang)
 
 list(APPEND LUA_TARGETS luajit libluajit minilua buildvm)
 
