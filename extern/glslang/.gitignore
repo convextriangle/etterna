@@ -18,7 +18,6 @@ CMakeUserPresets.json
 *.gclient_entries
 third_party/
 buildtools/
-tools/
 
 # Random OS stuff
 .DS_Store
