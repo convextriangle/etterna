@@ -14,7 +14,7 @@ class Renderer
 	virtual [[nodiscard]] std::string GetApiDescription() const = 0;
 	virtual void InitializeRenderer(const VideoModeParams& p) = 0;
 	virtual void OnRender(const ActualVideoModeParams* p,
-						  CommandBatcher& batcher) = 0;
+						  const CommandBatcher& batcher) = 0;
 	virtual bool IsD3DInternal() = 0;
 	virtual intptr_t CreateTexture(RageSurface* img, bool RGBA8) = 0;
 	virtual void UpdateTexture(intptr_t textureHandle,

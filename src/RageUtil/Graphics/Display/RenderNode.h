@@ -8,8 +8,8 @@
 struct PipelineSettings
 {
 	intptr_t GraphicsPipeline = 0;
-	intptr_t VertexShaderArg = 0;
-	intptr_t FragShaderArg = 0;
+	intptr_t VertexShaderArg = -1;
+	intptr_t FragShaderArg = -1;
 };
 
 struct DrawCall

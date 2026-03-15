@@ -24,19 +24,24 @@ struct DrawSettings
 class CommandBatcher
 {
   public:
-	void InsertPipelineChangeCommand(intptr_t pipeline, intptr_t vertexShaderInfo, intptr_t fragShaderInfo, bool persist);
+	void InsertPipelineChangeCommand(
+	  intptr_t pipeline,
+	  const std::vector<uint8_t>& vertexShaderArgs,
+	  const std::vector<uint8_t>& fragShaderArgs,
+	  bool persist);
 	void InsertRenderTargetCommand(intptr_t renderTarget, bool preserveTexture);
 	void InsertSpriteDrawCommand(DrawMode drawMode,
 								 MatrixState&& matrixState,
 								 const RageSpriteVertex* vertexData,
 								 int vertexCount,
-								 const RenderState& renderState
-					);
+								 const RenderState& renderState);
 	void InsertCompiledGeometryDrawCommand(MatrixState&& matrixState,
 										   const RageCompiledGeometry* p,
 										   int iMeshIndex,
 										   const RenderState& renderState);
-	void HandleDrawCommand(int indexOffset, int indexCount, const RenderState& renderState);
+	void HandleDrawCommand(int indexOffset,
+						   int indexCount,
+						   const RenderState& renderState);
 	void Clear();
 	void FixRenderNodeOrder();
 
@@ -46,12 +51,9 @@ class CommandBatcher
 	std::vector<MatrixState> m_MatrixStateBuffer;
 	std::vector<RenderNode> m_RenderNodes;
 	std::stack<PipelineSettings> m_PipelineStack;
+	std::vector<uint8_t> m_ShaderScratchBuffer;
 
-	std::vector<std::pair<size_t, size_t>> m_SortedNodes;
-	std::multimap<size_t, size_t> m_NodeDependents;
-	std::queue<size_t> m_NodeQueue;
-	std::optional<size_t>
-	  m_SwapchainNodeIndex;
+	std::optional<size_t> m_SwapchainNodeIndex;
 	size_t m_CurrentNodeIndex = 0;
 
 	std::optional<PipelineSettings> m_CurrentPipeline = std::nullopt;

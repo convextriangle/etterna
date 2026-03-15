@@ -4,11 +4,33 @@
 #include <algorithm>
 
 void
-Display::CommandBatcher::InsertPipelineChangeCommand(intptr_t pipeline,
-													 intptr_t vertexShaderInfo,
-													 intptr_t fragShaderInfo,
-													 bool persist)
+Display::CommandBatcher::InsertPipelineChangeCommand(
+  intptr_t pipeline,
+  const std::vector<uint8_t>& vertexShaderArgs,
+  const std::vector<uint8_t>& fragShaderArgs,
+  bool persist)
 {
+	intptr_t vertexShaderInfo = -1;
+	intptr_t fragShaderInfo = -1;
+
+	if (vertexShaderArgs.size()) {
+		vertexShaderInfo = m_ShaderScratchBuffer.size();
+		m_ShaderScratchBuffer.resize(m_ShaderScratchBuffer.size() +
+									 vertexShaderArgs.size());
+		std::memcpy(&m_ShaderScratchBuffer[vertexShaderInfo],
+					vertexShaderArgs.data(),
+					vertexShaderArgs.size() * sizeof(uint8_t));
+	}
+
+	if (fragShaderArgs.size()) {
+		fragShaderInfo = m_ShaderScratchBuffer.size();
+		m_ShaderScratchBuffer.resize(m_ShaderScratchBuffer.size() +
+									 fragShaderArgs.size());
+		std::memcpy(&m_ShaderScratchBuffer[fragShaderInfo],
+					fragShaderArgs.data(),
+					fragShaderArgs.size() * sizeof(uint8_t));
+	}
+
 	PipelineSettings settings = {};
 	if (persist) {
 		if (pipeline) {
@@ -326,9 +348,7 @@ Display::CommandBatcher::Clear()
 	m_SwapchainNodeIndex = std::nullopt;
 	m_CurrentNodeIndex = 0;
 
-	m_SortedNodes.clear();
-	m_NodeDependents.clear();
-	assert(m_NodeQueue.empty());
+	m_ShaderScratchBuffer.clear();
 }
 
 void

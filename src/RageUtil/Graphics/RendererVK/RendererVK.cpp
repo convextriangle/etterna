@@ -45,7 +45,7 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 /// ----------------------------------------
 void
 RendererVK::OnRender(const ActualVideoModeParams* p,
-					 Display::CommandBatcher& batcher)
+					 const Display::CommandBatcher& batcher)
 {
 	ThrowIfFail(m_Device.waitForFences(
 	  *m_InFlightFence[m_CurrentFrame], vk::True, Timeout));
@@ -523,6 +523,12 @@ RendererVK::~RendererVK()
 							 m_DrawSettingsBuffer[i].allocation);
 			m_DrawSettingsBuffer[i].buffer = VK_NULL_HANDLE;
 		}
+		if (m_ShaderScratchBuffer[i].buffer != VK_NULL_HANDLE) {
+			vmaDestroyBuffer(m_Allocator,
+							 m_ShaderScratchBuffer[i].buffer,
+							 m_ShaderScratchBuffer[i].allocation);
+			m_ShaderScratchBuffer[i].buffer = VK_NULL_HANDLE;
+		}
 	}
 
 	// likely the only thing that needs to be cleaned up manually (because
@@ -599,16 +605,26 @@ RendererVK::InitVulkanState()
 	vk12Features.descriptorIndexing = vk::True;
 	vk12Features.runtimeDescriptorArray = vk::True;
 	vk12Features.shaderSampledImageArrayNonUniformIndexing = vk::True;
+	vk12Features.scalarBlockLayout = vk::True;
+
+	// reported as force-turned-on by validation, so just in case?
+	vk12Features.timelineSemaphore = vk::True;
+	vk12Features.vulkanMemoryModel = vk::True;
+	vk12Features.vulkanMemoryModelAvailabilityVisibilityChains = vk::True;
+	vk12Features.storageBuffer8BitAccess = vk::True;
 
 	VkPhysicalDeviceVulkan11Features vk11Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES
 	};
-	vk11Features.shaderDrawParameters = true;
+	vk11Features.shaderDrawParameters = vk::True;
 
 	VkPhysicalDeviceFeatures vkFeatures = {};
 	vkFeatures.samplerAnisotropy = vk::True;
 	vkFeatures.multiDrawIndirect = vk::True;
 	vkFeatures.logicOp = vk::True;
+	vkFeatures.shaderInt64 = vk::True;
+	vkFeatures.fragmentStoresAndAtomics = vk::True;
+	vkFeatures.vertexPipelineStoresAndAtomics = vk::True;
 
 	vkb::PhysicalDeviceSelector selector(*instanceResult);
 	auto physicalDeviceResult =
@@ -867,7 +883,7 @@ RendererVK::InitSyncStructures()
 
 void
 RendererVK::RecordCommands(uint32_t imageIndex,
-						   Display::CommandBatcher& batcher)
+						   const Display::CommandBatcher& batcher)
 {
 	auto& buffer = m_CommandBuffers[m_CurrentFrame];
 	buffer.begin({});
@@ -951,14 +967,14 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 				  m_Pipelines[currentPipeline].GraphicsPipeline);
 			}
 
-			if (call.Settings.VertexShaderArg != 0) {
+			if (call.Settings.VertexShaderArg != -1) {
 				buffer.pushConstants<intptr_t>(
 				  *m_Pipelines[0].PipelineLayout,
 				  vk::ShaderStageFlagBits::eVertex,
 				  0,
 				  { call.Settings.VertexShaderArg });
 			}
-			if (call.Settings.FragShaderArg != 0) {
+			if (call.Settings.FragShaderArg != -1) {
 				buffer.pushConstants<intptr_t>(
 				  *m_Pipelines[0].PipelineLayout,
 				  vk::ShaderStageFlagBits::eFragment,
@@ -1079,6 +1095,17 @@ RendererVK::InitBatchBuffers()
 		m_MatrixStateBuffer[i].Init(
 		  m_Allocator, matrixBufferInfo, matrixAllocInfo);
 
+		vk::BufferCreateInfo scratchBufferInfo{};
+		scratchBufferInfo.size = sizeof(uint8_t) * 64'000'000;
+		scratchBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer |
+								  vk::BufferUsageFlagBits::eShaderDeviceAddress;
+		VmaAllocationCreateInfo scratchAllocInfo = {};
+		scratchAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		scratchAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		scratchAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		m_ShaderScratchBuffer[i].Init(
+		  m_Allocator, scratchBufferInfo, scratchAllocInfo);
+
 		vk::DescriptorBufferInfo triangleInfo(
 		  m_VertexBuffer[i].Get(), 0, VK_WHOLE_SIZE);
 		vk::DescriptorBufferInfo matrixInfo(
@@ -1118,7 +1145,7 @@ RendererVK::InitBatchBuffers()
 }
 
 void
-RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
+RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
 {
 	if (!batcher.m_VertexBuffer.empty()) {
 		if (m_PendingTextureUpdates[m_CurrentFrame]) {
@@ -1166,6 +1193,10 @@ RendererVK::UpdateBatchBuffers(Display::CommandBatcher& batcher)
 					batcher.m_DrawSettingsBuffer.data(),
 					sizeof(Display::DrawSettings) *
 					  batcher.m_DrawSettingsBuffer.size());
+
+		std::memcpy(m_ShaderScratchBuffer[m_CurrentFrame].GetMappedData(),
+					batcher.m_ShaderScratchBuffer.data(),
+					sizeof(uint8_t) * batcher.m_ShaderScratchBuffer.size());
 	}
 
 	if (!batcher.m_MatrixStateBuffer.empty()) {
