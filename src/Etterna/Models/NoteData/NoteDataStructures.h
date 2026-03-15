@@ -89,6 +89,11 @@ enum CalcPatternMod
 	GChordStream,
 	GBracketing,
 	HandSwitch,
+	OldAnchorScaler,
+	OldJumpScaler,
+	OldOHJScaler,
+	OldRollScaler,
+	HandBalance,
 	NUM_CalcPatternMod,
 	CalcPatternMod_Invalid,
 };

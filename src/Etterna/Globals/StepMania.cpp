@@ -54,11 +54,9 @@
 #include "RageUtil/File/RageFileManager.h"
 #include "Etterna/Actor/Base/ModelManager.h"
 #include "Etterna/Singletons/CryptManager.h"
-#include "GameLoop.h"
 #include "Etterna/Singletons/MessageManager.h"
 #include "Etterna/Singletons/NetworkSyncManager.h"
 #include "Etterna/Singletons/StatsManager.h"
-#include "discord_rpc.h"
 
 #include <ctime>
 
@@ -321,7 +319,6 @@ ShutdownGame()
 	DLMAN.reset();
 	SAFE_DELETE(FILEMAN);
 	SAFE_DELETE(LUA);
-	Discord_Shutdown();
 }
 
 static void

@@ -278,6 +278,8 @@ local translations = {
     BGBrightnessExplanation = THEME:GetString("Settings", "BGBrightnessExplanation"),
     ReplayModEmulation = THEME:GetString("Settings", "ReplayModEmulation"),
     ReplayModEmulationExplanation = THEME:GetString("Settings", "ReplayModEmulationExplanation"),
+    ReplayOffsetDisplay = THEME:GetString("Settings", "ReplayOffsetDisplay"),
+    ReplayOffsetDisplayExplanation = THEME:GetString("Settings", "ReplayOffsetDisplayExplanation"),
     ExtraScrollMods = THEME:GetString("Settings", "ExtraScrollMods"),
     ExtraScrollModsExplanation = THEME:GetString("Settings", "ExtraScrollModsExplanation"),
     FunEffects = THEME:GetString("Settings", "FunEffects"),
@@ -296,6 +298,8 @@ local translations = {
     RemoveModsExplanation = THEME:GetString("Settings", "RemoveModsExplanation"),
     InsertMods = THEME:GetString("Settings", "InsertMods"),
     InsertModsExplanation = THEME:GetString("Settings", "InsertModsExplanation"),
+    HoldReleases = THEME:GetString("Settings", "HoldReleases"),
+    HoldReleasesExplanation = THEME:GetString("Settings", "HoldReleasesExplanation"),
     BPMDisplay = THEME:GetString("Settings", "BPMDisplay"),
     BPMDisplayExplanation = THEME:GetString("Settings", "BPMDisplayExplanation"),
     RateDisplay = THEME:GetString("Settings", "RateDisplay"),
@@ -4573,6 +4577,15 @@ local function rightFrame()
                 ChoiceIndexGetter = preferenceToggleIndexGetter("ReplaysUseScoreMods", true),
             },
             {
+                Name = "Replay Offset Display",
+                DisplayName = translations["ReplayOffsetDisplay"],
+                Type = "SingleChoice",
+                Explanation = translations["ReplayOffsetDisplayExplanation"],
+                Choices = choiceSkeleton("On", "Off"),
+                Directions = preferenceToggleDirections("ReplaysShowOffsets", true, false),
+                ChoiceIndexGetter = preferenceToggleIndexGetter("ReplaysShowOffsets", true),
+            },
+            {
                 Name = "Extra Scroll Mods",
                 DisplayName = translations["ExtraScrollMods"],
                 Type = "MultiChoice",
@@ -4826,7 +4839,39 @@ local function rightFrame()
                     if po:Skippy() then o[5] = true end
                     return o
                 end,
-            }
+            },
+            {
+                Name = "HoldReleases",
+                DisplayName = translations["HoldReleases"],
+                Type = "SingleChoice",
+                Explanation = translations["HoldReleasesExplanation"],
+                Choices = {
+                    {
+                        Name = "On",
+                        DisplayName = translations["On"],
+                        ChosenFunction = function()
+                            setPlayerOptionsModValueAllLevels("HoldReleases", true)
+                        end,
+                    },
+                    {
+                        Name = "Off",
+                        DisplayName = translations["Off"],
+                        ChosenFunction = function()
+                            setPlayerOptionsModValueAllLevels("HoldReleases", false)
+                        end,
+                    },
+                },
+                ChoiceIndexGetter = function()
+                    local po = getPlayerOptions()
+                    if po:HoldReleases() then
+                        -- hold releases, invalidating
+                        return 1
+                    else
+                        -- regular holds, not invalidating
+                        return 2
+                    end
+                end,
+            },
         },
         --
         -----
