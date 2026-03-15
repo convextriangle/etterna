@@ -813,7 +813,7 @@ CreateDisplay()
 #if defined(SUPPORT_D3D)
 				pRet = new RageDisplay_D3D;
 #endif
-			} else if (CompareNoCase(sRenderer, "unstable_vk") == 0) {
+			} else if (CompareNoCase(sRenderer, "vulkan") == 0) {
 #if defined(SUPPORT_D3D)
 				pRet = new Display::Display(
 				  [] { return std::make_unique<RendererVK>(); });
