@@ -12,16 +12,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cfg:
+        cfg: # some jobs disabled because we have too many
           - { os: ubuntu-22.04, apt: g++-8,    cxx: g++-8,      cc: gcc-8,    dist: false}
-          - { os: ubuntu-22.04, apt: g++-9,    cxx: g++-9,      cc: gcc-9,    dist: false}
+          #- { os: ubuntu-22.04, apt: g++-9,    cxx: g++-9,      cc: gcc-9,    dist: false}
           - { os: ubuntu-22.04, apt: g++-10,   cxx: g++-10,     cc: gcc-10,   dist: false}
           - { os: ubuntu-22.04, apt: g++-13,   cxx: g++-13,     cc: gcc-13,   dist: false}
           - { os: ubuntu-22.04, apt: clang-9,  cxx: clang++-9,  cc: clang-9,  dist: false}
-          - { os: ubuntu-22.04, apt: clang-10, cxx: clang++-10, cc: clang-10, dist: false}
-          - { os: ubuntu-22.04, apt: clang-11, cxx: clang++-11, cc: clang-11, dist: false}
+          #- { os: ubuntu-22.04, apt: clang-10, cxx: clang++-10, cc: clang-10, dist: false}
+          #- { os: ubuntu-22.04, apt: clang-11, cxx: clang++-11, cc: clang-11, dist: false}
           - { os: ubuntu-22.04, apt: clang-12, cxx: clang++-12, cc: clang-12, dist: true}
           - { os: ubuntu-22.04, apt: clang-16, cxx: clang++-16, cc: clang-16, dist: false}
+          - { os: ubuntu-22.04-arm, apt: clang-16, cxx: clang++-16, cc: clang-16, dist: false}
 
     steps:
       - name: Checkout Etterna
@@ -138,7 +139,7 @@ jobs:
         run: brew install cmake nasm ninja openssl
 
       - name: Setup Python 3
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -215,9 +216,10 @@ jobs:
       matrix:
         cfg:
           #- { os: macos-10.15,  name: "Catalina", dist: false} # rendered useless by GHA
-          - { os: macos-13,     name: "Ventura", dist: true}
+          #- { os: macos-13,     name: "Ventura", dist: true} # rendered useless by GHA
           #- { os: macos-12,     name: "Monterey", dist: true} # rendered useless by GHA
           #- { os: macos-11,     name: "Big Sur",  dist: true} # rendered useless by GHA
+          - { os: macos-15,     name: "Sequoia", dist: true}
 
     steps:
 
@@ -236,14 +238,14 @@ jobs:
         run: brew install cmake nasm ninja openssl
 
       - name: Setup Python 2.7
-        uses: MatteoH2O1999/setup-python@v1.4.1
+        uses: MatteoH2O1999/setup-python@v6
         with:
           python-version: '2.7'
 
       - name: Setup Python 3
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.8'
+          python-version: '3.12'
 
       - name: Install Vulkan SDK
         uses: humbletim/setup-vulkan-sdk@v1.2.1
@@ -316,16 +318,17 @@ jobs:
         with:
           files: ${{github.workspace}}/main/build/*.dmg
   macos_high_sierra:
-    name: macOS High Sierra (Legacy) ${{matrix.cfg.name}}
+    name: macOS 10.x (Legacy) via ${{matrix.cfg.name}} Runner
     runs-on: ${{matrix.cfg.os}}
     strategy:
       fail-fast: false
       matrix:
         cfg:
           #- { os: macos-10.15,  name: "Catalina", dist: false} # rendered useless by GHA
-          - { os: macos-13,     name: "Ventura", dist: true}
+          #- { os: macos-13,     name: "Ventura", dist: true} # rendered useless by GHA
           #- { os: macos-12,     name: "Monterey", dist: true} # rendered useless by GHA
-          #- { os: macos-11,     name: "Big Sur",  dist: true}
+          #- { os: macos-11,     name: "Big Sur",  dist: true} # rendered useless by GHA
+          - { os: macos-14,     name: "Sonoma", dist: true}
 
     steps:
 
@@ -453,22 +456,27 @@ jobs:
           echo "ETTERNA_ARCH=${{matrix.cfg.name}}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Setup Python 3
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.8'
+          python-version: '3.12'
           
       - name: Setup Python 2.7
-        uses: MatteoH2O1999/setup-python@v1.4.1
+        uses: MatteoH2O1999/setup-python@v6
         with:
           python-version: '2.7'
 
       - name: Install chocolatey packages (i386)
         if: ${{ matrix.cfg.arch == 'x86' }}
-        run: choco install ninja nsis curl -y --x86
+        run: choco install ninja nsis -y --x86
+
+      # the last win32 curl version is 8.15.0
+      - name: Install curl (i386)
+        if: ${{ matrix.cfg.arch == 'x86' }}
+        run: choco install curl -y --x86 --version=8.15.0
       
       - name: Install openSSL (i386)
         if: ${{ matrix.cfg.arch == 'x86' }}
-        run: msiexec /i https://slproweb.com/download/Win32OpenSSL-3_5_1.msi /quiet
+        run: choco install openssl -y --x86
 
       - name: Install chocolatey packages (x64)
         if: ${{ matrix.cfg.arch == 'x64' }}
@@ -476,11 +484,12 @@ jobs:
 
       - name: Install openSSL (x64)
         if: ${{ matrix.cfg.arch == 'x64' }}
-        run: choco install openssl --version=3.5.1 -y
+        run: choco install openssl -y
       
+      #TODO: Also print Python install logs, more?
       - name: Print Install Failures (if present)
         if: ${{ failure() }}
-        run: type C:\ProgramData\chocolatey\logs\chocolatey.log && exit 1 #TODO: Also print Python install logs, more?
+        run: type C:\ProgramData\chocolatey\logs\chocolatey.log && exit 1
 
       - name: Configure MSBuild
         uses: ilammy/msvc-dev-cmd@v1
@@ -510,9 +519,9 @@ jobs:
           dump_syms.exe main/Program/Etterna.pdb > ${{github.workspace}}/main/Etterna.sym
 
       - name: Setup Python 3
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.8'
+          python-version: '3.12'
 
       - name: Prepare symbols for action artifacts
         run: cd main && python ${{github.workspace}}/main/.ci/prepare_symbols.py

@@ -422,6 +422,9 @@ Player::Init(const std::string& sType,
 	lastHoldHeadsSeconds.resize(
 	  GAMESTATE->GetCurrentStyle(GetPlayerState()->m_PlayerNumber)
 		->m_iColsPerPlayer);
+	activeHoldTaps.resize(
+	  GAMESTATE->GetCurrentStyle(GetPlayerState()->m_PlayerNumber)
+		->m_iColsPerPlayer);
 	for (auto i = 0;
 		 i < GAMESTATE->GetCurrentStyle(GetPlayerState()->m_PlayerNumber)
 			   ->m_iColsPerPlayer;
@@ -432,6 +435,7 @@ Player::Init(const std::string& sType,
 		// and also it gets changed back to a realistic number after a hold is
 		// hit -poco
 		lastHoldHeadsSeconds[i] = -1000.F;
+		activeHoldTaps[i] = nullptr;
 	}
 
 	if (HasVisibleParts()) {
@@ -907,7 +911,8 @@ Player::UpdateHoldsAndRolls(float fDeltaTime,
 			// holds.
 			lastHoldHeadsSeconds[iTrack] =
 			  max(lastHoldHeadsSeconds[iTrack],
-				  m_Timing->WhereUAtBro(NoteRowToBeat(iRow + tn.iDuration)));
+				  m_Timing->GetTimeFromRowFast(iRow + tn.iDuration));
+			activeHoldTaps[iTrack] = &tn;
 
 			/* All holds must be of the same subType because fLife is handled
 			 * in different ways depending on the SubType. Handle Rolls one at
@@ -1643,9 +1648,9 @@ Player::GetClosestNote(int col,
 	// Get the current time, previous time, and next time.
 	const auto fNoteTime = bUseSongTiming
 							 ? GAMESTATE->m_Position.m_fMusicSeconds
-							 : m_Timing->WhereUAtBro(iNoteRow);
-	const auto fNextTime = m_Timing->WhereUAtBro(iNextIndex);
-	const auto fPrevTime = m_Timing->WhereUAtBro(iPrevIndex);
+							 : m_Timing->GetTimeFromRowFast(iNoteRow);
+	const auto fNextTime = m_Timing->GetTimeFromRowFast(iNextIndex);
+	const auto fPrevTime = m_Timing->GetTimeFromRowFast(iPrevIndex);
 
 	// If we passed a mine, we can't hit it anymore. Literally.
 	// So forget about them.
@@ -1730,8 +1735,8 @@ Player::GetClosestNonEmptyRow(int iNoteRow,
 
 	// Get the current time, previous time, and next time.
 	const auto fNoteTime = GAMESTATE->m_Position.m_fMusicSeconds;
-	const auto fNextTime = m_Timing->WhereUAtBro(iNextRow);
-	const auto fPrevTime = m_Timing->WhereUAtBro(iPrevRow);
+	const auto fNextTime = m_Timing->GetTimeFromRowFast(iNextRow);
+	const auto fPrevTime = m_Timing->GetTimeFromRowFast(iPrevRow);
 
 	/* Figure out which row is closer. */
 	if (fabsf(fNoteTime - fNextTime) > fabsf(fNoteTime - fPrevTime)) {
@@ -1893,6 +1898,30 @@ Player::Step(int col,
 
 	const auto iSongRow = row == -1 ? BeatToNoteRow(fSongBeat) : row;
 
+	// instant-judge holds that are released close enough to the head
+	if (bRelease && col != -1 && lastHoldHeadsSeconds[col] > fMusicSeconds &&
+		m_pPlayerState->m_PlayerOptions.GetCurrent().m_bForceHoldReleases &&
+		activeHoldTaps[col]->subType == TapNoteSubType_Hold &&
+		NeedsHoldJudging(*activeHoldTaps[col])) {
+		const auto offset =
+		  fabsf((lastHoldHeadsSeconds[col] - fMusicSeconds) / fMusicRate);
+		activeHoldTaps[col]->HoldResult.bHeld = false;
+		if (offset <= GetWindowSeconds(TW_W3)) {
+			// safe
+			activeHoldTaps[col]->HoldResult.bActive = false;
+			activeHoldTaps[col]->HoldResult.hns = HNS_Held;
+			activeHoldTaps[col]->HoldResult.fLife = 1.F;
+		}
+		else {
+			// no
+			activeHoldTaps[col]->HoldResult.bActive = false;
+			activeHoldTaps[col]->HoldResult.hns = HNS_LetGo;
+			activeHoldTaps[col]->HoldResult.fLife = 0;
+		}
+		SetHoldJudgment(*activeHoldTaps[col], col, iSongRow);
+		HandleHoldScore(*activeHoldTaps[col]);
+	}
+
 	if (col != -1 && !bRelease) {
 		// Update roll life
 		// Let's not check the whole array every time.
@@ -2010,17 +2039,17 @@ Player::Step(int col,
 
 		auto SearchIndexBehind = nervpos;
 		auto SearchIndexAhead = nervpos;
-		auto SearchBeginTime = m_Timing->WhereUAtBro(nerv[nervpos]);
+		auto SearchBeginTime = m_Timing->GetTimeFromRowFast(nerv[nervpos]);
 
 		while (SearchIndexBehind > 1 &&
 			   SearchBeginTime -
-				   m_Timing->WhereUAtBro(nerv[SearchIndexBehind - 1]) <
+				   m_Timing->GetTimeFromRowFast(nerv[SearchIndexBehind - 1]) <
 				 StepSearchDistance) {
 			SearchIndexBehind -= 1;
 		}
 
 		while (SearchIndexAhead > 1 && SearchIndexAhead + 1 > nerv.size() &&
-			   m_Timing->WhereUAtBro(nerv[SearchIndexAhead + 1]) -
+			   m_Timing->GetTimeFromRowFast(nerv[SearchIndexAhead + 1]) -
 				   SearchBeginTime <
 				 StepSearchDistance) {
 			SearchIndexAhead += 1;
@@ -2047,9 +2076,9 @@ Player::Step(int col,
 	if (iRowOfOverlappingNoteOrRow != -1 && col != -1) {
 		// compute the score for this hit
 		auto fNoteOffset = 0.F;
-		// we need this later if we are autosyncing
-		const auto fStepBeat = NoteRowToBeat(iRowOfOverlappingNoteOrRow);
-		const auto fStepSeconds = m_Timing->WhereUAtBro(fStepBeat);
+
+		const auto fStepSeconds =
+		  m_Timing->GetTimeFromRowFast(iRowOfOverlappingNoteOrRow);
 
 		TapNote* pTN = nullptr;
 		auto iter = m_NoteData.FindTapNote(col, iRowOfOverlappingNoteOrRow);
