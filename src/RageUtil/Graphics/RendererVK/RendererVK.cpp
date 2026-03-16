@@ -5,13 +5,12 @@
 #define VMA_IMPLEMENTATION
 #include "RendererVK.h"
 
-// no penguin (For Now (TM))
-#include "archutils/Win32/GraphicsWindow.h"
 #include <numbers>
 #include <RageUtil/File/RageFileManager.h>
 #include <RageUtil/Misc/RageMath.h>
 #include <vulkan/vulkan_beta.h>
 #include "RenderTargetVK.h"
+#include "PlatformUtils.h"
 
 constexpr uint64_t Timeout = 1000'000'000;
 
@@ -554,43 +553,18 @@ VulkanDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 void
 RendererVK::InitVulkanState()
 {
-	vkb::InstanceBuilder builder;
-	auto instanceResult =
-	  builder
-#ifdef _DEBUG || DEBUG
-		.request_validation_layers(true)
-		.use_default_debug_messenger()
-		.add_validation_feature_enable(
-		  VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT)
-		.add_validation_feature_enable(
-		  VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT)
-		.add_validation_feature_enable(
-		  VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT)
-		.set_debug_callback(VulkanDebugCallback)
-#endif
-		.require_api_version(1, 3, 0)
-		.enable_extension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
-#ifdef __APPLE__
-		.enable_extension(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)
-		.enable_extension(
-		  VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)
-#endif
-		.build();
+	auto instanceResult = CreateInstance(VulkanDebugCallback);
 	if (!instanceResult) {
 		Fail();
 	}
 
 	m_Instance = vk::raii::Instance(m_Context, instanceResult->instance);
-#ifdef _DEBUG || DEBUG
+#ifdef VKDEBUG
 	m_DebugMessenger = vk::raii::DebugUtilsMessengerEXT(
 	  m_Instance, instanceResult->debug_messenger);
 #endif
 
-	VkWin32SurfaceCreateInfoKHR createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-	createInfo.hwnd = GraphicsWindow::GetHwnd();
-	createInfo.hinstance = GetModuleHandle(nullptr);
-	m_Surface = m_Instance.createWin32SurfaceKHR(createInfo);
+	m_Surface = CreateSurfaceKHR(m_Instance);
 
 	VkPhysicalDeviceVulkan13Features vk13Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES
@@ -675,57 +649,46 @@ RendererVK::InitVulkanState()
 void
 RendererVK::InitSwapchain(const VideoModeParams& p)
 {
-	auto surfaceCapabilities =
-	  m_PhysicalDevice.getSurfaceCapabilitiesKHR(*m_Surface);
-	m_SwapchainExtent = vk::Extent2D(p.width, p.height);
+	vkb::SwapchainBuilder swapchainBuilder(
+	  *m_PhysicalDevice, *m_Device, *m_Surface);
 
-	vk::SurfaceFormatKHR format = {};
-	{
-		std::vector<vk::SurfaceFormatKHR> formats =
-		  m_PhysicalDevice.getSurfaceFormatsKHR(m_Surface);
-		for (size_t i = 0; i < formats.size(); i++) {
-			bool spaceOk =
-			  formats[i].colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear;
-			bool formatOk = (formats[i].format == vk::Format::eR8G8B8A8Unorm);
-			if (spaceOk && formatOk) {
-				format = formats[i];
-				break;
-			}
-		}
+	swapchainBuilder.set_desired_min_image_count(FramesInFlight)
+	  .set_desired_format(
+		{ VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
+	  .set_desired_format(
+		{ VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
+	  .set_desired_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
+	  .set_desired_extent(p.width, p.height)
+	  .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+							 VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+	  .set_clipped(true);
 
-		if (format.format == vk::Format::eUndefined) {
-			Fail();
-		}
+	auto caps = *m_PhysicalDevice.getSurfaceCapabilitiesKHR(*m_Surface);
+	swapchainBuilder.set_pre_transform_flags(caps.currentTransform);
+
+	VkCompositeAlphaFlagBitsKHR compositeAlpha =
+	  VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	if (!(caps.supportedCompositeAlpha & compositeAlpha)) {
+		if (caps.supportedCompositeAlpha &
+			VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR)
+			compositeAlpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+		else
+			compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+	}
+	swapchainBuilder.set_composite_alpha_flags(compositeAlpha);
+
+	auto swapchain_ret = swapchainBuilder.build();
+	if (!swapchain_ret) {
+		Fail();
 	}
 
-	vk::SwapchainCreateInfoKHR swapChainCreateInfo{};
-	swapChainCreateInfo.surface = *m_Surface;
-	swapChainCreateInfo.minImageCount = FramesInFlight;
-	swapChainCreateInfo.imageFormat = ImageFormat;
-	swapChainCreateInfo.imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
-	swapChainCreateInfo.imageExtent = m_SwapchainExtent;
-	swapChainCreateInfo.imageArrayLayers = 1;
-	swapChainCreateInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment |
-									 vk::ImageUsageFlagBits::eTransferSrc;
+	vkb::Swapchain vkbSwapchain = swapchain_ret.value();
 
-	swapChainCreateInfo.imageSharingMode = vk::SharingMode::eExclusive;
-	swapChainCreateInfo.preTransform = surfaceCapabilities.currentTransform;
-
-	vk::CompositeAlphaFlagBitsKHR compositeAlpha =
-	  vk::CompositeAlphaFlagBitsKHR::eInherit;
-	const auto scaFlags = surfaceCapabilities.supportedCompositeAlpha;
-	if (scaFlags & vk::CompositeAlphaFlagBitsKHR::eOpaque) {
-		compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-	} else if (scaFlags & vk::CompositeAlphaFlagBitsKHR::ePreMultiplied) {
-		compositeAlpha = vk::CompositeAlphaFlagBitsKHR::ePreMultiplied;
-	}
-
-	swapChainCreateInfo.compositeAlpha = compositeAlpha;
-	swapChainCreateInfo.presentMode = vk::PresentModeKHR::eImmediate;
-	swapChainCreateInfo.clipped = true;
-
-	m_Swapchain = vk::raii::SwapchainKHR(m_Device, swapChainCreateInfo);
+	m_Swapchain = vk::raii::SwapchainKHR(m_Device, vkbSwapchain.swapchain);
 	m_SwapchainImages = m_Swapchain.getImages();
+	m_ImageFormat = static_cast<vk::Format>(vkbSwapchain.image_format);
+	m_SwapchainExtent =
+	  vk::Extent2D(vkbSwapchain.extent.width, vkbSwapchain.extent.height);
 }
 
 void
@@ -751,7 +714,7 @@ RendererVK::InitImageViews()
 	m_SwapchainImageViews.clear();
 	vk::ImageViewCreateInfo createInfo{};
 	createInfo.viewType = vk::ImageViewType::e2D;
-	createInfo.format = ImageFormat;
+	createInfo.format = m_ImageFormat;
 	createInfo.subresourceRange = {
 		vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1
 	};
@@ -1446,7 +1409,7 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 
 	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo = {};
 	pipelineRenderingCreateInfo.colorAttachmentCount = 1;
-	pipelineRenderingCreateInfo.pColorAttachmentFormats = &ImageFormat;
+	pipelineRenderingCreateInfo.pColorAttachmentFormats = &m_ImageFormat;
 
 	// we don't actually need any vertex info since we're reading stuffs from
 	// the storage buffer

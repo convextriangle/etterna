@@ -4,10 +4,14 @@
 #include "RageUtil/Graphics/Display/Renderer.h"
 #include "Core/Services/Locator.hpp"
 
-#ifdef _WIN32
-#define VK_USE_PLATFORM_WIN32_KHR
+#ifdef DEBUG
+#define VKDEBUG 1
 #endif
-#ifdef _DEBUG || DEBUG
+#ifdef _DEBUG
+#define VKDEBUG 1
+#endif
+
+#ifdef VKDEBUG
 #define VMA_DEBUG_LOG
 #define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
 #define VMA_DEBUG_LOG_FORMAT(format, ...)                                      \
@@ -81,8 +85,7 @@ class RendererVK : public Display::Renderer
 	vk::raii::SwapchainKHR m_Swapchain = nullptr;
 	vk::Extent2D m_SwapchainExtent;
 	std::vector<vk::Image> m_SwapchainImages;
-
-	constexpr static vk::Format ImageFormat = vk::Format::eR8G8B8A8Unorm;
+	vk::Format m_ImageFormat = {};
 
 	bool m_SwapchainIsInvalid = false;
 	void InitSwapchain(const VideoModeParams& p);
@@ -104,8 +107,7 @@ class RendererVK : public Display::Renderer
 	std::vector<vk::raii::CommandBuffer> m_CommandBuffers;
 	void InitCommandBuffers();
 
-	void TransitionImageLayout(
-	  vk::Image& image,
+	void TransitionImageLayout(vk::Image& image,
 							   vk::ImageLayout oldLayout,
 							   vk::ImageLayout newLayout,
 							   vk::AccessFlags2 srcAccessMask,
@@ -119,7 +121,8 @@ class RendererVK : public Display::Renderer
 	std::vector<vk::raii::Fence> m_InFlightFence;
 	uint32_t m_CurrentFrame = 0;
 	void InitSyncStructures();
-	void RecordCommands(uint32_t imageIndex, const Display::CommandBatcher& batcher);
+	void RecordCommands(uint32_t imageIndex,
+						const Display::CommandBatcher& batcher);
 
 	constexpr static size_t FramesInFlight = 3;
 	constexpr static size_t MaxDrawCount = 100'000;

@@ -72,6 +72,7 @@ list(APPEND SMDATA_RAGE_GRAPHICS_SRC
   "Graphics/RendererVK/VkUtils.cpp"
   "Graphics/RendererVK/PersistentBuffer.cpp"
   "Graphics/RendererVK/RenderTargetVK.cpp"
+  "Graphics/RendererVK/PlatformUtils.cpp"
 )
 list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/RageBitmapTexture.h"
@@ -109,6 +110,7 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/RendererVK/PersistentBuffer.h"
   "Graphics/RendererVK/Texture.h"
   "Graphics/RendererVK/RenderTargetVK.h"
+  "Graphics/RendererVK/PlatformUtils.h"
 )
 
 if(WIN32)

@@ -1,5 +1,5 @@
 #include "VkUtils.h"
-#include <format>
+#include <fmt/format.h>
 #include <fstream>
 #include <sstream>
 #include "Core/Services/Locator.hpp"
@@ -13,7 +13,7 @@ ThrowIfFail(VkResult result, const std::source_location location)
 	}
 
 	const std::string message =
-	  std::format("RendererVK failed: VkResult {} at {}:{} in function {}",
+	  fmt::format("RendererVK failed: VkResult {} at {}:{} in function {}",
 				  static_cast<int>(result),
 				  location.file_name(),
 				  location.line(),
@@ -32,7 +32,7 @@ void
 Fail(const std::source_location location)
 {
 	const std::string message =
-	  std::format("RendererVK failed at {}:{} in function {}",
+	  fmt::format("RendererVK failed at {}:{} in function {}",
 				  location.file_name(),
 				  location.line(),
 				  location.function_name());
@@ -52,7 +52,7 @@ CompileShader(const std::string& sourceName,
 	  source, shaderKind, sourceName.c_str(), options);
 
 	if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
-		auto message = std::format("Vulkan GLSL shader compilation failed: {}",
+		auto message = fmt::format("Vulkan GLSL shader compilation failed: {}",
 								   result.GetErrorMessage());
 		Locator::getLogger()->error(message);
 		sm_crash(message.c_str());
