@@ -28,10 +28,10 @@ set(CMAKE_CXX_STANDARD 20)                                      # Minimum C++ Ve
 set(CMAKE_CXX_EXTENSIONS OFF)                                   # True if compiler extensions are necessary. (Changes -std flag)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)                             # True to require minimum C++ version to compile
 if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET 10.11)                      # First macOS version supporting M1 chips
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)                      # First macOS version supporting M1 chips
 else()
     # Host is x86_64
-    set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)                      # Oldest platform we still support
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)                      # Oldest platform we still support
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)                           # Export compile commands for clang-tidy
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/CMake/Modules)  # Tell CMake where to access FindXXX.cmake files

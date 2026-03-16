@@ -68,7 +68,7 @@ void FeaturesChain::add_structure(VkStructureType sType, size_t struct_size, con
         // Add a structure into the chain
         structure_infos.push_back(StructInfo{ sType, structures.size(), struct_size });
         auto& new_structure_info = structure_infos.back();
-        structures.insert(structures.end(), struct_size, unsigned char(0));
+        structures.insert(structures.end(), struct_size, uint8_t(0));
         memcpy(&(structures.at(new_structure_info.starting_location)), structure, struct_size);
     }
 }

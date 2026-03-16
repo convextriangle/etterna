@@ -156,7 +156,7 @@ class FeaturesChain {
         size_t struct_size{};
     };
     std::vector<StructInfo> structure_infos;
-    std::vector<unsigned char> structures;
+    std::vector<uint8_t> structures;
 
     std::vector<StructInfo>::const_iterator find_sType(VkStructureType sType) const;
 
