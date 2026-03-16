@@ -349,7 +349,7 @@ if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 endif()
 
 add_subdirectory(source)
-add_subdirectory(tools)
+#add_subdirectory(tools)
 
 add_subdirectory(examples)
 
