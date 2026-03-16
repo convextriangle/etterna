@@ -7,7 +7,7 @@
 #ifdef _WIN32
 #include "archutils/Win32/GraphicsWindow.h"
 #else
-#error Display::Display is unfinished for non-Windows platforms
+//#error Display::Display is unfinished for non-Windows platforms
 #endif
 
 Display::Display::Display(
@@ -49,7 +49,7 @@ Display::Display::BeginFrame()
 #ifdef _WIN32
 	GraphicsWindow::Update();
 #else
-#error todo
+//#error todo
 #endif
 	m_Batcher.Clear();
 	m_RenderState.textureFiltering = true;
@@ -72,7 +72,7 @@ Display::Display::GetActualVideoModeParams() const
 #ifdef _WIN32
 	return GraphicsWindow::GetParams();
 #else
-#error Display::Display is unfinished for non-Windows platforms
+//#error Display::Display is unfinished for non-Windows platforms
 #endif
 }
 
@@ -82,7 +82,7 @@ Display::Display::TryVideoMode(const VideoModeParams& p, bool& bNewDeviceOut)
 #ifdef _WIN32
 	GraphicsWindow::CreateGraphicsWindow(p);
 #else
-#error Display::Display is unfinished for non-Windows platforms
+//#error Display::Display is unfinished for non-Windows platforms
 #endif
 
 	m_Renderer = m_RendererFactory();

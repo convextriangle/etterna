@@ -11,7 +11,7 @@ class Renderer
 {
   public:
 	virtual ~Renderer() {}
-	virtual [[nodiscard]] std::string GetApiDescription() const = 0;
+	virtual std::string GetApiDescription() const = 0;
 	virtual void InitializeRenderer(const VideoModeParams& p) = 0;
 	virtual void OnRender(const ActualVideoModeParams* p,
 						  const CommandBatcher& batcher) = 0;
