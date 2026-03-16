@@ -6,7 +6,7 @@
 #include <functional>
 #include <source_location>
 #include <span>
-#include <glslang/Public/ShaderLang.h>
+#include <shaderc/shaderc.hpp>
 #include <optional>
 
 void
@@ -22,10 +22,15 @@ ThrowIfFail(
 void
 Fail(const std::source_location location = std::source_location::current());
 
+std::vector<uint32_t>
+CompileShader(const std::string& sourceName,
+			  shaderc_shader_kind shaderKind,
+			  const std::string& source);
+
 vk::raii::ShaderModule
 LoadShaderFromFile(std::string path,
 				   vk::raii::Device& device,
-				   EShLanguage shaderKind);
+				   shaderc_shader_kind shaderKind);
 
 std::optional<uint32_t>
 GetMemoryType(uint32_t typeBits,

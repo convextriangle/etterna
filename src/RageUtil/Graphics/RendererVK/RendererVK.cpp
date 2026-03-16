@@ -1356,9 +1356,9 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	PipelineInfo info = {};
 
 	auto fragmentShader = LoadShaderFromFile(
-	  fragmentShaderPath, m_Device, EShLangFragment);
+	  fragmentShaderPath, m_Device, shaderc_glsl_fragment_shader);
 	auto vertexShader = LoadShaderFromFile(
-	  vertexShaderPath, m_Device, EShLangVertex);
+	  vertexShaderPath, m_Device, shaderc_glsl_vertex_shader);
 
 	vk::PipelineShaderStageCreateInfo vertexShaderStageInfo{};
 	vertexShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
