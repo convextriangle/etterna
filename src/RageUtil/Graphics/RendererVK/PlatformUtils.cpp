@@ -64,18 +64,7 @@ CreateSurfaceKHR(const vk::raii::Instance& instance)
 	createInfo.dpy = X11Helper::Dpy;
 	createInfo.window = X11Helper::Win;
 
-	PFN_vkCreateXlibSurfaceKHR createXlibSurface =
-	  reinterpret_cast<PFN_vkCreateXlibSurfaceKHR>(
-		instance.getProcAddr("vkCreateXlibSurfaceKHR"));
-
-	VkSurfaceKHR surface = nullptr;
-	createXlibSurface(*instance, &createInfo, nullptr, &surface);
-	assert(surface != nullptr);
-
-	XWindowAttributes attr;
-	XGetWindowAttributes(X11Helper::Dpy, X11Helper::Win, &attr);
-
-	return vk::raii::SurfaceKHR(instance, surface);
+	return instance.createXlibSurfaceKHR(createInfo);
 #endif
 #ifdef __APPLE__
 	// TODO: use vkCreateMacOSSurfaceMVK or vkCreateMetalSurfaceEXT?
