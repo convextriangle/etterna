@@ -6,7 +6,7 @@
 #include "RageUtil/Graphics/Display/CommandBatcher.h"
 #include "RageUtil/Graphics/RageSurface.h"
 
-namespace Display {
+namespace DisplayAdapter {
 class Renderer
 {
   public:

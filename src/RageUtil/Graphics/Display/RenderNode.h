@@ -5,6 +5,8 @@
 #include <vector>
 #include <set>
 
+namespace DisplayAdapter {
+
 struct PipelineSettings
 {
 	intptr_t GraphicsPipeline = 0;
@@ -25,5 +27,7 @@ struct RenderNode
 	bool PreserveRenderTarget = false;
 	std::vector<DrawCall> DrawCalls;
 };
+
+}
 
 #endif

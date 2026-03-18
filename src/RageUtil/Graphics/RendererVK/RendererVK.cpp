@@ -50,7 +50,7 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 /// ----------------------------------------
 void
 RendererVK::OnRender(const ActualVideoModeParams* p,
-					 const Display::CommandBatcher& batcher)
+					 const DisplayAdapter::CommandBatcher& batcher)
 {
 	ThrowIfFail(m_Device.waitForFences(
 	  *m_InFlightFence[m_CurrentFrame], vk::True, Timeout));
@@ -852,7 +852,7 @@ RendererVK::InitSyncStructures()
 
 void
 RendererVK::RecordCommands(uint32_t imageIndex,
-						   const Display::CommandBatcher& batcher)
+						   const DisplayAdapter::CommandBatcher& batcher)
 {
 	auto& buffer = m_CommandBuffers[m_CurrentFrame];
 	buffer.begin({});
@@ -1035,7 +1035,8 @@ RendererVK::InitBatchBuffers()
 
 		vk::BufferCreateInfo drawSettingsInfo{};
 		drawSettingsInfo.size =
-		  sizeof(uint32_t) + sizeof(Display::DrawSettings) * MaxDrawCount;
+		  sizeof(uint32_t) +
+		  sizeof(DisplayAdapter::DrawSettings) * MaxDrawCount;
 		drawSettingsInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
 		VmaAllocationCreateInfo drawSettingsAllocInfo = {};
 		drawSettingsAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -1055,7 +1056,8 @@ RendererVK::InitBatchBuffers()
 		m_IndexBuffer[i].Init(m_Allocator, indexBufferInfo, indexAllocInfo);
 
 		vk::BufferCreateInfo matrixBufferInfo{};
-		matrixBufferInfo.size = sizeof(Display::MatrixState) * MaxDrawCount;
+		matrixBufferInfo.size =
+		  sizeof(DisplayAdapter::MatrixState) * MaxDrawCount;
 		matrixBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
 		VmaAllocationCreateInfo matrixAllocInfo = {};
 		matrixAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -1114,7 +1116,7 @@ RendererVK::InitBatchBuffers()
 }
 
 void
-RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
+RendererVK::UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher)
 {
 	if (!batcher.m_VertexBuffer.empty()) {
 		if (m_PendingTextureUpdates[m_CurrentFrame]) {
@@ -1160,7 +1162,7 @@ RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
 
 		std::memcpy(settingsBuffer,
 					batcher.m_DrawSettingsBuffer.data(),
-					sizeof(Display::DrawSettings) *
+					sizeof(DisplayAdapter::DrawSettings) *
 					  batcher.m_DrawSettingsBuffer.size());
 
 		std::memcpy(m_ShaderScratchBuffer[m_CurrentFrame].GetMappedData(),
@@ -1171,7 +1173,7 @@ RendererVK::UpdateBatchBuffers(const Display::CommandBatcher& batcher)
 	if (!batcher.m_MatrixStateBuffer.empty()) {
 		std::memcpy(m_MatrixStateBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_MatrixStateBuffer.data(),
-					sizeof(Display::MatrixState) *
+					sizeof(DisplayAdapter::MatrixState) *
 					  batcher.m_MatrixStateBuffer.size());
 	}
 }

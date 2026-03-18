@@ -1,10 +1,17 @@
+#ifdef _WIN32
+#define VK_USE_PLATFORM_WIN32_KHR
+#endif
+#ifdef __unix__
+#define VK_USE_PLATFORM_XLIB_KHR
+#endif
+
 #include "PersistentBuffer.h"
 #include "VkUtils.h"
 
 void
 PersistentBuffer::Init(VmaAllocator allocator,
-				   const vk::BufferCreateInfo& createInfo,
-				   const VmaAllocationCreateInfo& allocInfo)
+					   const vk::BufferCreateInfo& createInfo,
+					   const VmaAllocationCreateInfo& allocInfo)
 {
 	this->allocator = allocator;
 	ThrowIfFail(

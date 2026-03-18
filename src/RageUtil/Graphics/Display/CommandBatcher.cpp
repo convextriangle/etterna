@@ -4,7 +4,7 @@
 #include <algorithm>
 
 void
-Display::CommandBatcher::InsertPipelineChangeCommand(
+DisplayAdapter::CommandBatcher::InsertPipelineChangeCommand(
   intptr_t pipeline,
   const std::vector<uint8_t>& vertexShaderArgs,
   const std::vector<uint8_t>& fragShaderArgs,
@@ -63,8 +63,8 @@ Display::CommandBatcher::InsertPipelineChangeCommand(
 }
 
 void
-Display::CommandBatcher::InsertRenderTargetCommand(intptr_t renderTarget,
-												   bool preserveTexture)
+DisplayAdapter::CommandBatcher::InsertRenderTargetCommand(intptr_t renderTarget,
+														  bool preserveTexture)
 {
 	if (renderTarget == 0) {
 		if (!m_SwapchainNodeIndex.has_value()) {
@@ -83,14 +83,14 @@ Display::CommandBatcher::InsertRenderTargetCommand(intptr_t renderTarget,
 }
 
 uint32_t
-GetSamplerFlagsFromRenderState(const Display::RenderState& state)
+GetSamplerFlagsFromRenderState(const DisplayAdapter::RenderState& state)
 {
 	return (uint8_t)state.textureWrapping |
 		   ((uint8_t)state.textureFiltering << 1);
 }
 
 void
-Display::CommandBatcher::InsertSpriteDrawCommand(
+DisplayAdapter::CommandBatcher::InsertSpriteDrawCommand(
   DrawMode drawMode,
   MatrixState&& matrixState,
   const RageSpriteVertex* vertexData,
@@ -244,7 +244,7 @@ Display::CommandBatcher::InsertSpriteDrawCommand(
 }
 
 void
-Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
+DisplayAdapter::CommandBatcher::InsertCompiledGeometryDrawCommand(
   MatrixState&& matrixState,
   const RageCompiledGeometry* p,
   int iMeshIndex,
@@ -294,9 +294,10 @@ Display::CommandBatcher::InsertCompiledGeometryDrawCommand(
 }
 
 void
-Display::CommandBatcher::HandleDrawCommand(int indexOffset,
-										   int indexCount,
-										   const RenderState& renderState)
+DisplayAdapter::CommandBatcher::HandleDrawCommand(
+  int indexOffset,
+  int indexCount,
+  const RenderState& renderState)
 {
 	assert(indexCount > 0);
 	assert(m_CurrentPipeline.has_value());
@@ -331,7 +332,7 @@ Display::CommandBatcher::HandleDrawCommand(int indexOffset,
 }
 
 void
-Display::CommandBatcher::Clear()
+DisplayAdapter::CommandBatcher::Clear()
 {
 	m_VertexBuffer.clear();
 	m_DrawSettingsBuffer.clear();
@@ -352,7 +353,7 @@ Display::CommandBatcher::Clear()
 }
 
 void
-Display::CommandBatcher::FixRenderNodeOrder()
+DisplayAdapter::CommandBatcher::FixRenderNodeOrder()
 {
 	if (!m_RenderNodes.size()) {
 		return;

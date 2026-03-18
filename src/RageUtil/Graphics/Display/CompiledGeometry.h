@@ -3,7 +3,7 @@
 
 #include "RageUtil/Graphics/RageDisplay.h"
 
-namespace Display {
+namespace DisplayAdapter {
 
 struct CompiledGeometry : public RageCompiledGeometry
 {

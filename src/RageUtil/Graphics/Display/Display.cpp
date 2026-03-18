@@ -8,16 +8,17 @@
 #include "archutils/Win32/GraphicsWindow.h"
 #endif
 
-Display::Display::Display(std::unique_ptr<Renderer> renderer)
+DisplayAdapter::Display::Display(std::unique_ptr<Renderer> renderer)
   : m_Renderer(std::move(renderer))
   , m_RenderState()
 {
 }
 
 std::string
-Display::Display::Init(VideoModeParams&& p, bool bAllowUnacceleratedRenderer)
+DisplayAdapter::Display::Init(VideoModeParams&& p,
+							  bool bAllowUnacceleratedRenderer)
 {
-	Locator::getLogger()->info("Display::Display::Init()");
+	Locator::getLogger()->info("DisplayAdapter::Display::Init()");
 	Locator::getLogger()->info("Current renderer: UnstableDisplay - {}",
 							   m_Renderer->GetApiDescription());
 
@@ -33,19 +34,19 @@ Display::Display::Init(VideoModeParams&& p, bool bAllowUnacceleratedRenderer)
 }
 
 void
-Display::Display::GetDisplaySpecs(DisplaySpecs& out) const
+DisplayAdapter::Display::GetDisplaySpecs(DisplaySpecs& out) const
 {
 }
 
 void
-Display::Display::ResolutionChanged()
+DisplayAdapter::Display::ResolutionChanged()
 {
 	m_Renderer->ResolutionChanged();
 	RageDisplay::ResolutionChanged();
 }
 
 bool
-Display::Display::BeginFrame()
+DisplayAdapter::Display::BeginFrame()
 {
 #ifdef _WIN32
 	GraphicsWindow::Update();
@@ -60,7 +61,7 @@ Display::Display::BeginFrame()
 }
 
 void
-Display::Display::EndFrame()
+DisplayAdapter::Display::EndFrame()
 {
 	m_Batcher.FixRenderNodeOrder();
 	m_Renderer->OnRender(GetActualVideoModeParams(), m_Batcher);
@@ -68,7 +69,7 @@ Display::Display::EndFrame()
 }
 
 const ActualVideoModeParams*
-Display::Display::GetActualVideoModeParams() const
+DisplayAdapter::Display::GetActualVideoModeParams() const
 {
 #ifdef _WIN32
 	return GraphicsWindow::GetParams();
@@ -79,7 +80,8 @@ Display::Display::GetActualVideoModeParams() const
 }
 
 std::string
-Display::Display::TryVideoMode(const VideoModeParams& p, bool& bNewDeviceOut)
+DisplayAdapter::Display::TryVideoMode(const VideoModeParams& p,
+									  bool& bNewDeviceOut)
 {
 #ifdef _WIN32
 	GraphicsWindow::CreateGraphicsWindow(p);
@@ -104,7 +106,7 @@ Display::Display::TryVideoMode(const VideoModeParams& p, bool& bNewDeviceOut)
 #pragma region Texture handling
 
 const RageDisplay::RagePixelFormatDesc*
-Display::Display::GetPixelFormatDesc(RagePixelFormat pf) const
+DisplayAdapter::Display::GetPixelFormatDesc(RagePixelFormat pf) const
 {
 	assert(pf == RagePixelFormat_RGBA8 || pf == RagePixelFormat_BGRA8);
 	static auto rgba8 =
@@ -117,15 +119,16 @@ Display::Display::GetPixelFormatDesc(RagePixelFormat pf) const
 }
 
 bool
-Display::Display::SupportsTextureFormat(RagePixelFormat pixfmt, bool realtime)
+DisplayAdapter::Display::SupportsTextureFormat(RagePixelFormat pixfmt,
+											   bool realtime)
 {
 	return pixfmt == RagePixelFormat_RGBA8 || pixfmt == RagePixelFormat_BGRA8;
 }
 
 intptr_t
-Display::Display::CreateTexture(RagePixelFormat pixfmt,
-								RageSurface* img,
-								bool bGenerateMipMaps)
+DisplayAdapter::Display::CreateTexture(RagePixelFormat pixfmt,
+									   RageSurface* img,
+									   bool bGenerateMipMaps)
 {
 	assert(SupportsTextureFormat(pixfmt));
 
@@ -133,38 +136,38 @@ Display::Display::CreateTexture(RagePixelFormat pixfmt,
 }
 
 void
-Display::Display::UpdateTexture(intptr_t uTexHandle,
-								RageSurface* img,
-								int xoffset,
-								int yoffset,
-								int width,
-								int height)
+DisplayAdapter::Display::UpdateTexture(intptr_t uTexHandle,
+									   RageSurface* img,
+									   int xoffset,
+									   int yoffset,
+									   int width,
+									   int height)
 {
 	m_Renderer->UpdateTexture(uTexHandle, img, xoffset, yoffset, width, height);
 }
 
 void
-Display::Display::DeleteTexture(intptr_t iTexHandle)
+DisplayAdapter::Display::DeleteTexture(intptr_t iTexHandle)
 {
 	m_Renderer->DeleteTexture(iTexHandle);
 }
 
 void
-Display::Display::ClearAllTextures()
+DisplayAdapter::Display::ClearAllTextures()
 {
 	m_Renderer->ClearAllTextures();
 }
 
 int
-Display::Display::GetNumTextureUnits()
+DisplayAdapter::Display::GetNumTextureUnits()
 {
 	return 1;
 }
 
 int
-Display::Display::GetMaxTextureSize() const
+DisplayAdapter::Display::GetMaxTextureSize() const
 {
-	return Display::Display::MaxTextureSize;
+	return DisplayAdapter::Display::MaxTextureSize;
 }
 
 #pragma endregion
@@ -172,21 +175,21 @@ Display::Display::GetMaxTextureSize() const
 #pragma region RenderState handling
 
 void
-Display::Display::SetTexture(TextureUnit tu, intptr_t iTexture)
+DisplayAdapter::Display::SetTexture(TextureUnit tu, intptr_t iTexture)
 {
 	assert(tu == TextureUnit_1);
 	m_RenderState.textureHandle = iTexture;
 }
 
 void
-Display::Display::SetTextureWrapping(TextureUnit tu, bool b)
+DisplayAdapter::Display::SetTextureWrapping(TextureUnit tu, bool b)
 {
 	assert(tu == TextureUnit_1);
 	m_RenderState.textureWrapping = b;
 }
 
 void
-Display::Display::SetTextureFiltering(TextureUnit tu, bool b)
+DisplayAdapter::Display::SetTextureFiltering(TextureUnit tu, bool b)
 {
 	assert(tu == TextureUnit_1);
 	m_RenderState.textureFiltering = b;
@@ -197,15 +200,16 @@ Display::Display::SetTextureFiltering(TextureUnit tu, bool b)
 #pragma region Draw queueing
 
 void
-Display::Display::DrawQuadsInternal(const RageSpriteVertex v[], int iNumVerts)
+DisplayAdapter::Display::DrawQuadsInternal(const RageSpriteVertex v[],
+										   int iNumVerts)
 {
 	m_Batcher.InsertSpriteDrawCommand(
 	  DrawMode::Quads, GetCurrentMatrixState(), v, iNumVerts, m_RenderState);
 }
 
 void
-Display::Display::DrawQuadStripInternal(const RageSpriteVertex v[],
-										int iNumVerts)
+DisplayAdapter::Display::DrawQuadStripInternal(const RageSpriteVertex v[],
+											   int iNumVerts)
 {
 	m_Batcher.InsertSpriteDrawCommand(DrawMode::QuadStrip,
 									  GetCurrentMatrixState(),
@@ -215,22 +219,24 @@ Display::Display::DrawQuadStripInternal(const RageSpriteVertex v[],
 }
 
 void
-Display::Display::DrawFanInternal(const RageSpriteVertex v[], int iNumVerts)
+DisplayAdapter::Display::DrawFanInternal(const RageSpriteVertex v[],
+										 int iNumVerts)
 {
 	m_Batcher.InsertSpriteDrawCommand(
 	  DrawMode::Fan, GetCurrentMatrixState(), v, iNumVerts, m_RenderState);
 }
 
 void
-Display::Display::DrawStripInternal(const RageSpriteVertex v[], int iNumVerts)
+DisplayAdapter::Display::DrawStripInternal(const RageSpriteVertex v[],
+										   int iNumVerts)
 {
 	m_Batcher.InsertSpriteDrawCommand(
 	  DrawMode::Strip, GetCurrentMatrixState(), v, iNumVerts, m_RenderState);
 }
 
 void
-Display::Display::DrawTrianglesInternal(const RageSpriteVertex v[],
-										int iNumVerts)
+DisplayAdapter::Display::DrawTrianglesInternal(const RageSpriteVertex v[],
+											   int iNumVerts)
 {
 	m_Batcher.InsertSpriteDrawCommand(DrawMode::Triangles,
 									  GetCurrentMatrixState(),
@@ -240,8 +246,9 @@ Display::Display::DrawTrianglesInternal(const RageSpriteVertex v[],
 }
 
 void
-Display::Display::DrawSymmetricQuadStripInternal(const RageSpriteVertex v[],
-												 int iNumVerts)
+DisplayAdapter::Display::DrawSymmetricQuadStripInternal(
+  const RageSpriteVertex v[],
+  int iNumVerts)
 {
 	m_Batcher.InsertSpriteDrawCommand(DrawMode::SymmetricQuadStrip,
 									  GetCurrentMatrixState(),
@@ -251,8 +258,9 @@ Display::Display::DrawSymmetricQuadStripInternal(const RageSpriteVertex v[],
 }
 
 void
-Display::Display::DrawCompiledGeometryInternal(const RageCompiledGeometry* p,
-											   int iMeshIndex)
+DisplayAdapter::Display::DrawCompiledGeometryInternal(
+  const RageCompiledGeometry* p,
+  int iMeshIndex)
 {
 	m_Batcher.InsertCompiledGeometryDrawCommand(
 	  GetCurrentMatrixState(), p, iMeshIndex, m_RenderState);
@@ -261,60 +269,61 @@ Display::Display::DrawCompiledGeometryInternal(const RageCompiledGeometry* p,
 #pragma endregion
 
 intptr_t
-Display::Display::CreateRenderTarget(const RenderTargetParam& param,
-									 int& iTextureWidthOut,
-									 int& iTextureHeightOut)
+DisplayAdapter::Display::CreateRenderTarget(const RenderTargetParam& param,
+											int& iTextureWidthOut,
+											int& iTextureHeightOut)
 {
 	return m_Renderer->CreateRenderTarget(
 	  param, iTextureWidthOut, iTextureHeightOut);
 }
 
 intptr_t
-Display::Display::GetRenderTarget()
+DisplayAdapter::Display::GetRenderTarget()
 {
 	return m_CurrentRenderTarget;
 }
 
 void
-Display::Display::SetRenderTarget(intptr_t uTexHandle, bool bPreserveTexture)
+DisplayAdapter::Display::SetRenderTarget(intptr_t uTexHandle,
+										 bool bPreserveTexture)
 {
 	m_Batcher.InsertRenderTargetCommand(uTexHandle, bPreserveTexture);
 	m_CurrentRenderTarget = uTexHandle;
 }
 
 RageCompiledGeometry*
-Display::Display::CreateCompiledGeometry()
+DisplayAdapter::Display::CreateCompiledGeometry()
 {
 	return new CompiledGeometry;
 }
 
 void
-Display::Display::DeleteCompiledGeometry(RageCompiledGeometry* p)
+DisplayAdapter::Display::DeleteCompiledGeometry(RageCompiledGeometry* p)
 {
 	assert(p != nullptr);
 	delete p;
 }
 
 RageSurface*
-Display::Display::CreateScreenshot()
+DisplayAdapter::Display::CreateScreenshot()
 {
 	return m_Renderer->CreateScreenshot();
 }
 
 bool
-Display::Display::SupportsThreadedRendering()
+DisplayAdapter::Display::SupportsThreadedRendering()
 {
 	return false;
 }
 
 bool
-Display::Display::SupportsPerVertexMatrixScale()
+DisplayAdapter::Display::SupportsPerVertexMatrixScale()
 {
 	return false;
 }
 
-Display::MatrixState
-Display::Display::GetCurrentMatrixState()
+DisplayAdapter::MatrixState
+DisplayAdapter::Display::GetCurrentMatrixState()
 {
 	MatrixState m;
 	m.projection = *GetProjectionTop();
@@ -326,15 +335,16 @@ Display::Display::GetCurrentMatrixState()
 }
 
 intptr_t
-Display::Display::CreateGraphicsPipeline(const std::string& vertexShaderPath,
-										 const std::string& fragmentShaderPath)
+DisplayAdapter::Display::CreateGraphicsPipeline(
+  const std::string& vertexShaderPath,
+  const std::string& fragmentShaderPath)
 {
 	return m_Renderer->CreateGraphicsPipeline(vertexShaderPath,
 											  fragmentShaderPath);
 }
 
 void
-Display::Display::SetGraphicsPipeline(intptr_t pipeline, bool persist)
+DisplayAdapter::Display::SetGraphicsPipeline(intptr_t pipeline, bool persist)
 {
 	m_Batcher.InsertPipelineChangeCommand(pipeline, {}, {}, persist);
 }
@@ -342,92 +352,92 @@ Display::Display::SetGraphicsPipeline(intptr_t pipeline, bool persist)
 #pragma region Unsupported / old graphics API functions
 
 void
-Display::Display::SetBlendMode(BlendMode mode)
+DisplayAdapter::Display::SetBlendMode(BlendMode mode)
 {
 }
 
 void
-Display::Display::SetTextureMode(TextureUnit tu, TextureMode tm)
+DisplayAdapter::Display::SetTextureMode(TextureUnit tu, TextureMode tm)
 {
 }
 
 void
-Display::Display::SetZWrite(bool b)
+DisplayAdapter::Display::SetZWrite(bool b)
 {
 }
 
 void
-Display::Display::SetZBias(float f)
+DisplayAdapter::Display::SetZBias(float f)
 {
 }
 
 void
-Display::Display::SetZTestMode(ZTestMode mode)
+DisplayAdapter::Display::SetZTestMode(ZTestMode mode)
 {
 }
 
 void
-Display::Display::SetCullMode(CullMode mode)
+DisplayAdapter::Display::SetCullMode(CullMode mode)
 {
 }
 
 void
-Display::Display::SetAlphaTest(bool b)
+DisplayAdapter::Display::SetAlphaTest(bool b)
 {
 }
 
 void
-Display::Display::ClearZBuffer()
+DisplayAdapter::Display::ClearZBuffer()
 {
 }
 
 bool
-Display::Display::IsZWriteEnabled() const
+DisplayAdapter::Display::IsZWriteEnabled() const
 {
 	return false;
 }
 
 bool
-Display::Display::IsZTestEnabled() const
+DisplayAdapter::Display::IsZTestEnabled() const
 {
 	return false;
 }
 
 void
-Display::Display::SetMaterial(const RageColor& emissive,
-							  const RageColor& ambient,
-							  const RageColor& diffuse,
-							  const RageColor& specular,
-							  float shininess)
+DisplayAdapter::Display::SetMaterial(const RageColor& emissive,
+									 const RageColor& ambient,
+									 const RageColor& diffuse,
+									 const RageColor& specular,
+									 float shininess)
 {
 }
 
 void
-Display::Display::SetLighting(bool b)
+DisplayAdapter::Display::SetLighting(bool b)
 {
 }
 
 void
-Display::Display::SetLightOff(int index)
+DisplayAdapter::Display::SetLightOff(int index)
 {
 }
 
 void
-Display::Display::SetLightDirectional(int index,
-									  const RageColor& ambient,
-									  const RageColor& diffuse,
-									  const RageColor& specular,
-									  const RageVector3& dir)
+DisplayAdapter::Display::SetLightDirectional(int index,
+											 const RageColor& ambient,
+											 const RageColor& diffuse,
+											 const RageColor& specular,
+											 const RageVector3& dir)
 {
 }
 
 void
-Display::Display::SetSphereEnvironmentMapping(TextureUnit tu, bool b)
+DisplayAdapter::Display::SetSphereEnvironmentMapping(TextureUnit tu, bool b)
 {
 }
 
 void
-Display::Display::SetCelShaded(int stage)
+DisplayAdapter::Display::SetCelShaded(int stage)
 {
 }
 

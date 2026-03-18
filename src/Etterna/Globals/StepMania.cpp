@@ -819,7 +819,8 @@ CreateDisplay()
 				pRet = new RageDisplay_D3D;
 #endif
 			} else if (CompareNoCase(sRenderer, "vulkan") == 0) {
-				pRet = new Display::Display(std::make_unique<RendererVK>());
+				pRet =
+				  new DisplayAdapter::Display(std::make_unique<RendererVK>());
 			} else if (CompareNoCase(sRenderer, "null") == 0) {
 				return new RageDisplay_Null;
 			} else {

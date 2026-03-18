@@ -1,7 +1,7 @@
 #ifndef DISPLAY_DRAW_MODE_H
 #define DISPLAY_DRAW_MODE_H
 
-namespace Display {
+namespace DisplayAdapter {
 
 enum class DrawMode
 {

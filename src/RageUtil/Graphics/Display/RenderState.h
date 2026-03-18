@@ -4,16 +4,15 @@
 #include "RageUtil/Misc/RageTypes.h"
 #include "RageUtil/Graphics/RageDisplay.h"
 
-namespace Display
-{
+namespace DisplayAdapter {
 
 struct RenderState
 {
-    bool textureWrapping;
-    bool textureFiltering;
-    intptr_t textureHandle;
+	bool textureWrapping;
+	bool textureFiltering;
+	intptr_t textureHandle;
 };
 
-} // namespace Display
+} // namespace DisplayAdapter
 
 #endif

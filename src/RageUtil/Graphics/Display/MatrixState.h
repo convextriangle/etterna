@@ -3,7 +3,7 @@
 
 #include "RageUtil/Misc/RageTypes.h"
 
-namespace Display {
+namespace DisplayAdapter {
 
 struct MatrixState
 {

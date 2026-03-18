@@ -41,14 +41,14 @@ struct PipelineInfo
 	vk::raii::Pipeline GraphicsPipeline = nullptr;
 };
 
-class RendererVK : public Display::Renderer
+class RendererVK : public DisplayAdapter::Renderer
 {
   public:
 	RendererVK();
 	std::string GetApiDescription() const override;
 	void InitializeRenderer(const VideoModeParams& p) override;
 	void OnRender(const ActualVideoModeParams* p,
-				  const Display::CommandBatcher& batcher) override;
+				  const DisplayAdapter::CommandBatcher& batcher) override;
 	bool IsD3DInternal() override;
 	intptr_t CreateTexture(RageSurface* img, bool RGBA8) override;
 	void UpdateTexture(intptr_t textureHandle,
@@ -123,7 +123,7 @@ class RendererVK : public Display::Renderer
 	uint32_t m_CurrentFrame = 0;
 	void InitSyncStructures();
 	void RecordCommands(uint32_t imageIndex,
-						const Display::CommandBatcher& batcher);
+						const DisplayAdapter::CommandBatcher& batcher);
 
 	constexpr static size_t FramesInFlight = 3;
 	constexpr static size_t MaxDrawCount = 100'000;
@@ -139,7 +139,7 @@ class RendererVK : public Display::Renderer
 	vk::raii::DescriptorPool m_DescriptorPool = nullptr;
 
 	void InitBatchBuffers();
-	void UpdateBatchBuffers(const Display::CommandBatcher& batcher);
+	void UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher);
 
 	std::unordered_map<intptr_t, Texture> m_Textures;
 	std::unordered_set<intptr_t> m_EmptyTextureSlots;

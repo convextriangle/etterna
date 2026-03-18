@@ -12,7 +12,7 @@
 #include "arch/LowLevelWindow/LowLevelWindow_X11.h"
 #endif
 
-namespace Display {
+namespace DisplayAdapter {
 class Display : public RageDisplay
 {
   public:

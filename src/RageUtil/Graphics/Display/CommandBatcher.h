@@ -11,7 +11,7 @@
 #include "RenderState.h"
 #include "RenderNode.h"
 
-namespace Display {
+namespace DisplayAdapter {
 
 struct DrawSettings
 {

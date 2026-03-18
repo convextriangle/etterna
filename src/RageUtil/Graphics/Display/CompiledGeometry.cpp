@@ -2,7 +2,7 @@
 #include <cassert>
 
 void
-Display::CompiledGeometry::Allocate(const std::vector<msMesh>& vMeshes)
+DisplayAdapter::CompiledGeometry::Allocate(const std::vector<msMesh>& vMeshes)
 {
 	m_Vertices.resize(std::max(1U, static_cast<unsigned>(GetTotalVertices())));
 	m_Triangles.resize(
@@ -10,7 +10,7 @@ Display::CompiledGeometry::Allocate(const std::vector<msMesh>& vMeshes)
 }
 
 void
-Display::CompiledGeometry::Change(const std::vector<msMesh>& vMeshes)
+DisplayAdapter::CompiledGeometry::Change(const std::vector<msMesh>& vMeshes)
 {
 	for (unsigned i = 0; i < vMeshes.size(); i++) {
 		const auto& meshInfo = m_vMeshInfo[i];
@@ -32,7 +32,7 @@ Display::CompiledGeometry::Change(const std::vector<msMesh>& vMeshes)
 }
 
 void
-Display::CompiledGeometry::Draw(int iMeshIndex) const
+DisplayAdapter::CompiledGeometry::Draw(int iMeshIndex) const
 {
 	assert(false && "This should never be called, "
 					"CommandBatcher::InsertCompiledGeometryDrawCommand should "

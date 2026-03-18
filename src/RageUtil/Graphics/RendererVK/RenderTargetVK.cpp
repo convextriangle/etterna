@@ -1,3 +1,10 @@
+#ifdef _WIN32
+#define VK_USE_PLATFORM_WIN32_KHR
+#endif
+#ifdef __unix__
+#define VK_USE_PLATFORM_XLIB_KHR
+#endif
+
 #include "RenderTargetVK.h"
 #include <cassert>
 
