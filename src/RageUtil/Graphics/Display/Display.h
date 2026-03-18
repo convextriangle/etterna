@@ -19,7 +19,7 @@ class Display : public RageDisplay
 	static constexpr size_t TexturePixelSize = 4;
 	static constexpr size_t MaxTextureSize = 4096;
 
-	Display(std::function<std::unique_ptr<Renderer>()> rendererFactory);
+	Display(std::unique_ptr<Renderer> renderer);
 	~Display() override {}
 
 	std::string Init(VideoModeParams&& p,
@@ -122,9 +122,8 @@ class Display : public RageDisplay
 	MatrixState GetCurrentMatrixState();
 
   private:
-	std::function<std::unique_ptr<Renderer>()> m_RendererFactory;
 	std::unique_ptr<Renderer> m_Renderer;
-	bool m_IsInitDone;
+	bool m_IsInitDone = false;
 	CommandBatcher m_Batcher;
 	RenderState m_RenderState;
 	intptr_t m_CurrentRenderTarget = 0;

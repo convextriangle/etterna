@@ -33,6 +33,7 @@ class Renderer
 	virtual intptr_t CreateGraphicsPipeline(
 	  const std::string& vertexShaderPath,
 	  const std::string& fragmentShaderPath) = 0;
+	virtual void TryVideoMode(const VideoModeParams& params) = 0;
 };
 }
 

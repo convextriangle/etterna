@@ -66,6 +66,7 @@ class RendererVK : public Display::Renderer
 	intptr_t CreateGraphicsPipeline(
 	  const std::string& vertexShaderPath,
 	  const std::string& fragmentShaderPath) override;
+	void TryVideoMode(const VideoModeParams& params) override;
 	~RendererVK() override;
 
   private:

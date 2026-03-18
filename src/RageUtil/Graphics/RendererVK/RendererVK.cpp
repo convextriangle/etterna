@@ -1,6 +1,12 @@
 #ifndef NOMINMAX // >:3
 #define NOMINMAX
 #endif
+#ifdef _WIN32
+#define VK_USE_PLATFORM_WIN32_KHR
+#endif
+#ifdef __unix__
+#define VK_USE_PLATFORM_XLIB_KHR
+#endif
 
 #define VMA_IMPLEMENTATION
 #include "RendererVK.h"
@@ -1433,4 +1439,13 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 
 	m_Pipelines.push_back(std::move(info));
 	return static_cast<intptr_t>(m_Pipelines.size() - 1);
+}
+
+void
+RendererVK::TryVideoMode(const VideoModeParams& params)
+{
+	m_Device.waitIdle();
+
+	m_Surface = CreateSurfaceKHR(m_Instance);
+	RecreateSwapchain(params);
 }

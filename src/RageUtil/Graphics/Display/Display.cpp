@@ -8,9 +8,8 @@
 #include "archutils/Win32/GraphicsWindow.h"
 #endif
 
-Display::Display::Display(
-  std::function<std::unique_ptr<Renderer>()> rendererFactory)
-  : m_RendererFactory(rendererFactory)
+Display::Display::Display(std::unique_ptr<Renderer> renderer)
+  : m_Renderer(std::move(renderer))
   , m_RenderState()
 {
 }
@@ -18,7 +17,6 @@ Display::Display::Display(
 std::string
 Display::Display::Init(VideoModeParams&& p, bool bAllowUnacceleratedRenderer)
 {
-	m_Renderer = m_RendererFactory();
 	Locator::getLogger()->info("Display::Display::Init()");
 	Locator::getLogger()->info("Current renderer: UnstableDisplay - {}",
 							   m_Renderer->GetApiDescription());
@@ -89,12 +87,14 @@ Display::Display::TryVideoMode(const VideoModeParams& p, bool& bNewDeviceOut)
 	m_Window->TryVideoMode(p, bNewDeviceOut);
 #endif
 
-	m_Renderer = m_RendererFactory();
-	m_Renderer->InitializeRenderer(p);
+	if (!m_IsInitDone) {
+		m_Renderer->InitializeRenderer(p);
+	} else {
+		m_Renderer->TryVideoMode(p);
+	}
 
 	ResolutionChanged();
 
-	// OnRender() with a black clearing to not whiteblast people?
 	m_Renderer->OnRender(GetActualVideoModeParams(), m_Batcher);
 
 	m_IsInitDone = true;
