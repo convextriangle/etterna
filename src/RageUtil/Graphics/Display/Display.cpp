@@ -36,6 +36,12 @@ DisplayAdapter::Display::Init(VideoModeParams&& p,
 void
 DisplayAdapter::Display::GetDisplaySpecs(DisplaySpecs& out) const
 {
+#ifdef _WIN32
+// TODO
+#endif
+#ifdef __unix__
+	m_Window->GetDisplaySpecs(out);
+#endif
 }
 
 void
