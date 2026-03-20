@@ -34,7 +34,8 @@ DisplayAdapter::CommandBatcher::InsertPipelineChangeCommand(
 	PipelineSettings settings = {};
 	if (persist) {
 		if (pipeline) {
-			m_PipelineStack.emplace(pipeline, vertexShaderInfo, fragShaderInfo);
+			m_PipelineStack.push(
+			  { pipeline, vertexShaderInfo, fragShaderInfo });
 		} else {
 			m_PipelineStack.pop();
 		}
@@ -55,8 +56,8 @@ DisplayAdapter::CommandBatcher::InsertPipelineChangeCommand(
 		  std::tie(m_CurrentPipeline->GraphicsPipeline,
 				   m_CurrentPipeline->VertexShaderArg,
 				   m_CurrentPipeline->FragShaderArg)) {
-		m_RenderNodes[m_CurrentNodeIndex].DrawCalls.emplace_back(
-		  settings, m_IndexBuffer.size(), 0);
+		m_RenderNodes[m_CurrentNodeIndex].DrawCalls.push_back(
+		  { settings, m_IndexBuffer.size(), (size_t)0 });
 	}
 
 	m_CurrentPipeline = settings;
@@ -68,16 +69,16 @@ DisplayAdapter::CommandBatcher::InsertRenderTargetCommand(intptr_t renderTarget,
 {
 	if (renderTarget == 0) {
 		if (!m_SwapchainNodeIndex.has_value()) {
-			m_RenderNodes.emplace_back(
-			  renderTarget, preserveTexture, std::vector<DrawCall>());
+			m_RenderNodes.push_back(
+			  { renderTarget, preserveTexture, std::vector<DrawCall>() });
 			m_SwapchainNodeIndex = m_RenderNodes.size() - 1;
 		}
 		m_CurrentNodeIndex = *m_SwapchainNodeIndex;
 		m_RenderNodes[m_CurrentNodeIndex].PreserveRenderTarget =
 		  preserveTexture;
 	} else {
-		m_RenderNodes.emplace_back(
-		  renderTarget, preserveTexture, std::vector<DrawCall>());
+		m_RenderNodes.push_back(
+		  { renderTarget, preserveTexture, std::vector<DrawCall>() });
 		m_CurrentNodeIndex = m_RenderNodes.size() - 1;
 	}
 }
@@ -107,11 +108,11 @@ DisplayAdapter::CommandBatcher::InsertSpriteDrawCommand(
 	//    so just convert to a triangle list
 	// -- unrolled loops look funny though
 	m_MatrixStateBuffer.push_back(matrixState);
-	m_DrawSettingsBuffer.emplace_back(
-	  m_VertexBuffer.size(),
-	  (uint32_t)m_MatrixStateBuffer.size() - 1,
-	  (uint32_t)renderState.textureHandle,
-	  GetSamplerFlagsFromRenderState(renderState));
+	m_DrawSettingsBuffer.push_back(
+	  { (uint32_t)m_VertexBuffer.size(),
+		(uint32_t)m_MatrixStateBuffer.size() - 1,
+		(uint32_t)renderState.textureHandle,
+		GetSamplerFlagsFromRenderState(renderState) });
 
 	const auto previousVertexCount = m_VertexBuffer.size();
 	m_VertexBuffer.resize(previousVertexCount + vertexCount);
@@ -259,11 +260,11 @@ DisplayAdapter::CommandBatcher::InsertCompiledGeometryDrawCommand(
 		m_MatrixStateBuffer.back().texture.m[3][1] = 0;
 	}
 
-	m_DrawSettingsBuffer.emplace_back(
-	  m_VertexBuffer.size(),
-	  (uint32_t)m_MatrixStateBuffer.size() - 1,
-	  (uint32_t)renderState.textureHandle,
-	  GetSamplerFlagsFromRenderState(renderState));
+	m_DrawSettingsBuffer.push_back(
+	  { (uint32_t)m_VertexBuffer.size(),
+		(uint32_t)m_MatrixStateBuffer.size() - 1,
+		(uint32_t)renderState.textureHandle,
+		GetSamplerFlagsFromRenderState(renderState) });
 
 	RageVColor whiteVColor = {};
 	whiteVColor.r = UINT8_MAX;
@@ -274,7 +275,7 @@ DisplayAdapter::CommandBatcher::InsertCompiledGeometryDrawCommand(
 	const auto previousVertexCount = m_VertexBuffer.size();
 	for (int i = 0; i < meshInfo.iVertexCount; i++) {
 		const auto& vertex = geometry->m_Vertices[meshInfo.iVertexStart + i];
-		m_VertexBuffer.emplace_back(vertex.p, vertex.n, whiteVColor, vertex.t);
+		m_VertexBuffer.push_back({ vertex.p, vertex.n, whiteVColor, vertex.t });
 	}
 
 	const auto prevIndexCount = m_IndexBuffer.size();
@@ -307,8 +308,8 @@ DisplayAdapter::CommandBatcher::HandleDrawCommand(
 
 	auto& node = m_RenderNodes[m_CurrentNodeIndex];
 	if (!node.DrawCalls.size()) {
-		m_RenderNodes[m_CurrentNodeIndex].DrawCalls.emplace_back(
-		  *m_CurrentPipeline, indexOffset, 0);
+		m_RenderNodes[m_CurrentNodeIndex].DrawCalls.push_back(
+		  { *m_CurrentPipeline, (size_t)indexOffset, (size_t)0 });
 	}
 
 	// if we previously filled in a different draw call, we should create a new
@@ -322,7 +323,8 @@ DisplayAdapter::CommandBatcher::HandleDrawCommand(
 		node.DrawCalls[node.DrawCalls.size() - 1].IndexCount +
 			node.DrawCalls[node.DrawCalls.size() - 1].IndexOffset !=
 		  indexOffset) {
-		node.DrawCalls.emplace_back(*m_CurrentPipeline, indexOffset, 0);
+		node.DrawCalls.push_back(
+		  { *m_CurrentPipeline, (size_t)indexOffset, (size_t)0 });
 	}
 
 	node.DrawCalls[node.DrawCalls.size() - 1].IndexCount += indexCount;
