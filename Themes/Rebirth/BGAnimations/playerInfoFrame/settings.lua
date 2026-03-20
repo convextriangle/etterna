@@ -404,6 +404,8 @@ local translations = {
     AllowBGChangesExplanation = THEME:GetString("Settings", "AllowBGChangesExplanation"),
     EasterEggs = THEME:GetString("Settings", "EasterEggs"),
     EasterEggsExplanation = THEME:GetString("Settings", "EasterEggsExplanation"),
+    MultiToasty = THEME:GetString("Settings", "MultiToasty"),
+    MultiToastyExplanation = THEME:GetString("Settings", "MultiToastyExplanation"),
     Visualizer = THEME:GetString("Settings", "Visualizer"),
     VisualizerExplanation = THEME:GetString("Settings", "VisualizerExplanation"),
     MidGrades = THEME:GetString("Settings", "MidGrades"),
@@ -3678,8 +3680,7 @@ local function rightFrame()
                             wheel:playcommand("SelectCurrent")
                         else
                             -- select random
-                            local group = WHEELDATA:GetRandomFolder()
-                            local song = WHEELDATA:GetRandomSongInFolder(group)
+                            local song = WHEELDATA:GetRandomSongReversible(false)
                             wheel:playcommand("FindSong", {song = song})
                             wheel:playcommand("SelectCurrent")
                         end
@@ -4146,8 +4147,7 @@ local function rightFrame()
                                 wheel:playcommand("SelectCurrent")
                             else
                                 -- select random
-                                local group = WHEELDATA:GetRandomFolder()
-                                local song = WHEELDATA:GetRandomSongInFolder(group)
+                                local song = WHEELDATA:GetRandomSongReversible(false)
                                 wheel:playcommand("FindSong", {song = song})
                                 wheel:playcommand("SelectCurrent")
                             end
@@ -6148,6 +6148,15 @@ local function rightFrame()
                 Choices = choiceSkeleton("On", "Off"),
                 Directions = preferenceToggleDirections("EasterEggs", true, false),
                 ChoiceIndexGetter = preferenceToggleIndexGetter("EasterEggs", true),
+            },
+            {
+                Name = "MultiToasty",
+                DisplayName = translations["MultiToasty"],
+                Type = "SingleChoice",
+                Explanation = translations["MultiToastyExplanation"],
+                Choices = choiceSkeleton("On", "Off"),
+                Directions = preferenceToggleDirections("MultiToasty", true, false),
+                ChoiceIndexGetter = preferenceToggleIndexGetter("MultiToasty", true),
             },
             {
                 Name = "Music Visualizer",
