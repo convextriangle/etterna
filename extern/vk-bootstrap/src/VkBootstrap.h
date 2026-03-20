@@ -86,6 +86,42 @@ struct Error {
 #pragma GCC diagnostic pop
 #endif
 
+// because we still support macOS 10.10-10.11? and it doesn't fully support C++17
+namespace utils {
+    template<typename T, typename... Types>
+    T& get(std::variant<Types...>& v) {
+        return std::visit([](auto&& arg) -> T& {
+            using U = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<U, T>)
+                return arg;
+            else
+                throw std::bad_variant_access();
+        }, v);
+    }
+
+    template<typename T, typename... Types>
+    const T& get(const std::variant<Types...>& v) {
+        return std::visit([](auto&& arg) -> const T& {
+            using U = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<U, T>)
+                return arg;
+            else
+                throw std::bad_variant_access();
+        }, v);
+    }
+
+    template<typename T, typename... Types>
+    T&& get(std::variant<Types...>&& v) {
+        return std::visit([](auto&& arg) -> T&& {
+            using U = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<U, T>)
+                return std::move(arg);
+            else
+                throw std::bad_variant_access();
+        }, std::move(v));
+    }
+}
+
 template <typename T> class Result {
     public:
     Result(const T& value) noexcept : m_data{ value } {}
@@ -117,28 +153,28 @@ template <typename T> class Result {
         return *this;
     }
     // clang-format off
-    const T* operator-> () const { return &std::get<T>(m_data); }
-    T*       operator-> ()       { return &std::get<T>(m_data); }
-    const T& operator* () const& { return std::get<T>(m_data); }
-    T&       operator* () &      { return std::get<T>(m_data); }
-    T        operator* () &&     { return std::move(std::get<T>(m_data)); }
-    const T&  value () const&    { return std::get<T>(m_data); }
-    T&        value () &         { return std::get<T>(m_data); }
-    T         value () &&        { return std::move(std::get<T>(m_data)); }
+    const T* operator-> () const { return &utils::get<T>(m_data); }
+    T*       operator-> ()       { return &utils::get<T>(m_data); }
+    const T& operator* () const& { return utils::get<T>(m_data); }
+    T&       operator* () &      { return utils::get<T>(m_data); }
+    T        operator* () &&     { return std::move(utils::get<T>(m_data)); }
+    const T&  value () const&    { return utils::get<T>(m_data); }
+    T&        value () &         { return utils::get<T>(m_data); }
+    T         value () &&        { return std::move(utils::get<T>(m_data)); }
 
     // std::error_code associated with the error
-    std::error_code error() const { return std::get<Error>(m_data).type; }
+    std::error_code error() const { return utils::get<Error>(m_data).type; }
     // optional VkResult that could of been produced due to the error
-    VkResult vk_result() const { return std::get<Error>(m_data).vk_result; }
+    VkResult vk_result() const { return utils::get<Error>(m_data).vk_result; }
     // Returns the struct that holds the std::error_code and VkResult
-    Error full_error() const { return std::get<Error>(m_data); }
+    Error full_error() const { return utils::get<Error>(m_data); }
     // Returns the detailed error list that contributed to the error. Example: Reasons why VkPhysicalDevices failed to be selected
-    std::vector<std::string> const& detailed_failure_reasons() const  { return std::get<Error>(m_data).detailed_failure_reasons; }
+    std::vector<std::string> const& detailed_failure_reasons() const  { return utils::get<Error>(m_data).detailed_failure_reasons; }
     // clang-format on
 
     // check if the result has an error that matches a specific error case
     template <typename E> bool matches_error(E error_enum_value) const {
-        return !has_value() && static_cast<E>(std::get<Error>(m_data).type.value()) == error_enum_value;
+        return !has_value() && static_cast<E>(utils::get<Error>(m_data).type.value()) == error_enum_value;
     }
 
     bool has_value() const { return std::holds_alternative<T>(m_data); }
