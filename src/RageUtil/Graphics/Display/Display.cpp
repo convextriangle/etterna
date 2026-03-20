@@ -26,7 +26,7 @@ DisplayAdapter::Display::Init(VideoModeParams&& p,
 	GraphicsWindow::Initialize(false);
 #endif
 #ifdef __unix__
-	m_Window = LowLevelWindow::Create();
+	m_Window = LowLevelWindowVK::Create();
 #endif
 
 	bool ignored = false;
@@ -51,7 +51,7 @@ DisplayAdapter::Display::BeginFrame()
 #ifdef _WIN32
 	GraphicsWindow::Update();
 #else
-// #error todo
+	m_Window->Update();
 #endif
 	m_Batcher.Clear();
 	m_RenderState.textureFiltering = true;

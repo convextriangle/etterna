@@ -18,7 +18,10 @@
 
 #elif defined(__unix__)
 #include "LowLevelWindow/LowLevelWindow_X11.h"
-
+#include "LowLevelWindowVK/LowLevelWindowVK_X11.h"
+#ifndef LOW_LEVEL_WINDOW_VK
+#define LOW_LEVEL_WINDOW_VK LowLevelWindowVK_X11
+#endif
 #if defined(HAVE_GTK)
 #include "LoadingWindow/LoadingWindow_Gtk.h"
 #endif

@@ -9,7 +9,7 @@
 #include <functional>
 
 #ifdef __unix__
-#include "arch/LowLevelWindow/LowLevelWindow_X11.h"
+#include "arch/LowLevelWindowVK/LowLevelWindowVK.h"
 #endif
 
 namespace DisplayAdapter {
@@ -129,7 +129,7 @@ class Display : public RageDisplay
 	intptr_t m_CurrentRenderTarget = 0;
 
 #ifdef __unix__
-	LowLevelWindow* m_Window = nullptr;
+	LowLevelWindowVK* m_Window = nullptr;
 #endif
 };
 } // namespace Display
