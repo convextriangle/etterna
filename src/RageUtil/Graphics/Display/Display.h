@@ -8,7 +8,7 @@
 #include "RenderState.h"
 #include <functional>
 
-#ifdef __unix__
+#ifndef _WIN32
 #include "arch/LowLevelWindowVK/LowLevelWindowVK.h"
 #endif
 
@@ -128,7 +128,7 @@ class Display : public RageDisplay
 	RenderState m_RenderState;
 	intptr_t m_CurrentRenderTarget = 0;
 
-#ifdef __unix__
+#ifndef _WIN32
 	LowLevelWindowVK* m_Window = nullptr;
 #endif
 };
