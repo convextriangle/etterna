@@ -6,7 +6,7 @@
 LowLevelWindowVK*
 LowLevelWindowVK::Create()
 {
-#ifdef _WIN32
+#ifndef __unix__
 	assert(false && "Should never be called");
 	return nullptr;
 #else
