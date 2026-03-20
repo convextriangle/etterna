@@ -37,7 +37,7 @@
 #include <vector>
 #include <string>
 #include <system_error>
-#include <variant>
+#include <memory>
 
 #include <vulkan/vulkan_core.h>
 
@@ -86,102 +86,55 @@ struct Error {
 #pragma GCC diagnostic pop
 #endif
 
-// because we still support macOS 10.10-10.11? and it doesn't fully support C++17
-namespace utils {
-    template<typename T, typename... Types>
-    T& get(std::variant<Types...>& v) {
-        return std::visit([](auto&& arg) -> T& {
-            using U = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<U, T>)
-                return arg;
-            else
-                throw std::bad_variant_access();
-        }, v);
+// patched because we still support macOS 10.10-10.11? and it doesn't fully support C++17's std::variant
+template <typename T>
+class Result {
+public:
+    Result(const T& value) : m_hasValue(true), m_value(new T(value)), m_error() {}
+    Result(T&& value) : m_hasValue(true), m_value(new T(std::move(value))), m_error() {}
+
+    Result(const Error& error) : m_hasValue(false), m_value(), m_error(new Error(error)) {}
+    Result(Error&& error) : m_hasValue(false), m_value(), m_error(new Error(std::move(error))) {}
+
+    Result(std::error_code error_code, VkResult result = VK_SUCCESS)
+        : m_hasValue(false), m_value(), m_error(new Error{ error_code, result, {} }) {}
+
+    Result(std::error_code error_code, std::vector<std::string> const& detailed_failure_reasons)
+        : m_hasValue(false), m_value(), m_error(new Error{ error_code, VK_SUCCESS, detailed_failure_reasons }) {}
+
+    Result(const Result&) = delete;
+    Result& operator=(const Result&) = delete;
+    Result(Result&&) = default;
+    Result& operator=(Result&&) = default;
+
+    T* operator->() { return m_value.get(); }
+    const T* operator->() const { return m_value.get(); }
+    T& operator*() & { return *m_value; }
+    const T& operator*() const& { return *m_value; }
+    T operator*() && { return std::move(*m_value); }
+    T& value() & { return *m_value; }
+    const T& value() const& { return *m_value; }
+    T value() && { return std::move(*m_value); }
+
+    std::error_code error() const { return m_error->type; }
+    VkResult vk_result() const { return m_error->vk_result; }
+    Error full_error() const { return *m_error; }
+    const std::vector<std::string>& detailed_failure_reasons() const {
+        return m_error->detailed_failure_reasons;
     }
 
-    template<typename T, typename... Types>
-    const T& get(const std::variant<Types...>& v) {
-        return std::visit([](auto&& arg) -> const T& {
-            using U = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<U, T>)
-                return arg;
-            else
-                throw std::bad_variant_access();
-        }, v);
+    bool has_value() const { return m_hasValue; }
+    explicit operator bool() const { return m_hasValue; }
+
+    template <typename E>
+    bool matches_error(E error_enum_value) const {
+        return !m_hasValue && static_cast<E>(m_error->type.value()) == error_enum_value;
     }
 
-    template<typename T, typename... Types>
-    T&& get(std::variant<Types...>&& v) {
-        return std::visit([](auto&& arg) -> T&& {
-            using U = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<U, T>)
-                return std::move(arg);
-            else
-                throw std::bad_variant_access();
-        }, std::move(v));
-    }
-}
-
-template <typename T> class Result {
-    public:
-    Result(const T& value) noexcept : m_data{ value } {}
-    Result(T&& value) noexcept : m_data{ std::move(value) } {}
-
-    Result(const Error& error) noexcept : m_data{ error } {}
-    Result(Error&& error) noexcept : m_data{ std::move(error) } {}
-
-    Result(std::error_code error_code, VkResult result = VK_SUCCESS) noexcept
-    : m_data{ Error{ error_code, result, {} } } {}
-
-    Result(std::error_code error_code, std::vector<std::string> const& detailed_failure_reasons) noexcept
-    : m_data{ Error{ error_code, VK_SUCCESS, detailed_failure_reasons } } {}
-
-    Result& operator=(const T& expect) noexcept {
-        m_data = expect;
-        return *this;
-    }
-    Result& operator=(T&& expect) noexcept {
-        m_data = std::move(expect);
-        return *this;
-    }
-    Result& operator=(const Error& error) noexcept {
-        m_data = error;
-        return *this;
-    }
-    Result& operator=(Error&& error) noexcept {
-        m_data = std::move(error);
-        return *this;
-    }
-    // clang-format off
-    const T* operator-> () const { return &utils::get<T>(m_data); }
-    T*       operator-> ()       { return &utils::get<T>(m_data); }
-    const T& operator* () const& { return utils::get<T>(m_data); }
-    T&       operator* () &      { return utils::get<T>(m_data); }
-    T        operator* () &&     { return std::move(utils::get<T>(m_data)); }
-    const T&  value () const&    { return utils::get<T>(m_data); }
-    T&        value () &         { return utils::get<T>(m_data); }
-    T         value () &&        { return std::move(utils::get<T>(m_data)); }
-
-    // std::error_code associated with the error
-    std::error_code error() const { return utils::get<Error>(m_data).type; }
-    // optional VkResult that could of been produced due to the error
-    VkResult vk_result() const { return utils::get<Error>(m_data).vk_result; }
-    // Returns the struct that holds the std::error_code and VkResult
-    Error full_error() const { return utils::get<Error>(m_data); }
-    // Returns the detailed error list that contributed to the error. Example: Reasons why VkPhysicalDevices failed to be selected
-    std::vector<std::string> const& detailed_failure_reasons() const  { return utils::get<Error>(m_data).detailed_failure_reasons; }
-    // clang-format on
-
-    // check if the result has an error that matches a specific error case
-    template <typename E> bool matches_error(E error_enum_value) const {
-        return !has_value() && static_cast<E>(utils::get<Error>(m_data).type.value()) == error_enum_value;
-    }
-
-    bool has_value() const { return std::holds_alternative<T>(m_data); }
-    explicit operator bool() const { return has_value(); }
-
-    private:
-    std::variant<T, Error> m_data;
+private:
+    bool m_hasValue;
+    std::unique_ptr<T> m_value;
+    std::unique_ptr<Error> m_error;
 };
 
 namespace detail {
