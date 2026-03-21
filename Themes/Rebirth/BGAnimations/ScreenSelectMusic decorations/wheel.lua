@@ -1,38 +1,38 @@
--- 11 visible items (top is a group header)
--- an unfortunate amount of code is reliant on the fact that there are 11 items
--- but thankfully everything works fine if you change it
--- ... the header wont look very good if you push it off the screen though
--- (retrospective comment: wtf i changed this to 14 and it still works)
+ -- 11 visible items (top is a group header)
+ -- an unfortunate amount of code is reliant on the fact that there are 11 items
+ -- but thankfully everything works fine if you change it
+ -- ... the header wont look very good if you push it off the screen though
+ -- (retrospective comment: wtf i changed this to 14 and it still works)
 local numWheelItems = 14
 
 local ratios = {
     LeftGap = 16 / 1920,
-    UpperGap = 219 / 1080,    -- distance from top of screen, not info frame
-    LowerGap = 0 / 1080,      -- expected, maybe unused
+    UpperGap = 219 / 1080, -- distance from top of screen, not info frame
+    LowerGap = 0 / 1080, -- expected, maybe unused
     Width = 867 / 1920,
-    Height = 861 / 1080,      -- does not include the header
+    Height = 861 / 1080, -- does not include the header
     ItemHeight = 86.5 / 1080, -- 85 + 2 to account for half of the upper and lower item dividers
     ItemDividerThickness = 2 / 1080,
     ItemDividerLength = 584 / 1920,
-    ItemTextUpperGap = 20 / 1080,            -- distance from top of item to center of title text
-    ItemTextLowerGap = 18 / 1080,            -- distance from center of divider to center of author text
-    ItemTextCenterDistance = 40 / 1080,      -- distance from lower (divider center) to center of subtitle
-    ItemGradeTextRightGap = 24 / 1920,       -- distance from right of item to right edge of text
-    ItemGradeTextMaxWidth = 86 / 1920,       -- approximation of width of the AAAAA grade
-    ItemFavoriteIconRightGap = 18 / 1920,    -- from right edge of banner to middle of favorite icon
-    ItemFavoriteIconSize = 36 / 1080,        -- width and height of the icon
+    ItemTextUpperGap = 20 / 1080, -- distance from top of item to center of title text
+    ItemTextLowerGap = 18 / 1080, -- distance from center of divider to center of author text
+    ItemTextCenterDistance = 40 / 1080, -- distance from lower (divider center) to center of subtitle
+    ItemGradeTextRightGap = 24 / 1920, -- distance from right of item to right edge of text
+    ItemGradeTextMaxWidth = 86 / 1920, -- approximation of width of the AAAAA grade
+    ItemFavoriteIconRightGap = 18 / 1920, -- from right edge of banner to middle of favorite icon
+    ItemFavoriteIconSize = 36 / 1080, -- width and height of the icon
     ItemPermamirrorIconRightGap = 40 / 1920, -- from right edge of banner to middle of favorite icon
-    ItemPermamirrorIconSize = 39 / 1080,     -- width and height of the icon
+    ItemPermamirrorIconSize = 39 / 1080, -- width and height of the icon
     BannerWidth = 265 / 1920,
-    BannerItemGap = 18 / 1920,               -- gap between banner and item text/dividers
+    BannerItemGap = 18 / 1920, -- gap between banner and item text/dividers
     HeaderHeight = 110 / 1080,
-    HeaderUpperGap = 109 / 1080,             -- top of screen to top of frame (same as playerinfo height)
-    wtffudge = 45 / 1080,                    -- this random number fixes the weird offset of the wheel vertically so that it fits perfectly with the header
+    HeaderUpperGap = 109 / 1080, -- top of screen to top of frame (same as playerinfo height)
+    wtffudge = 45 / 1080, -- this random number fixes the weird offset of the wheel vertically so that it fits perfectly with the header
     -- effective measurements for group specific information
     HeaderBannerWidth = 336 / 1920,
     HeaderText1UpperGap = 21 / 1080, -- distance from top edge to top text top edge
     HeaderText2UpperGap = 68 / 1080, -- distance from top edge to top edge of lower text
-    HeaderTextLeftGap = 21 / 1920,   -- distance from edge of banner to left of text
+    HeaderTextLeftGap = 21 / 1920, -- distance from edge of banner to left of text
     -- effective measurements for the header lines when not in group specific info mode
     HeaderMText1UpperGap = 16 / 1080,
     HeaderMText2UpperGap = 47 / 1080,
@@ -113,8 +113,7 @@ local primaryTextColor = COLORS:getMainColor("PrimaryText")
 -- header related things
 local headerTransitionSeconds = 0.2
 local graphBoundTextSize = 0.4
-local graphBoundOffset = 10 / 1080 *
-    SCREEN_HEIGHT -- offset the graph bounds diagonally by this much for alignment reasons
+local graphBoundOffset = 10 / 1080 * SCREEN_HEIGHT -- offset the graph bounds diagonally by this much for alignment reasons
 local graphWidth = actuals.ItemDividerLength - actuals.ItemGradeTextRightGap / 2
 local playsThisSession = SCOREMAN:GetNumScoresThisSession()
 local scoresThisSession = SCOREMAN:GetScoresThisSession()
@@ -224,10 +223,10 @@ end
 
 -- generate vertices for 1 dot in the graph
 local function createVertices(vt, x, y, c)
-    vt[#vt + 1] = { { x, y, 0 }, c }
+    vt[#vt + 1] = {{x, y, 0}, c}
 end
 
--- generate the vertices to put into the ActorMultiVertex for the MiscPage graph
+-- generate the vertices to put into the ActorFrameTexture for the MiscPage graph
 local function generateRecentWifeScoreGraph()
     local v = {}
     -- update color if it happened to update before now
@@ -421,18 +420,18 @@ local function wheelItemBase()
                 if getWheelPosition() then
                     if useWheelBanners() then
                         self:zoomto(actuals.ItemDividerLength, actuals.ItemDividerThickness)
-                        self:xy(actuals.Width / 2 - actuals.ItemDividerLength, -actuals.ItemHeight / 2)
+                        self:xy(actuals.Width / 2 - actuals.ItemDividerLength, -actuals.ItemHeight/2)
                     else
                         self:zoomto(actuals.Width, actuals.ItemDividerThickness)
-                        self:xy(actuals.Width / 2 - actuals.Width, -actuals.ItemHeight / 2)
+                        self:xy(actuals.Width / 2 - actuals.Width, -actuals.ItemHeight/2)
                     end
                 else
                     if useWheelBanners() then
                         self:zoomto(actuals.ItemDividerLength, actuals.ItemDividerThickness)
-                        self:xy(-actuals.Width / 2, -actuals.ItemHeight / 2)
+                        self:xy(-actuals.Width / 2, -actuals.ItemHeight/2)
                     else
                         self:zoomto(actuals.Width, actuals.ItemDividerThickness)
-                        self:xy(-actuals.Width / 2, -actuals.ItemHeight / 2)
+                        self:xy(-actuals.Width / 2, -actuals.ItemHeight/2)
                     end
                 end
             end,
@@ -472,11 +471,6 @@ local function songBannerSetter(self, song, isCurrentItem)
         end
         if self.bnpath ~= bnpath then
             self:Load(bnpath)
-            if self:GetNumStates() > 1 then
-                self:StopUsingCustomTexCoords()
-            else
-                self:EnableCustomTexCoords()
-            end
         end
         self.bnpath = bnpath
     end
@@ -507,11 +501,6 @@ local function groupBannerSetter(self, group, isCurrentItem)
     end
     if self.bnpath ~= bnpath then
         self:Load(bnpath)
-        if self:GetNumStates() > 1 then
-            self:StopUsingCustomTexCoords()
-        else
-            self:EnableCustomTexCoords()
-        end
     end
     self.bnpath = bnpath
 end
@@ -520,8 +509,8 @@ end
 local function songActorUpdater(songFrame, song, isCurrentItem)
     songFrame.Title:settext(song:GetDisplayMainTitle())
     songFrame.SubTitle:settext(song:GetDisplaySubTitle())
-    songFrame.Artist:settext("~" .. song:GetDisplayArtist())
-    songFrame.Grade:playcommand("SetGrade", { grade = song:GetHighestGrade() })
+    songFrame.Artist:settext("~"..song:GetDisplayArtist())
+    songFrame.Grade:playcommand("SetGrade", {grade = song:GetHighestGrade()})
     songFrame.Favorited:diffusealpha(#WHEELDATA:GetFavoritedCharts(song) > 0 and 1 or 0)
     songFrame.Permamirror:diffusealpha(#WHEELDATA:GetPermaMirrorCharts(song) > 0 and 1 or 0)
     songBannerSetter(songFrame.Banner, song, isCurrentItem)
@@ -534,9 +523,9 @@ local function groupActorUpdater(groupFrame, packName, isCurrentItem)
     local clearstats = WHEELDATA:GetFolderClearStats(packName)
 
     groupFrame.Title:settext(packName)
-    groupFrame.GroupInfo:playcommand("SetInfo", { count = packCount, avg = packAverageDiff[1] })
-    groupFrame.ClearStats:playcommand("SetInfo", { stats = clearstats })
-    groupFrame.ScoreStats:playcommand("SetInfo", { stats = clearstats, count = packCount })
+    groupFrame.GroupInfo:playcommand("SetInfo", {count = packCount, avg = packAverageDiff[1]})
+    groupFrame.ClearStats:playcommand("SetInfo", {stats = clearstats})
+    groupFrame.ScoreStats:playcommand("SetInfo", {stats = clearstats, count = packCount})
     groupBannerSetter(groupFrame.Banner, packName, isCurrentItem)
 end
 
@@ -567,21 +556,17 @@ local function songActorBuilder()
                 if getWheelPosition() then
                     if useWheelBanners() then
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength)
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemTitleTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemTitleTextSize - textzoomfudge)
                     else
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength - actuals.BannerWidth)
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemTitleTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemTitleTextSize - textzoomfudge)
                     end
                 else
                     self:x((-actuals.Width / 2) + actuals.ItemGradeTextMaxWidth + actuals.ItemGradeTextRightGap)
                     if useWheelBanners() then
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemTitleTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemTitleTextSize - textzoomfudge)
                     else
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemTitleTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemTitleTextSize - textzoomfudge)
                     end
                 end
                 self:y(-actuals.ItemHeight / 2 + actuals.ItemTextUpperGap)
@@ -610,21 +595,17 @@ local function songActorBuilder()
                 if getWheelPosition() then
                     if useWheelBanners() then
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength)
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemSubTitleTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemSubTitleTextSize - textzoomfudge)
                     else
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength - actuals.BannerWidth)
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemSubTitleTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemSubTitleTextSize - textzoomfudge)
                     end
                 else
                     self:x((-actuals.Width / 2) + actuals.ItemGradeTextMaxWidth + actuals.ItemGradeTextRightGap)
                     if useWheelBanners() then
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemSubTitleTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemSubTitleTextSize - textzoomfudge)
                     else
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemSubTitleTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemSubTitleTextSize - textzoomfudge)
                     end
                 end
                 self:y(actuals.ItemHeight / 2 - actuals.ItemTextCenterDistance)
@@ -653,23 +634,19 @@ local function songActorBuilder()
                     self:halign(0)
                     if useWheelBanners() then
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength)
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemArtistTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemArtistTextSize - textzoomfudge)
                     else
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength - actuals.BannerWidth)
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemArtistTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemArtistTextSize - textzoomfudge)
                     end
                 else
                     self:halign(1)
                     if useWheelBanners() then
                         self:x(actuals.Width / 2 - actuals.BannerWidth - actuals.ItemGradeTextRightGap)
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap * 2) /
-                            wheelItemArtistTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap * 2) / wheelItemArtistTextSize - textzoomfudge)
                     else
                         self:x(actuals.Width / 2 - actuals.ItemGradeTextRightGap)
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemArtistTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemArtistTextSize - textzoomfudge)
                     end
                 end
                 self:y(actuals.ItemHeight / 2 - actuals.ItemTextLowerGap)
@@ -706,8 +683,7 @@ local function songActorBuilder()
                 else
                     self:halign(0.5)
                     self:x(-actuals.Width / 2 + (actuals.ItemGradeTextMaxWidth + actuals.ItemGradeTextRightGap) / 2)
-                    self:maxwidth((actuals.ItemGradeTextMaxWidth - (actuals.ItemGradeTextRightGap)) /
-                        wheelItemGradeTextSize)
+                    self:maxwidth((actuals.ItemGradeTextMaxWidth - (actuals.ItemGradeTextRightGap)) / wheelItemGradeTextSize)
                 end
             end,
             UpdateWheelPositionCommand = function(self)
@@ -828,6 +804,7 @@ end
 
 -- generates the clear stats bar for each group
 local function scoreStatsFrame()
+
     -- list of grades to consider (midgrades will be converted appropriately based on the table below)
     local gradesToUse = {
         "Grade_Tier01", -- AAAAA
@@ -843,21 +820,18 @@ local function scoreStatsFrame()
     -- lists of grades that are equivalent to the current grade
     -- all keys of this should match the above table
     local expandedGrades = {
-        Grade_Tier01 = { "Grade_Tier01" },
-        Grade_Tier04 = { "Grade_Tier02", "Grade_Tier03", "Grade_Tier04" },
-        Grade_Tier07 = { "Grade_Tier05", "Grade_Tier06", "Grade_Tier07" },
-        Grade_Tier10 = { "Grade_Tier08", "Grade_Tier09", "Grade_Tier10" },
-        Grade_Tier13 = { "Grade_Tier11", "Grade_Tier12", "Grade_Tier13" },
-        Grade_Tier14 = { "Grade_Tier14" },
-        Grade_Tier15 = { "Grade_Tier15" },
-        Grade_Tier20 = { "Grade_Tier20" },
+        Grade_Tier01 = {"Grade_Tier01"},
+        Grade_Tier04 = {"Grade_Tier02", "Grade_Tier03", "Grade_Tier04"},
+        Grade_Tier07 = {"Grade_Tier05", "Grade_Tier06", "Grade_Tier07"},
+        Grade_Tier10 = {"Grade_Tier08", "Grade_Tier09", "Grade_Tier10"},
+        Grade_Tier13 = {"Grade_Tier11", "Grade_Tier12", "Grade_Tier13"},
+        Grade_Tier14 = {"Grade_Tier14"},
+        Grade_Tier15 = {"Grade_Tier15"},
+        Grade_Tier20 = {"Grade_Tier20"},
     }
 
     -- determines the size of the outline quad
-    local function framelength()
-        return useWheelBanners() and actuals.ItemDividerLength * (3 / 4) or
-            actuals.Width * (3 / 4)
-    end
+    local function framelength() return useWheelBanners() and actuals.ItemDividerLength * (3/4) or actuals.Width * (3/4) end
     local frameheight = 11 / 1080 * SCREEN_HEIGHT
     -- determines how much to shave off to make the size fit
     local outlineThickness = 2 / 1080 * SCREEN_HEIGHT
@@ -868,7 +842,7 @@ local function scoreStatsFrame()
     local function makeBar(i)
         local grade = gradesToUse[i]
         return Def.Quad {
-            Name = "Bar_" .. grade,
+            Name = "Bar_"..grade,
             InitCommand = function(self)
                 self:halign(0)
                 self:zoomto(0, barheight)
@@ -914,7 +888,7 @@ local function scoreStatsFrame()
                 local runningsum = 0
                 for i = #gradesToUse, 1, -1 do
                     local grade = gradesToUse[i]
-                    local child = self:GetChild("Bar_" .. grade)
+                    local child = self:GetChild("Bar_"..grade)
                     local percentSoFar = runningsum / params.count
                     local percentForThisBar = (barcounts[grade] or 0) / params.count
                     runningsum = runningsum + (barcounts[grade] or 0)
@@ -954,7 +928,7 @@ local function scoreStatsFrame()
     }
 
     for i = 1, #gradesToUse do
-        t[#t + 1] = makeBar(i)
+        t[#t+1] = makeBar(i)
     end
 
     return t
@@ -1004,21 +978,17 @@ local function groupActorBuilder()
                 if getWheelPosition() then
                     if useWheelBanners() then
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength)
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemGroupTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemGroupTextSize - textzoomfudge)
                     else
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength - actuals.BannerWidth)
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemGroupTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemGroupTextSize - textzoomfudge)
                     end
                 else
                     self:x((-actuals.Width / 2) + actuals.ItemGradeTextMaxWidth + actuals.ItemGradeTextRightGap)
                     if useWheelBanners() then
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemGroupTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemGroupTextSize - textzoomfudge)
                     else
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemGroupTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemGroupTextSize - textzoomfudge)
                     end
                 end
                 self:y(-actuals.ItemHeight / 2 + actuals.ItemTextUpperGap)
@@ -1050,31 +1020,26 @@ local function groupActorBuilder()
             end,
             UpdateTextCommand = function(self)
                 self:visible(not WHEELDATA:inSortModeMenu())
-                self:settextf("%d %s (%s %5.2f)", self.count, translations["NumberOfSongs"],
-                    translations["AverageMSDShort"], self.avg)
+                self:settextf("%d %s (%s %5.2f)", self.count, translations["NumberOfSongs"], translations["AverageMSDShort"], self.avg)
             end,
             SetPositionCommand = function(self)
                 if getWheelPosition() then
                     self:halign(0)
                     if useWheelBanners() then
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength)
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemGroupInfoTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemGroupInfoTextSize - textzoomfudge)
                     else
                         self:x(actuals.Width / 2 - actuals.ItemDividerLength - actuals.BannerWidth)
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemGroupInfoTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemGroupInfoTextSize - textzoomfudge)
                     end
                 else
                     self:halign(1)
                     if useWheelBanners() then
                         self:x(actuals.Width / 2 - actuals.BannerWidth - actuals.ItemGradeTextRightGap)
-                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap * 2) /
-                            wheelItemGroupInfoTextSize - textzoomfudge)
+                        self:maxwidth((actuals.ItemDividerLength - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap * 2) / wheelItemGroupInfoTextSize - textzoomfudge)
                     else
                         self:x(actuals.Width / 2 - actuals.ItemGradeTextRightGap)
-                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) /
-                            wheelItemGroupInfoTextSize - textzoomfudge)
+                        self:maxwidth(((actuals.ItemDividerLength + actuals.BannerWidth) - actuals.ItemGradeTextMaxWidth - actuals.ItemGradeTextRightGap) / wheelItemGroupInfoTextSize - textzoomfudge)
                     end
                 end
                 self:y(actuals.ItemHeight / 2 - actuals.ItemTextLowerGap)
@@ -1125,8 +1090,7 @@ local function groupActorBuilder()
                 else
                     self:halign(0.5)
                     self:x(-actuals.Width / 2 + (actuals.ItemGradeTextMaxWidth + actuals.ItemGradeTextRightGap) / 2)
-                    self:maxwidth((actuals.ItemGradeTextMaxWidth - (actuals.ItemGradeTextRightGap)) /
-                        wheelItemGradeTextSize)
+                    self:maxwidth((actuals.ItemGradeTextMaxWidth - (actuals.ItemGradeTextRightGap)) / wheelItemGradeTextSize)
                 end
             end,
             UpdateWheelPositionCommand = function(self)
@@ -1185,13 +1149,12 @@ local function groupActorBuilder()
     }
 end
 
-t[#t + 1] = Def.ActorFrame {
+t[#t+1] = Def.ActorFrame {
     Name = "WheelContainer",
     InitCommand = function(self)
         -- push from top left of screen, this position is CENTER of the wheel X/Y
         -- also for some odd reason we have to move down by half a wheelItem....
-        self:xy(actuals.LeftGap + actuals.Width / 2,
-            actuals.UpperGap + actuals.Height / 2 - actuals.ItemHeight + actuals.wtffudge)
+        self:xy(actuals.LeftGap + actuals.Width / 2, actuals.UpperGap + actuals.Height / 2 - actuals.ItemHeight + actuals.wtffudge)
         SCREENMAN:set_input_redirected(PLAYER_1, true)
     end,
     BeginCommand = function(self)
@@ -1208,7 +1171,7 @@ t[#t + 1] = Def.ActorFrame {
         self:playcommand("UpdateWheel")
     end,
     UpdateWheelPositionCommand = function(self)
-        self:playcommand("SetFrameTransformer", { f = getFrameTransformer() })
+        self:playcommand("SetFrameTransformer", {f = getFrameTransformer()})
     end,
 
 
@@ -1219,47 +1182,46 @@ t[#t + 1] = Def.ActorFrame {
         startOnPreferred = true,
         songActorBuilder = songActorBuilder,
         groupActorBuilder = groupActorBuilder,
-        highlightBuilder = function()
-            return Def.ActorFrame {
-                Name = "HighlightFrame",
-                Def.Quad {
-                    Name = "Highlight",
-                    InitCommand = function(self)
-                        -- the highlighter should not cover the banner
-                        -- move it by half the size and make it that much smaller
-                        self:playcommand("SetPosition")
-                        self:diffusealpha(0.2)
-                        self:diffuseramp()
-                        self:effectclock("beat")
-                        registerActorToColorConfigElementForDiffuseRamp(self, "musicWheel", "HighlightColor", 0.5, 0.8)
-                    end,
-                    SetPositionCommand = function(self)
-                        if getWheelPosition() then
-                            if useWheelBanners() then
-                                self:x(actuals.BannerWidth / 2)
-                                self:zoomto(actuals.Width - actuals.BannerWidth, actuals.ItemHeight)
-                            else
-                                self:x(0)
-                                self:zoomto(actuals.Width, actuals.ItemHeight)
-                            end
+        highlightBuilder = function() return Def.ActorFrame {
+            Name = "HighlightFrame",
+            Def.Quad {
+                Name = "Highlight",
+                InitCommand = function(self)
+                    -- the highlighter should not cover the banner
+                    -- move it by half the size and make it that much smaller
+                    self:playcommand("SetPosition")
+                    self:diffusealpha(0.2)
+                    self:diffuseramp()
+                    self:effectclock("beat")
+                    registerActorToColorConfigElementForDiffuseRamp(self, "musicWheel", "HighlightColor", 0.5, 0.8)
+                end,
+                SetPositionCommand = function(self)
+                    if getWheelPosition() then
+                        if useWheelBanners() then
+                            self:x(actuals.BannerWidth / 2)
+                            self:zoomto(actuals.Width - actuals.BannerWidth, actuals.ItemHeight)
                         else
-                            if useWheelBanners() then
-                                self:x(-actuals.BannerWidth / 2)
-                                self:zoomto(actuals.Width - actuals.BannerWidth, actuals.ItemHeight)
-                            else
-                                self:x(0)
-                                self:zoomto(actuals.Width, actuals.ItemHeight)
-                            end
+                            self:x(0)
+                            self:zoomto(actuals.Width, actuals.ItemHeight)
                         end
-                    end,
-                    UpdateWheelPositionCommand = function(self)
-                        self:playcommand("SetPosition")
-                    end,
-                    UpdateWheelBannersCommand = function(self)
-                        self:playcommand("SetPosition")
-                    end,
-                }
+                    else
+                        if useWheelBanners() then
+                            self:x(-actuals.BannerWidth / 2)
+                            self:zoomto(actuals.Width - actuals.BannerWidth, actuals.ItemHeight)
+                        else
+                            self:x(0)
+                            self:zoomto(actuals.Width, actuals.ItemHeight)
+                        end
+                    end
+                end,
+                UpdateWheelPositionCommand = function(self)
+                    self:playcommand("SetPosition")
+                end,
+                UpdateWheelBannersCommand = function(self)
+                    self:playcommand("SetPosition")
+                end,
             }
+        }
         end,
         songActorUpdater = songActorUpdater,
         groupActorUpdater = groupActorUpdater,
@@ -1288,7 +1250,7 @@ t[#t + 1] = Def.ActorFrame {
                             local wheel = self:GetParent():GetParent()
                             if distance ~= 0 then
                                 -- clicked a nearby item
-                                wheel:playcommand("Move", { direction = distance })
+                                wheel:playcommand("Move", {direction = distance})
                                 wheel:playcommand("OpenIfGroup")
                             else
                                 -- clicked the current item
@@ -1358,9 +1320,9 @@ t[#t + 1] = Def.ActorFrame {
         MouseScrollMessageCommand = function(self, params)
             if isOver(self) and visible then
                 if params.direction == "Up" then
-                    self:GetParent():GetChild("Wheel"):playcommand("Move", { direction = -1 })
+                    self:GetParent():GetChild("Wheel"):playcommand("Move", {direction = -1})
                 else
-                    self:GetParent():GetChild("Wheel"):playcommand("Move", { direction = 1 })
+                    self:GetParent():GetChild("Wheel"):playcommand("Move", {direction = 1})
                 end
             end
         end,
@@ -1416,7 +1378,7 @@ t[#t + 1] = Def.ActorFrame {
                 if params.event == "DeviceButton_left mouse button" then
                     local max = self:GetZoomedHeight()
                     local dist = params.MouseY
-                    self:GetParent():GetParent():GetChild("Wheel"):playcommand("Move", { percent = dist / max })
+                    self:GetParent():GetParent():GetChild("Wheel"):playcommand("Move", {percent = dist / max})
                 end
             end,
             MouseDragCommand = function(self, params)
@@ -1424,7 +1386,7 @@ t[#t + 1] = Def.ActorFrame {
                 if params.event == "DeviceButton_left mouse button" then
                     local max = self:GetZoomedHeight()
                     local dist = params.MouseY
-                    self:GetParent():GetParent():GetChild("Wheel"):playcommand("Move", { percent = dist / max })
+                    self:GetParent():GetParent():GetChild("Wheel"):playcommand("Move", {percent = dist / max})
                 end
             end,
         },
@@ -1458,10 +1420,10 @@ t[#t + 1] = Def.ActorFrame {
     },
 }
 
-t[#t + 1] = Def.ActorFrame {
+t[#t+1] = Def.ActorFrame {
     Name = "WheelHeader",
     InitCommand = function(self)
-        self:xy(actuals.LeftGap, actuals.HeaderUpperGap)
+        self:xy(actuals.LeftGap,actuals.HeaderUpperGap)
     end,
     ClosedGroupMessageCommand = function(self)
         self:playcommand("ScrolledOutOfGroup")
@@ -1494,22 +1456,22 @@ t[#t + 1] = Def.ActorFrame {
             if params.event == "DeviceButton_left mouse button" then
                 if not self:GetParent():GetChild("GroupPage"):IsInvisible() then
                     -- left clicking the group header gives a random song in the group
-                    local song = WHEELDATA:GetRandomSongInFolderReversible(openedGroup, INPUTFILTER:IsShiftPressed())
+                    local song = WHEELDATA:GetRandomSongInFolder(openedGroup)
                     self:GetParent():GetParent():GetChild("WheelContainer"):playcommand("FindSong", {song = song, group = openedGroup})
                 elseif not self:GetParent():GetChild("MiscPage"):IsInvisible() then
                     -- left clicking the normal header gives a random group (???)
                     local group = WHEELDATA:GetRandomFolder()
-                    self:GetParent():GetParent():GetChild("WheelContainer"):playcommand("FindGroup", { group = group })
+                    self:GetParent():GetParent():GetChild("WheelContainer"):playcommand("FindGroup", {group = group})
                 end
             end
         end,
         MouseOverCommand = function(self)
             self:GetParent():diffusealpha(hoverAlpha)
-            MESSAGEMAN:Broadcast("HoverWheelHeader", { on = true })
+            MESSAGEMAN:Broadcast("HoverWheelHeader", {on = true})
         end,
         MouseOutCommand = function(self)
             self:GetParent():diffusealpha(1)
-            MESSAGEMAN:Broadcast("HoverWheelHeader", { off = true })
+            MESSAGEMAN:Broadcast("HoverWheelHeader", {off = true})
         end,
     },
     Def.ActorFrame {
@@ -1547,11 +1509,6 @@ t[#t + 1] = Def.ActorFrame {
                     self:visible(true)
                 end
                 self:Load(bnpath)
-                if self:GetNumStates() > 1 then
-                    self:StopUsingCustomTexCoords()
-                else
-                    self:EnableCustomTexCoords()
-                end
             end,
             OptionUpdatedMessageCommand = function(self, params)
                 if params and params.name == "Video Banners" then
@@ -1567,8 +1524,7 @@ t[#t + 1] = Def.ActorFrame {
                 self:halign(0):valign(0)
                 self:xy(actuals.HeaderBannerWidth + actuals.HeaderTextLeftGap, actuals.HeaderText1UpperGap)
                 self:zoom(wheelHeaderTextSize)
-                self:maxwidth((actuals.Width - actuals.HeaderTextLeftGap * 2 - actuals.HeaderBannerWidth) /
-                    wheelHeaderTextSize)
+                self:maxwidth((actuals.Width - actuals.HeaderTextLeftGap * 2 - actuals.HeaderBannerWidth) / wheelHeaderTextSize)
                 self:diffusealpha(1)
                 registerActorToColorConfigElement(self, "main", "PrimaryText")
             end,
@@ -1582,16 +1538,14 @@ t[#t + 1] = Def.ActorFrame {
                 self:halign(0):valign(0)
                 self:xy(actuals.HeaderBannerWidth + actuals.HeaderTextLeftGap, actuals.HeaderText2UpperGap)
                 self:zoom(wheelHeaderTextSize)
-                self:maxwidth((actuals.Width - actuals.HeaderTextLeftGap * 2 - actuals.HeaderBannerWidth) /
-                    wheelHeaderTextSize)
+                self:maxwidth((actuals.Width - actuals.HeaderTextLeftGap * 2 - actuals.HeaderBannerWidth) / wheelHeaderTextSize)
                 self:diffusealpha(1)
                 registerActorToColorConfigElement(self, "main", "SecondaryText")
             end,
             SetCommand = function(self)
                 local files = WHEELDATA:GetFolderCount(openedGroup)
                 local avg = WHEELDATA:GetFolderAverageDifficulty(openedGroup)[1]
-                self:settextf("%d %s (%s: %5.2f)", files, translations["NumberOfSongs"], translations["AverageMSDLong"],
-                    avg)
+                self:settextf("%d %s (%s: %5.2f)", files, translations["NumberOfSongs"], translations["AverageMSDLong"], avg)
             end
         }
     },
@@ -1732,10 +1686,10 @@ t[#t + 1] = Def.ActorFrame {
                     local v = generateRecentWifeScoreGraph()
                     if #v > 1 then
                         self:SetVertices(v)
-                        self:SetDrawState { Mode = "DrawMode_LineStrip", First = 1, Num = #v }
+                        self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = #v}
                     else
                         self:SetVertices({})
-                        self:SetDrawState { Mode = "DrawMode_LineStrip", First = 1, Num = 0 }
+                        self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = 0}
                     end
                 end,
                 ColorConfigUpdatedMessageCommand = function(self)
