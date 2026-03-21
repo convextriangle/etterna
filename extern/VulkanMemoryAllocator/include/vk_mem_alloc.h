@@ -2933,7 +2933,7 @@ VmaAllocatorCreateInfo::pVulkanFunctions. Other members can be null.
 #endif
 
 #ifndef VMA_USE_STL_SHARED_MUTEX
-    #if !defined(_APPLE__) && (__cplusplus >= 201703L || _MSVC_LANG >= 201703L) // C++17
+    #if __cplusplus >= 201703L || _MSVC_LANG >= 201703L // C++17
         #define VMA_USE_STL_SHARED_MUTEX 1
     // Visual studio defines __cplusplus properly only when passed additional parameter: /Zc:__cplusplus
     // Otherwise it is always 199711L, despite shared_mutex works since Visual Studio 2015 Update 2.
@@ -3202,7 +3202,7 @@ static void vma_aligned_free(void* VMA_NULLABLE ptr)
 
 // Read-write mutex, where "read" is shared access, "write" is exclusive access.
 #ifndef VMA_RW_MUTEX
-    #if VMA_USE_STL_SHARED_MUTEX
+    #if 0 // apple?
         // Use std::shared_mutex from C++17.
         #include <shared_mutex>
         class VmaRWMutex
