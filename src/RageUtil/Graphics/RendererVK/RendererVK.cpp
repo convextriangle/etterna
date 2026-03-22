@@ -936,19 +936,21 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 				  m_Pipelines[currentPipeline].GraphicsPipeline);
 			}
 
-			if (call.Settings.VertexShaderArg != -1) {
-				buffer.pushConstants<intptr_t>(
+			if (call.Settings.VertexShaderArg != UINT64_MAX) {
+				buffer.pushConstants<uint64_t>(
 				  *m_Pipelines[0].PipelineLayout,
 				  vk::ShaderStageFlagBits::eVertex,
 				  0,
-				  { call.Settings.VertexShaderArg });
+				  { m_ShaderScratchBuffer[m_CurrentFrame].gpuAddress +
+					call.Settings.VertexShaderArg });
 			}
-			if (call.Settings.FragShaderArg != -1) {
-				buffer.pushConstants<intptr_t>(
+			if (call.Settings.FragShaderArg != UINT64_MAX) {
+				buffer.pushConstants<uint64_t>(
 				  *m_Pipelines[0].PipelineLayout,
 				  vk::ShaderStageFlagBits::eFragment,
-				  sizeof(intptr_t),
-				  { call.Settings.FragShaderArg });
+				  sizeof(uint64_t),
+				  { m_ShaderScratchBuffer[m_CurrentFrame].gpuAddress +
+					call.Settings.FragShaderArg });
 			}
 
 			buffer.drawIndexed(call.IndexCount, 1, call.IndexOffset, 0, 0);
@@ -1076,6 +1078,10 @@ RendererVK::InitBatchBuffers()
 		scratchAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_ShaderScratchBuffer[i].Init(
 		  m_Allocator, scratchBufferInfo, scratchAllocInfo);
+		vk::BufferDeviceAddressInfo scratchAddressInfo = {};
+		scratchAddressInfo.buffer = m_ShaderScratchBuffer[i].buffer;
+		m_ShaderScratchBuffer[i].gpuAddress =
+		  m_Device.getBufferAddressKHR(scratchAddressInfo);
 
 		vk::DescriptorBufferInfo triangleInfo(
 		  m_VertexBuffer[i].Get(), 0, VK_WHOLE_SIZE);
@@ -1400,10 +1406,10 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	}
 
 	std::array<vk::PushConstantRange, 2> pushConstants = {};
-	pushConstants[0].size = sizeof(intptr_t);
+	pushConstants[0].size = sizeof(uint64_t);
 	pushConstants[0].stageFlags = vk::ShaderStageFlagBits::eVertex;
-	pushConstants[1].offset = sizeof(intptr_t);
-	pushConstants[1].size = sizeof(intptr_t);
+	pushConstants[1].offset = sizeof(uint64_t);
+	pushConstants[1].size = sizeof(uint64_t);
 	pushConstants[1].stageFlags = vk::ShaderStageFlagBits::eFragment;
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {};

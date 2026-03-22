@@ -813,6 +813,7 @@ class Actor : public MessageSubscriber
 	void ResetShaders() { m_CustomShaders = 0; }
 	bool GetShaderPersistence() const { return m_ShaderPersistence; }
 	void SetShaderPersistence(bool persist) { m_ShaderPersistence = persist; }
+	std::vector<uint8_t> m_VertexShaderArgs, m_FragmentShaderArgs;
 
 	std::unique_ptr<LuaClass> m_pLuaInstance;
 

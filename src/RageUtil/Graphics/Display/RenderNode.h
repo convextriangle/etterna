@@ -10,8 +10,8 @@ namespace DisplayAdapter {
 struct PipelineSettings
 {
 	intptr_t GraphicsPipeline = 0;
-	intptr_t VertexShaderArg = -1;
-	intptr_t FragShaderArg = -1;
+	uint64_t VertexShaderArg = UINT64_MAX;
+	uint64_t FragShaderArg = UINT64_MAX;
 };
 
 struct DrawCall

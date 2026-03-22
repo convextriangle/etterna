@@ -10,6 +10,7 @@ struct PersistentBuffer
 	VmaAllocation allocation = VK_NULL_HANDLE;
 	VmaAllocationInfo allocInfo = {};
 	VmaAllocator allocator = nullptr;
+	uint64_t gpuAddress = 0;
 
 	void Init(VmaAllocator allocator,
 			  const vk::BufferCreateInfo& createInfo,

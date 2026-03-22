@@ -7,6 +7,7 @@
 #include "Etterna/Singletons/MessageManager.h"
 #include "Etterna/Models/Misc/Preference.h"
 #include "RageUtil/Graphics/RageDisplay.h"
+#include "RageUtil/Graphics/RageTexture.h"
 #include "RageUtil/Misc/RageMath.h"
 #include "RageUtil/Misc/RageTimer.h"
 #include "RageUtil/Utils/RageUtil.h"
@@ -2761,6 +2762,138 @@ class LunaActor : public Luna<Actor>
 		lua_pushboolean(L,p->GetShaderPersistence());
 		return 1;
 	}
+	static int SetShaderParameters(T* p, lua_State* L)
+	{
+		int argCount = lua_gettop(L);
+		if (argCount != 2) {
+			luaL_error(
+			  L,
+			  "Expected shader type and shader parameter table as arguments");
+		}
+
+		auto shaderType = Enum::Check<ShaderType>(L, 1);
+		if (shaderType == ShaderType_Invalid) {
+			luaL_error(L, "Invalid shader type passed");
+		}
+
+		if (!lua_istable(L, 2)) {
+			luaL_error(L,
+					   "expected shader parameter table to be... a table");
+		}
+
+		std::vector<uint8_t>& scratchBuffer = shaderType == ShaderType_Vertex
+												? p->m_VertexShaderArgs
+												: p->m_FragmentShaderArgs;
+		size_t scratchOffset = scratchBuffer.size();
+
+		int paramCount = lua_objlen(L, 2);
+		for (int i = 1; i <= paramCount; i++) {
+			lua_rawgeti(L, 2, i);
+
+			lua_rawgeti(L, -1, i);
+			auto paramType = Enum::Check<ShaderParamType>(L, -1);
+			lua_pop(L, 1);
+
+			switch (paramType) {
+				case ShaderParamType_Int: {
+					lua_rawgeti(L, -1, 2);
+
+					int arg = IArg(-1);
+					scratchBuffer.resize(scratchOffset + sizeof(int));
+					std::memcpy(
+					  &scratchBuffer[scratchOffset], &arg, sizeof(int));
+
+					lua_pop(L, 1);
+					break;
+				}
+				case ShaderParamType_IntArray: {
+					lua_rawgeti(L, -1, 2);
+					int arrayLength = IArg(-1);
+					if (arrayLength < 1) {
+						luaL_error(
+						  L,
+						  "Invalid array length passed for a shader parameter");
+					}
+
+					std::vector<int> array(arrayLength);
+					for (int j = 0; j < arrayLength; j++) {
+						lua_rawgeti(L, -1, 3 + j);
+						array[j] = IArg(-1);
+						lua_pop(L, 1);
+					}
+
+					scratchBuffer.resize(scratchOffset +
+										 sizeof(int) * arrayLength);
+					std::memcpy(&scratchBuffer[scratchOffset],
+								&array[0],
+								sizeof(int) * arrayLength);
+
+					lua_pop(L, 1);
+					break;
+				}
+				case ShaderParamType_Float: {
+					lua_rawgeti(L, -1, 2);
+
+					float arg = FArg(-1);
+					scratchBuffer.resize(scratchOffset + sizeof(float));
+					std::memcpy(
+					  &scratchBuffer[scratchOffset], &arg, sizeof(float));
+
+					lua_pop(L, 1);
+					break;
+				}
+				case ShaderParamType_FloatArray: {
+					lua_rawgeti(L, -1, 2);
+					int arrayLength = IArg(-1);
+					if (arrayLength < 1) {
+						luaL_error(
+						  L,
+						  "Invalid array length passed for a shader parameter");
+					}
+
+					std::vector<float> array(arrayLength);
+					for (int j = 0; j < arrayLength; j++) {
+						lua_rawgeti(L, -1, 3 + j);
+						array[j] = FArg(-1);
+						lua_pop(L, 1);
+					}
+
+					scratchBuffer.resize(scratchOffset +
+										 sizeof(float) * arrayLength);
+					std::memcpy(&scratchBuffer[scratchOffset],
+								&array[0],
+								sizeof(float) * arrayLength);
+
+					lua_pop(L, 1);
+					break;
+				}
+				case ShaderParamType_Texture: {
+					lua_rawgeti(L, -1, 2);
+
+					auto* texture = Luna<RageTexture>::check(L, -1);
+					int arg = texture->GetTexHandle();
+					scratchBuffer.resize(scratchOffset + sizeof(int));
+					std::memcpy(
+					  &scratchBuffer[scratchOffset], &arg, sizeof(int));
+
+					lua_pop(L, 1);
+					break;
+				}
+				default:
+					luaL_error(L, "Invalid shader parameter type passed");
+			}
+
+			lua_pop(L, 1);
+		}
+
+		COMMON_RETURN_SELF;
+	}
+	static int ResetShaderParameters(T* p, lua_State* L)
+	{
+		p->m_VertexShaderArgs.clear();
+		p->m_FragmentShaderArgs.clear();
+		COMMON_RETURN_SELF;
+	}
 	DEFINE_METHOD(GetTrueX, GetTrueX());
 	DEFINE_METHOD(GetTrueY, GetTrueY());
 	DEFINE_METHOD(GetTrueZ, GetTrueZ());
@@ -2964,6 +3097,8 @@ class LunaActor : public Luna<Actor>
 		ADD_METHOD(ResetShaders);
 		ADD_METHOD(SetShaderPersistence);
 		ADD_METHOD(GetShaderPersistence);
+		ADD_METHOD(SetShaderParameters);
+		ADD_METHOD(ResetShaderParameters);
 	}
 };
 

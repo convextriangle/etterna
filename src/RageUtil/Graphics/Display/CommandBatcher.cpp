@@ -10,8 +10,8 @@ DisplayAdapter::CommandBatcher::InsertPipelineChangeCommand(
   const std::vector<uint8_t>& fragShaderArgs,
   bool persist)
 {
-	intptr_t vertexShaderInfo = -1;
-	intptr_t fragShaderInfo = -1;
+	uint64_t vertexShaderInfo = UINT64_MAX;
+	uint64_t fragShaderInfo = UINT64_MAX;
 
 	if (vertexShaderArgs.size()) {
 		vertexShaderInfo = m_ShaderScratchBuffer.size();
