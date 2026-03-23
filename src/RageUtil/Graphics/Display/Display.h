@@ -28,7 +28,7 @@ class Display : public RageDisplay
 	{
 		return m_Renderer->GetApiDescription();
 	}
-	virtual void GetDisplaySpecs(DisplaySpecs& out) const override;
+	void GetDisplaySpecs(DisplaySpecs& out) const override;
 	void ResolutionChanged() override;
 	[[nodiscard]] const RagePixelFormatDesc* GetPixelFormatDesc(
 	  RagePixelFormat pf) const override;

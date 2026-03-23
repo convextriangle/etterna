@@ -24,8 +24,7 @@ DisplayAdapter::Display::Init(VideoModeParams&& p,
 
 #ifdef _WIN32
 	GraphicsWindow::Initialize(false);
-#endif
-#ifdef __unix__
+#else
 	m_Window = LowLevelWindowVK::Create();
 #endif
 
@@ -33,13 +32,61 @@ DisplayAdapter::Display::Init(VideoModeParams&& p,
 	return SetVideoMode(std::move(p), ignored);
 }
 
+#ifdef _WIN32
+static BOOL CALLBACK
+EnumerateMonitors(HMONITOR monitor,
+				  HDC deviceContextHandle,
+				  LPRECT monitorRect,
+				  LPARAM userData)
+{
+	auto* out = reinterpret_cast<DisplaySpecs*>(userData);
+
+	MONITORINFOEXW monitorInfo = {};
+	monitorInfo.cbSize = sizeof(monitorInfo);
+	if (!GetMonitorInfoW(monitor, &monitorInfo)) {
+		return TRUE;
+	}
+
+	std::set<DisplayMode> modes;
+	DEVMODEW deviceMode = {};
+	deviceMode.dmSize = sizeof(deviceMode);
+	deviceMode.dmDriverExtra = 0;
+	DWORD modeIndex = 0;
+	while (
+	  EnumDisplaySettingsW(monitorInfo.szDevice, modeIndex, &deviceMode)) {
+		modes.insert({ deviceMode.dmPelsWidth,
+					   deviceMode.dmPelsHeight,
+					   static_cast<double>(deviceMode.dmDisplayFrequency) });
+		modeIndex++;
+	}
+
+	DisplayMode active = { 0, 0, 0.0 };
+	if (EnumDisplaySettingsW(
+		  monitorInfo.szDevice, ENUM_CURRENT_SETTINGS, &deviceMode)) {
+		active.width = deviceMode.dmPelsWidth;
+		active.height = deviceMode.dmPelsHeight;
+		active.refreshRate = static_cast<double>(deviceMode.dmDisplayFrequency);
+	} else if (!modes.empty()) {
+		active = *modes.begin();
+	}
+
+	RectI bounds(monitorInfo.rcMonitor.left,
+				 monitorInfo.rcMonitor.top,
+				 monitorInfo.rcMonitor.right,
+				 monitorInfo.rcMonitor.bottom);
+
+	out->insert(DisplaySpec("", "Fullscreen", modes, active, bounds));
+	return TRUE;
+}
+#endif
+
 void
 DisplayAdapter::Display::GetDisplaySpecs(DisplaySpecs& out) const
 {
 #ifdef _WIN32
-// TODO
-#endif
-#ifdef __unix__
+	EnumDisplayMonitors(
+	  nullptr, nullptr, EnumerateMonitors, reinterpret_cast<LPARAM>(&out));
+#else
 	m_Window->GetDisplaySpecs(out);
 #endif
 }
@@ -79,8 +126,7 @@ DisplayAdapter::Display::GetActualVideoModeParams() const
 {
 #ifdef _WIN32
 	return GraphicsWindow::GetParams();
-#endif
-#ifdef __unix__
+#else
 	return m_Window->GetActualVideoModeParams();
 #endif
 }
@@ -356,7 +402,8 @@ DisplayAdapter::Display::SetGraphicsPipeline(
   const std::vector<uint8_t>& fragShaderArgs,
   bool persist)
 {
-	m_Batcher.InsertPipelineChangeCommand(pipeline, vertexShaderArgs, fragShaderArgs, persist);
+	m_Batcher.InsertPipelineChangeCommand(
+	  pipeline, vertexShaderArgs, fragShaderArgs, persist);
 }
 
 #pragma region Unsupported / old graphics API functions
