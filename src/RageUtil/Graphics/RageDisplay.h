@@ -416,9 +416,16 @@ class RageDisplay
 	virtual void SetSphereEnvironmentMapping(TextureUnit tu, bool b) = 0;
 	virtual void SetCelShaded(int stage) = 0;
 
-	virtual intptr_t CreateGraphicsPipeline(const std::string& vertexShaderPath,
-									const std::string& fragmentShaderPath) = 0;
-	virtual void SetGraphicsPipeline(intptr_t pipeline, bool persist) = 0;
+	virtual intptr_t CreateGraphicsPipeline(
+	  const std::string& vertexShaderPath,
+	  const std::string& fragmentShaderPath) {
+		return 0;
+	}
+	virtual void SetGraphicsPipeline(
+	  intptr_t pipeline,
+	  const std::vector<uint8_t>& vertexShaderArgs,
+	  const std::vector<uint8_t>& fragShaderArgs,
+	  bool persist) {}
 
 	virtual auto CreateCompiledGeometry() -> RageCompiledGeometry* = 0;
 	virtual void DeleteCompiledGeometry(RageCompiledGeometry* p) = 0;

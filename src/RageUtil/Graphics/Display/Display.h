@@ -84,7 +84,10 @@ class Display : public RageDisplay
 	intptr_t CreateGraphicsPipeline(
 	  const std::string& vertexShaderPath,
 	  const std::string& fragmentShaderPath) override;
-	void SetGraphicsPipeline(intptr_t pipeline, bool persist) override;
+	void SetGraphicsPipeline(intptr_t pipeline,
+							 const std::vector<uint8_t>& vertexShaderArgs,
+							 const std::vector<uint8_t>& fragShaderArgs,
+							 bool persist) override;
 	intptr_t CreateRenderTarget(const RenderTargetParam& param,
 								int& iTextureWidthOut,
 								int& iTextureHeightOut) override;

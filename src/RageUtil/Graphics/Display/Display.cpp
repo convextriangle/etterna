@@ -350,9 +350,13 @@ DisplayAdapter::Display::CreateGraphicsPipeline(
 }
 
 void
-DisplayAdapter::Display::SetGraphicsPipeline(intptr_t pipeline, bool persist)
+DisplayAdapter::Display::SetGraphicsPipeline(
+  intptr_t pipeline,
+  const std::vector<uint8_t>& vertexShaderArgs,
+  const std::vector<uint8_t>& fragShaderArgs,
+  bool persist)
 {
-	m_Batcher.InsertPipelineChangeCommand(pipeline, {}, {}, persist);
+	m_Batcher.InsertPipelineChangeCommand(pipeline, vertexShaderArgs, fragShaderArgs, persist);
 }
 
 #pragma region Unsupported / old graphics API functions

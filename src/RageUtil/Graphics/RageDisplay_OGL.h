@@ -82,10 +82,6 @@ class RageDisplay_Legacy : public RageDisplay
 	bool IsEffectModeSupported(EffectMode effect) override;
 	bool SupportsRenderToTexture() const override;
 	bool SupportsFullscreenBorderlessWindow() const override;
-	intptr_t CreateGraphicsPipeline(
-	  const std::string& vertexShaderPath,
-	  const std::string& fragmentShaderPath) override;
-	void SetGraphicsPipeline(intptr_t pipeline, bool persist) override;
 	intptr_t CreateRenderTarget(const RenderTargetParam& param,
 								int& iTextureWidthOut,
 								int& iTextureHeightOut) override;

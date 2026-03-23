@@ -2768,21 +2768,6 @@ RageDisplay_Legacy::SupportsFullscreenBorderlessWindow() const
 		   SupportsRenderToTexture();
 }
 
-intptr_t
-RageDisplay_Legacy::CreateGraphicsPipeline(
-  const std::string& vertexShaderPath,
-  const std::string& fragmentShaderPath)
-{
-	ASSERT_M(false, "Supported only on Vulkan");
-	return 0;
-}
-
-void
-RageDisplay_Legacy::SetGraphicsPipeline(intptr_t pipeline, bool persist)
-{
-	ASSERT_M(pipeline == 0, "Supported only on Vulkan");
-}
-
 /*
  * Render-to-texture can be implemented in several ways: the generic
  * GL_ARB_pixel_buffer_object, or platform-specifically.  PBO is not available
