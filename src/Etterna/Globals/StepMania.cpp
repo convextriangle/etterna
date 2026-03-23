@@ -818,10 +818,14 @@ CreateDisplay()
 #if defined(SUPPORT_D3D)
 				pRet = new RageDisplay_D3D;
 #endif
-			} else if (CompareNoCase(sRenderer, "vulkan") == 0) {
+			}
+#if !defined(__APPLE__)
+			else if (CompareNoCase(sRenderer, "vulkan") == 0) {
 				pRet =
 				  new DisplayAdapter::Display(std::make_unique<RendererVK>());
-			} else if (CompareNoCase(sRenderer, "null") == 0) {
+			}
+#endif
+			else if (CompareNoCase(sRenderer, "null") == 0) {
 				return new RageDisplay_Null;
 			} else {
 				RageException::Throw(
