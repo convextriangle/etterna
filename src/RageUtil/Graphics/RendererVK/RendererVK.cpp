@@ -1081,7 +1081,7 @@ RendererVK::InitBatchBuffers()
 		vk::BufferDeviceAddressInfo scratchAddressInfo = {};
 		scratchAddressInfo.buffer = m_ShaderScratchBuffer[i].buffer;
 		m_ShaderScratchBuffer[i].gpuAddress =
-		  m_Device.getBufferAddressKHR(scratchAddressInfo);
+		  m_Device.getBufferAddress(scratchAddressInfo);
 
 		vk::DescriptorBufferInfo triangleInfo(
 		  m_VertexBuffer[i].Get(), 0, VK_WHOLE_SIZE);
