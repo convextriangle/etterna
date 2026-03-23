@@ -2789,6 +2789,10 @@ class LunaActor : public Luna<Actor>
 		int paramCount = lua_objlen(L, 2);
 		for (int i = 1; i <= paramCount; i++) {
 			lua_rawgeti(L, 2, i);
+			if (!lua_istable(L, -1)) {
+				luaL_error(
+				  L, "Shader parameter table should be a table of tables");
+			}
 
 			lua_rawgeti(L, -1, i);
 			auto paramType = Enum::Check<ShaderParamType>(L, -1);
