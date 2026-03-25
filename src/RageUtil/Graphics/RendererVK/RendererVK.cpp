@@ -219,7 +219,7 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	barrier.subresourceRange.levelCount = 1;
 	barrier.subresourceRange.layerCount = 1;
 	copyBuffer.pipelineBarrier(texture.initialized
-								 ? vk::PipelineStageFlagBits::eFragmentShader
+								 ? vk::PipelineStageFlagBits::eAllGraphics
 								 : vk::PipelineStageFlagBits::eHost,
 							   vk::PipelineStageFlagBits::eTransfer,
 							   {},
@@ -244,7 +244,7 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
 	barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-							   vk::PipelineStageFlagBits::eFragmentShader,
+							   vk::PipelineStageFlagBits::eAllGraphics,
 							   {},
 							   {},
 							   {},
@@ -754,17 +754,15 @@ RendererVK::GetDescriptorBindings()
 											vk::DescriptorType::eStorageBuffer,
 											1,
 											vk::ShaderStageFlagBits::eVertex),
-			 // technically someone might want to access textures in vertex
-			 // shader, so switch to vk::ShaderStageFlagBits::eAllGraphics?
 			 vk::DescriptorSetLayoutBinding(3,
 											vk::DescriptorType::eSampledImage,
 											GetMaxTextureCount(),
-											vk::ShaderStageFlagBits::eFragment),
+											vk::ShaderStageFlagBits::eAllGraphics),
 			 vk::DescriptorSetLayoutBinding(
 			   4,
 			   vk::DescriptorType::eSampler,
 			   Texture::PossibleSamplerCount,
-			   vk::ShaderStageFlagBits::eFragment) };
+			   vk::ShaderStageFlagBits::eAllGraphics) };
 }
 
 void
@@ -888,7 +886,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		  vk::AccessFlagBits2::eColorAttachmentWrite |
 			vk::AccessFlagBits2::eColorAttachmentRead,
 		  swapchain ? vk::PipelineStageFlagBits2::eColorAttachmentOutput
-					: vk::PipelineStageFlagBits2::eFragmentShader,
+					: vk::PipelineStageFlagBits2::eAllGraphics,
 		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 		  buffer);
 
@@ -968,7 +966,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		  swapchain ? vk::AccessFlags2() : vk::AccessFlagBits2::eShaderRead,
 		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 		  swapchain ? vk::PipelineStageFlagBits2::eBottomOfPipe
-					: vk::PipelineStageFlagBits2::eFragmentShader,
+					: vk::PipelineStageFlagBits2::eAllGraphics,
 		  buffer);
 
 		if (!swapchain) {
