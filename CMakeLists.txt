@@ -15,7 +15,13 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW) # Tell CMake to use the new policy for CMP
 ## We statically link the CRT by default. If you would like to dynamically
 ## link the CRT, you can append "DLL" to the end of the variable below.
 ## More Info: https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+
+set(STATIC_LINK ON CACHE BOOL "Set CRT to be statically linked")
+if(STATIC_LINK)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+else()
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+endif()
 
 # PROJECT WIDE SETUP
 project(Etterna
