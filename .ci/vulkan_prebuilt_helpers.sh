@@ -69,7 +69,7 @@ function install_linux() {
 
 function install_windows() {
   test -d $VULKAN_SDK && test -f vulkan_sdk.exe
-  7z x vulkan_sdk.exe -aoa -o$VULKAN_SDK
+  vulkan_sdk.exe in --al --am -c
 }
 
 function install_mac() {

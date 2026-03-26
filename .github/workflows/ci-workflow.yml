@@ -457,9 +457,7 @@ jobs:
         shell: bash
         run: |
           echo "VULKAN_SDK=$VULKAN_SDK"
-          ls -la "$VULKAN_SDK"
-          ls -la "$VULKAN_SDK/Include" || echo "Include not found"
-          ls -la "$VULKAN_SDK/Lib" || echo "Lib not found"
+          ls -R "$VULKAN_SDK"
 
       - name: Update Environment Variables
         run: |
