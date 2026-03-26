@@ -591,31 +591,16 @@ RendererVK::InitVulkanState()
 	vk12Features.shaderSampledImageArrayNonUniformIndexing = vk::True;
 	vk12Features.scalarBlockLayout = vk::True;
 
-	// reported as force-turned-on by validation, so just in case?
-	vk12Features.timelineSemaphore = vk::True;
-	vk12Features.vulkanMemoryModel = vk::True;
-	vk12Features.vulkanMemoryModelAvailabilityVisibilityChains = vk::True;
-	vk12Features.storageBuffer8BitAccess = vk::True;
-
-	VkPhysicalDeviceVulkan11Features vk11Features = {
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES
-	};
-	vk11Features.shaderDrawParameters = vk::True;
-
 	VkPhysicalDeviceFeatures vkFeatures = {};
 	vkFeatures.samplerAnisotropy = vk::True;
-	vkFeatures.multiDrawIndirect = vk::True;
 	vkFeatures.logicOp = vk::True;
 	vkFeatures.shaderInt64 = vk::True;
-	vkFeatures.fragmentStoresAndAtomics = vk::True;
-	vkFeatures.vertexPipelineStoresAndAtomics = vk::True;
 
 	vkb::PhysicalDeviceSelector selector(*instanceResult);
 	auto physicalDeviceResult =
 	  selector.set_minimum_version(1, 3)
 		.set_required_features_13(vk13Features)
 		.set_required_features_12(vk12Features)
-		.set_required_features_11(vk11Features)
 		.set_required_features(vkFeatures)
 		.set_surface(static_cast<vk::SurfaceKHR>(m_Surface))
 #ifdef __APPLE__
@@ -623,8 +608,9 @@ RendererVK::InitVulkanState()
 #endif
 		.select();
 	if (!physicalDeviceResult) {
-		Locator::getLogger()->fatal("RendererVK: physical device creation failed - {}",
-									GetDetailedErrorString(physicalDeviceResult));
+		Locator::getLogger()->fatal(
+		  "RendererVK: physical device creation failed - {}",
+		  GetDetailedErrorString(physicalDeviceResult));
 		Fail();
 	}
 
@@ -754,27 +740,28 @@ RendererVK::InitGraphicsPipeline()
 std::vector<vk::DescriptorSetLayoutBinding>
 RendererVK::GetDescriptorBindings()
 {
-	return { vk::DescriptorSetLayoutBinding(0,
-											vk::DescriptorType::eStorageBuffer,
-											1,
-											vk::ShaderStageFlagBits::eVertex),
-			 vk::DescriptorSetLayoutBinding(1,
-											vk::DescriptorType::eStorageBuffer,
-											1,
-											vk::ShaderStageFlagBits::eVertex),
-			 vk::DescriptorSetLayoutBinding(2,
-											vk::DescriptorType::eStorageBuffer,
-											1,
-											vk::ShaderStageFlagBits::eVertex),
-			 vk::DescriptorSetLayoutBinding(3,
-											vk::DescriptorType::eSampledImage,
-											GetMaxTextureCount(),
-											vk::ShaderStageFlagBits::eAllGraphics),
-			 vk::DescriptorSetLayoutBinding(
-			   4,
-			   vk::DescriptorType::eSampler,
-			   Texture::PossibleSamplerCount,
-			   vk::ShaderStageFlagBits::eAllGraphics) };
+	return {
+		vk::DescriptorSetLayoutBinding(0,
+									   vk::DescriptorType::eStorageBuffer,
+									   1,
+									   vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(1,
+									   vk::DescriptorType::eStorageBuffer,
+									   1,
+									   vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(2,
+									   vk::DescriptorType::eStorageBuffer,
+									   1,
+									   vk::ShaderStageFlagBits::eVertex),
+		vk::DescriptorSetLayoutBinding(3,
+									   vk::DescriptorType::eSampledImage,
+									   GetMaxTextureCount(),
+									   vk::ShaderStageFlagBits::eAllGraphics),
+		vk::DescriptorSetLayoutBinding(4,
+									   vk::DescriptorType::eSampler,
+									   Texture::PossibleSamplerCount,
+									   vk::ShaderStageFlagBits::eAllGraphics)
+	};
 }
 
 void
