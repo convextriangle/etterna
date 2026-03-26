@@ -42,7 +42,7 @@ function preset_env() {
         echo "note: resolving '$version' for '$os' via webservices lookup: $url" >&2
         version=$(curl -sL $url)
         test -n "$version" || { echo "could not resolve latest version" ; exit 9 ; }
-        [[ "${{ inputs.quiet }}" == "true" ]] || echo "::notice title=Using Vulkan SDK $version::resolved via '$url'"
+        echo "::notice title=Using Vulkan SDK $version::resolved via '$url'"
     fi
     (
         echo VULKAN_SDK=$sdk_dir
