@@ -11,9 +11,7 @@
 #include <sstream>
 #include "Core/Services/Locator.hpp"
 #include <Etterna/Globals/global.h>
-#include <glslang/Public/ShaderLang.h>
-#include <glslang/Public/ResourceLimits.h>
-#include <glslang/SPIRV/GlslangToSpv.h>
+#include <shaderc/shaderc.hpp>
 
 void
 ThrowIfFail(VkResult result, const std::source_location location)
@@ -51,53 +49,24 @@ Fail(const std::source_location location)
 }
 
 std::vector<uint32_t>
-CompileShader(EShLanguage shaderStage,
+CompileShader(const std::string& sourceName,
+			  shaderc_shader_kind shaderKind,
 			  const std::string& source)
 {
-	static bool initialized = false;
-	if (!initialized) {
-		glslang::InitializeProcess();
-		initialized = true;
-	}
+	shaderc::Compiler compiler;
+	shaderc::CompileOptions options;
 
-	const char* strings[] = { source.c_str() };
+	auto result = compiler.CompileGlslToSpv(
+	  source, shaderKind, sourceName.c_str(), options);
 
-	glslang::TShader shader(shaderStage);
-	shader.setStrings(strings, 1);
-
-	shader.setEnvInput(
-	  glslang::EShSourceGlsl, shaderStage, glslang::EShClientVulkan, 100);
-
-	shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
-
-	shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_5);
-
-	EShMessages messages = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules);
-
-	if (!shader.parse(GetDefaultResources(), 100, false, messages)) {
-		auto message = fmt::format("Vulkan GLSL shader compilation failed:\n{}",
-								   shader.getInfoLog());
-
+	if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
+		auto message = fmt::format("Vulkan GLSL shader compilation failed: {}",
+								   result.GetErrorMessage());
 		Locator::getLogger()->error(message);
 		sm_crash(message.c_str());
 	}
 
-	glslang::TProgram program;
-	program.addShader(&shader);
-
-	if (!program.link(messages)) {
-		auto message = fmt::format("Vulkan GLSL shader linking failed:\n{}",
-								   program.getInfoLog());
-
-		Locator::getLogger()->error(message);
-		sm_crash(message.c_str());
-	}
-
-	std::vector<uint32_t> spirv;
-
-	glslang::GlslangToSpv(*program.getIntermediate(shaderStage), spirv);
-
-	return spirv;
+	return { result.begin(), result.end() };
 }
 
 vk::raii::ShaderModule
@@ -111,13 +80,13 @@ LoadShaderFromFile(std::string path,
 	}
 #endif
 
-	EShLanguage shaderKind = {};
+	shaderc_shader_kind shaderKind = {};
 	switch (shaderType) {
 		case ShaderType_Vertex:
-			shaderKind = EShLangVertex;
+			shaderKind = shaderc_vertex_shader;
 			break;
 		case ShaderType_Fragment:
-			shaderKind = EShLangFragment;
+			shaderKind = shaderc_fragment_shader;
 			break;
 		default:
 			assert(false && "Invalid shader type specified!");
@@ -126,7 +95,7 @@ LoadShaderFromFile(std::string path,
 	std::ifstream inputFile(path);
 	std::stringstream contents;
 	contents << inputFile.rdbuf();
-	auto shaderBlob = CompileShader(shaderKind, contents.str());
+	auto shaderBlob = CompileShader("meow", shaderKind, contents.str());
 
 	VkShaderModuleCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

@@ -118,17 +118,10 @@ target_link_libraries(Etterna PRIVATE ghc_filesystem)
 target_link_libraries(Etterna PRIVATE vk-bootstrap::vk-bootstrap)
 target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
 
-find_package(Vulkan REQUIRED COMPONENTS glslang SPIRV-Tools)
+find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
 target_link_libraries(Etterna PRIVATE
     Vulkan::Vulkan
-    Vulkan::glslang
-    Vulkan::SPIRV-Tools)
-
-get_filename_component(VULKAN_LIB_DIR "${Vulkan_LIBRARY}" DIRECTORY)
-find_library(SPIRV_TOOLS_OPT_DEBUG NAMES SPIRV-Tools-optd PATHS ${VULKAN_LIB_DIR})
-find_library(SPIRV_TOOLS_OPT_RELEASE REQUIRED NAMES SPIRV-Tools-opt PATHS ${VULKAN_LIB_DIR})
-find_library(GLSLANG_RESOURCE_DEBUG NAMES glslang-default-resource-limitsd PATHS ${VULKAN_LIB_DIR})
-find_library(GLSLANG_RESOURCE_RELEASE REQUIRED NAMES glslang-default-resource-limits PATHS ${VULKAN_LIB_DIR})
+    Vulkan::shaderc_combined)
 
 if(NOT SPIRV_TOOLS_OPT_DEBUG)
     set(SPIRV_TOOLS_OPT_DEBUG ${SPIRV_TOOLS_OPT_RELEASE})
