@@ -49,9 +49,7 @@ function preset_env() {
     export VULKAN_SDK_VERSION="$version"
     export VULKAN_SDK_PLATFORM="$os"
 
-    (
-        echo VULKAN_SDK=$sdk_dir
-        echo VULKAN_SDK_VERSION=$version
-        echo VULKAN_SDK_PLATFORM=$os
-    ) | tee -a $GITHUB_ENV
+    echo "VULKAN_SDK=$sdk_dir" >> "$GITHUB_ENV"
+    echo "VULKAN_SDK_VERSION=$version" >> "$GITHUB_ENV"
+    echo "VULKAN_SDK_PLATFORM=$os" >> "$GITHUB_ENV"
 }
