@@ -9,6 +9,7 @@
 #include <span>
 #include <shaderc/shaderc.hpp>
 #include <optional>
+#include <RageUtil/Misc/RageTypes.h>
 
 void
 ThrowIfFail(
@@ -23,15 +24,10 @@ ThrowIfFail(
 void
 Fail(const std::source_location location = std::source_location::current());
 
-std::vector<uint32_t>
-CompileShader(const std::string& sourceName,
-			  shaderc_shader_kind shaderKind,
-			  const std::string& source);
-
 vk::raii::ShaderModule
 LoadShaderFromFile(std::string path,
 				   vk::raii::Device& device,
-				   shaderc_shader_kind shaderKind);
+				   ShaderType shaderType);
 
 std::optional<uint32_t>
 GetMemoryType(uint32_t typeBits,
@@ -44,7 +40,7 @@ GetDetailedErrorString(vkb::Result<T>& result)
 {
 	std::string reason;
 	auto& reasons = result.detailed_failure_reasons();
-
+	
 	for (int i = 0; i < reasons.size(); i++) {
 		reason += reasons[i];
 		if (i != reasons.size() - 1) {

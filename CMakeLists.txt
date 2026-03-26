@@ -15,7 +15,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW) # Tell CMake to use the new policy for CMP
 ## We statically link the CRT by default. If you would like to dynamically
 ## link the CRT, you can append "DLL" to the end of the variable below.
 ## More Info: https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
 # PROJECT WIDE SETUP
 project(Etterna
@@ -117,9 +117,8 @@ target_link_libraries(Etterna PRIVATE ghc_filesystem)
 
 target_link_libraries(Etterna PRIVATE vk-bootstrap::vk-bootstrap)
 target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
-find_package(Vulkan REQUIRED)
-target_link_libraries(Etterna PRIVATE Vulkan::Vulkan)
-target_link_libraries(Etterna PRIVATE shaderc)
+find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
+target_link_libraries(Etterna PRIVATE Vulkan::Vulkan Vulkan::shaderc_combined)
 
 if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
   target_link_libraries(Etterna PRIVATE sse2neon)

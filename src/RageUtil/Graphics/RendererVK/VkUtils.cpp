@@ -71,13 +71,25 @@ CompileShader(const std::string& sourceName,
 vk::raii::ShaderModule
 LoadShaderFromFile(std::string path,
 				   vk::raii::Device& device,
-				   shaderc_shader_kind shaderKind)
+				   ShaderType shaderType)
 {
 #ifdef _WIN32
 	if (path[0] == '/') {
 		path = path.substr(1);
 	}
 #endif
+
+	shaderc_shader_kind shaderKind = {};
+	switch (shaderType) {
+		case ShaderType_Vertex:
+			shaderKind = shaderc_vertex_shader;
+			break;
+		case ShaderType_Fragment:
+			shaderKind = shaderc_fragment_shader;
+			break;
+		default:
+			assert(false && "Invalid shader type specified!");
+	}
 
 	std::ifstream inputFile(path);
 	std::stringstream contents;
