@@ -2,6 +2,7 @@
 #define VK_UTILS_H
 
 #include <vulkan/vulkan_raii.hpp>
+#include <VkBootstrap.h>
 #include <deque>
 #include <functional>
 #include <source_location>
@@ -36,5 +37,22 @@ std::optional<uint32_t>
 GetMemoryType(uint32_t typeBits,
 			  vk::MemoryPropertyFlags neededProps,
 			  vk::PhysicalDeviceMemoryProperties memoryProps);
+
+template <typename T>
+std::string
+GetDetailedErrorString(vkb::Result<T>& result)
+{
+	std::string reason;
+	auto& reasons = result.detailed_failure_reasons();
+
+	for (int i = 0; i < reasons.size(); i++) {
+		reason += reasons[i];
+		if (i != reasons.size() - 1) {
+			reason += " ; ";
+		}
+	}
+
+	return reason;
+}
 
 #endif

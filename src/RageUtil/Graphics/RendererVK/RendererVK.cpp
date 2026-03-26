@@ -323,6 +323,8 @@ RendererVK::CreateScreenshot()
 					  vk::MemoryPropertyFlagBits::eHostCoherent,
 					m_PhysicalDevice.getMemoryProperties());
 	if (!memoryTypeIndex.has_value()) {
+		Locator::getLogger()->error("RendererVK: failed to screenshot (can't "
+									"find memory type for image creation)");
 		Fail();
 	}
 
@@ -561,6 +563,8 @@ RendererVK::InitVulkanState()
 {
 	auto instanceResult = CreateInstance(VulkanDebugCallback);
 	if (!instanceResult) {
+		Locator::getLogger()->fatal("RendererVK: instance creation failed - {}",
+									GetDetailedErrorString(instanceResult));
 		Fail();
 	}
 
@@ -619,12 +623,17 @@ RendererVK::InitVulkanState()
 #endif
 		.select();
 	if (!physicalDeviceResult) {
+		Locator::getLogger()->fatal("RendererVK: physical device creation failed - {}",
+									GetDetailedErrorString(physicalDeviceResult));
 		Fail();
 	}
 
 	vkb::DeviceBuilder deviceBuilder(*physicalDeviceResult);
 	auto deviceResult = deviceBuilder.build();
 	if (!deviceResult) {
+		Locator::getLogger()->fatal(
+		  "RendererVK: physical device creation failed - {}",
+		  GetDetailedErrorString(physicalDeviceResult));
 		Fail();
 	}
 
@@ -685,6 +694,9 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 
 	auto swapchain_ret = swapchainBuilder.build();
 	if (!swapchain_ret) {
+		Locator::getLogger()->fatal(
+		  "RendererVK: swapchain creation failed - {}",
+		  GetDetailedErrorString(swapchain_ret));
 		Fail();
 	}
 
