@@ -121,18 +121,7 @@ target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
 find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
 target_link_libraries(Etterna PRIVATE
     Vulkan::Vulkan
-    Vulkan::shaderc_combined)
-
-if(NOT SPIRV_TOOLS_OPT_DEBUG)
-    set(SPIRV_TOOLS_OPT_DEBUG ${SPIRV_TOOLS_OPT_RELEASE})
-endif()
-if(NOT GLSLANG_RESOURCE_DEBUG)
-    set(GLSLANG_RESOURCE_DEBUG ${GLSLANG_RESOURCE_RELEASE})
-endif()
-
-target_link_libraries(Etterna PRIVATE
-    debug ${SPIRV_TOOLS_OPT_DEBUG} optimized ${SPIRV_TOOLS_OPT_RELEASE}
-    debug ${GLSLANG_RESOURCE_DEBUG} optimized ${GLSLANG_RESOURCE_RELEASE})   
+    Vulkan::shaderc_combined) 
 
 if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
   target_link_libraries(Etterna PRIVATE sse2neon)

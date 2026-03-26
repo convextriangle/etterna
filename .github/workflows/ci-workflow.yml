@@ -453,12 +453,6 @@ jobs:
           download_vulkan_installer ${VULKAN_SDK_PLATFORM}
           unpack_vulkan_installer ${VULKAN_SDK_PLATFORM}
 
-      - name: Debug check
-        shell: bash
-        run: |
-          echo "VULKAN_SDK=$VULKAN_SDK"
-          ls -R "$VULKAN_SDK"
-
       - name: Update Environment Variables
         run: |
           echo "${{github.workspace}}/tools/win/" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
