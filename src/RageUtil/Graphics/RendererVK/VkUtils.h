@@ -52,6 +52,10 @@ GetDetailedErrorString(vkb::Result<T>& result)
 		}
 	}
 
+	if (reasons.empty()) {
+		reason = "No reason given";
+	}
+
 	return reason;
 }
 
