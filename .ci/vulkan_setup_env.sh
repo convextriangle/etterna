@@ -34,7 +34,7 @@ function preset_env() {
         Windows|MINGW*) os=windows ; basedir=$(pwd -W) ;;
         *) echo "unknown runner_os: $runner_os" ; exit 7 ; ;;
     esac
-    version='latest'
+    version='latest' # hi hello
     sdk_dir=${VULKAN_SDK:-$basedir/VULKAN_SDK}
     test -d $sdk_dir || mkdir -pv $sdk_dir
     if [[ $version == 'latest' ]] ; then
@@ -44,6 +44,11 @@ function preset_env() {
         test -n "$version" || { echo "could not resolve latest version" ; exit 9 ; }
         echo "::notice title=Using Vulkan SDK $version::resolved via '$url'"
     fi
+
+    export VULKAN_SDK="$sdk_dir"
+    export VULKAN_SDK_VERSION="$version"
+    export VULKAN_SDK_PLATFORM="$os"
+
     (
         echo VULKAN_SDK=$sdk_dir
         echo VULKAN_SDK_VERSION=$version
