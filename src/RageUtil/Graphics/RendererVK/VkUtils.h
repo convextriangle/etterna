@@ -7,7 +7,6 @@
 #include <functional>
 #include <source_location>
 #include <span>
-#include <shaderc/shaderc.hpp>
 #include <optional>
 #include <RageUtil/Misc/RageTypes.h>
 

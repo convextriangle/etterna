@@ -37,10 +37,10 @@ jobs:
           path: tools
       
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
+        uses: humbletim/install-vulkan-sdk@v1.2
         with:
-          vulkan-query-version: latest
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          version: 1.4.341.1
+          cache: true
 
       - name: Install apt packages
         run: sudo apt update && sudo apt install ${{ matrix.cfg.cpp-version }} nasm ninja-build libglew-dev libxrandr-dev libxtst-dev libpulse-dev libasound-dev libogg-dev libvorbis-dev xorg-dev libcurl4-openssl-dev
@@ -130,10 +130,10 @@ jobs:
           path: tools
 
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
+        uses: humbletim/install-vulkan-sdk@v1.2
         with:
-          vulkan-query-version: latest
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          version: 1.4.341.1
+          cache: true
 
       - name: Install homebrew packages
         run: brew install cmake nasm ninja openssl
@@ -248,10 +248,10 @@ jobs:
           python-version: '3.12'
 
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
+        uses: humbletim/install-vulkan-sdk@v1.2
         with:
-          vulkan-query-version: latest
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          version: 1.4.341.1
+          cache: true
       
       - name: Update CPack Environment
         if: ${{matrix.cfg.dist}}
@@ -344,10 +344,10 @@ jobs:
           path: tools
 
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
+        uses: humbletim/install-vulkan-sdk@v1.2
         with:
-          vulkan-query-version: latest
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          version: 1.4.341.1
+          cache: true
 
       - name: Install homebrew packages
         run: brew install cmake nasm ninja openssl && brew tap etternagame/etterna && brew update && HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
@@ -445,10 +445,10 @@ jobs:
           path: dxsdk
 
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
+        uses: humbletim/install-vulkan-sdk@v1.2
         with:
-          vulkan-query-version: latest
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          version: 1.4.341.1
+          cache: true
 
       - name: Update Environment Variables
         run: |

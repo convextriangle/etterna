@@ -11,6 +11,7 @@
 #include <sstream>
 #include "Core/Services/Locator.hpp"
 #include <Etterna/Globals/global.h>
+#include <shaderc/shaderc.hpp>
 
 void
 ThrowIfFail(VkResult result, const std::source_location location)
