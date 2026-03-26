@@ -632,7 +632,7 @@ RendererVK::InitVulkanState()
 	auto deviceResult = deviceBuilder.build();
 	if (!deviceResult) {
 		Locator::getLogger()->fatal(
-		  "RendererVK: physical device creation failed - {}",
+		  "RendererVK: device creation failed - {}",
 		  GetDetailedErrorString(physicalDeviceResult));
 		Fail();
 	}
