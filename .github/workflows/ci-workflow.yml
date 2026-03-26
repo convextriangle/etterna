@@ -445,10 +445,13 @@ jobs:
           path: dxsdk
 
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
-        with:
-          vulkan-query-version: latest
-          vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang, SPIRV-Tools
+        shell: bash
+        run: |
+          . main/.ci/vulkan_setup_env.sh
+          preset_env
+          . main/.ci/vulkan_prebuilt_helpers.sh
+          download_vulkan_installer ${VULKAN_SDK_PLATFORM}
+          unpack_vulkan_installer ${VULKAN_SDK_PLATFORM}
 
       - name: Update Environment Variables
         run: |
