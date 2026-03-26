@@ -125,9 +125,9 @@ target_link_libraries(Etterna PRIVATE
     Vulkan::SPIRV-Tools)
 
 get_filename_component(VULKAN_LIB_DIR "${Vulkan_LIBRARY}" DIRECTORY)
-find_library(SPIRV_TOOLS_OPT_DEBUG REQUIRED NAMES SPIRV-Tools-optd PATHS ${VULKAN_LIB_DIR})
+find_library(SPIRV_TOOLS_OPT_DEBUG NAMES SPIRV-Tools-optd PATHS ${VULKAN_LIB_DIR})
 find_library(SPIRV_TOOLS_OPT_RELEASE REQUIRED NAMES SPIRV-Tools-opt PATHS ${VULKAN_LIB_DIR})
-find_library(GLSLANG_RESOURCE_DEBUG REQUIRED NAMES glslang-default-resource-limitsd PATHS ${VULKAN_LIB_DIR})
+find_library(GLSLANG_RESOURCE_DEBUG NAMES glslang-default-resource-limitsd PATHS ${VULKAN_LIB_DIR})
 find_library(GLSLANG_RESOURCE_RELEASE REQUIRED NAMES glslang-default-resource-limits PATHS ${VULKAN_LIB_DIR})
 
 target_link_libraries(Etterna PRIVATE
