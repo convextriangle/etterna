@@ -126,7 +126,7 @@ class RendererVK : public DisplayAdapter::Renderer
 						const DisplayAdapter::CommandBatcher& batcher);
 
 	constexpr static size_t FramesInFlight = 3;
-	constexpr static size_t MaxDrawCount = 100'000;
+	constexpr static size_t MaxDrawCount = 25'000;
 
 	std::array<PersistentBuffer, FramesInFlight> m_VertexBuffer;
 	std::array<PersistentBuffer, FramesInFlight> m_IndexBuffer;

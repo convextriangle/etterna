@@ -1066,7 +1066,7 @@ RendererVK::InitBatchBuffers()
 		  m_Allocator, matrixBufferInfo, matrixAllocInfo);
 
 		vk::BufferCreateInfo scratchBufferInfo{};
-		scratchBufferInfo.size = sizeof(uint8_t) * 64'000'000;
+		scratchBufferInfo.size = sizeof(uint8_t) * 1'000'000;
 		scratchBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer |
 								  vk::BufferUsageFlagBits::eShaderDeviceAddress;
 		VmaAllocationCreateInfo scratchAllocInfo = {};
@@ -1329,10 +1329,10 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 
 	PipelineInfo info = {};
 
-	auto fragmentShader = LoadShaderFromFile(
-	  fragmentShaderPath, m_Device, ShaderType_Fragment);
-	auto vertexShader = LoadShaderFromFile(
-	  vertexShaderPath, m_Device, ShaderType_Vertex);
+	auto fragmentShader =
+	  LoadShaderFromFile(fragmentShaderPath, m_Device, ShaderType_Fragment);
+	auto vertexShader =
+	  LoadShaderFromFile(vertexShaderPath, m_Device, ShaderType_Vertex);
 
 	vk::PipelineShaderStageCreateInfo vertexShaderStageInfo{};
 	vertexShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
