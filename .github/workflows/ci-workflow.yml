@@ -47,7 +47,7 @@ jobs:
       - name: Install OpenSSL 3.5
         run: mkdir -p tmp/openssl && cd tmp/openssl && wget https://github.com/openssl/openssl/releases/download/openssl-3.5.1/openssl-3.5.1.tar.gz && tar -xf openssl-3.5.1.tar.gz && cd openssl-3.5.1 && ./Configure --prefix="${HOME}/toolchain" && make -j `nproc` && make test -j `nproc` && sudo make install
       - name: Generate CMake
-        run: mkdir main/build && cd main/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=FALSE -DBUILD_EXAMPLES=FALSE -DOPENSSL_ROOT_DIR=~/toolchain/ ..
+        run: mkdir main/build && cd main/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=FALSE -DBUILD_EXAMPLES=FALSE -DOPENSSL_ROOT_DIR=~/toolchain/ -DCMAKE_CXX_FLAGS="-D_DEBUG" ..
         env:
           CXX: ${{matrix.cfg.cpp-version}}
 
