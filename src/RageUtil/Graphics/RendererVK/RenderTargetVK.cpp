@@ -14,8 +14,8 @@ RenderTargetVK::Create(const RenderTargetParam& param,
 					   int& iTextureHeightOut)
 {
 	m_Param = param;
-	const auto width = power_of_two(param.iWidth);
-	const auto height = power_of_two(param.iHeight);
+	const auto width = param.iWidth;
+	const auto height = param.iHeight;
 
 	iTextureWidthOut = width;
 	iTextureHeightOut = height;

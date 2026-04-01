@@ -120,8 +120,8 @@ RendererVK::CreateTexture(RageSurface* img, bool RGBA8)
 	m_EmptyTextureSlots.erase(currentHandle);
 
 	Texture texture = {};
-	texture.width = power_of_two(img->w);
-	texture.height = power_of_two(img->h);
+	texture.width = img->w;
+	texture.height = img->h;
 
 	VmaAllocationCreateInfo allocCreateInfo = {};
 	allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -1272,8 +1272,8 @@ RendererVK::CreateRenderTargetTexture(int width, int height)
 	m_EmptyTextureSlots.erase(currentHandle);
 
 	Texture texture = {};
-	texture.width = power_of_two(width);
-	texture.height = power_of_two(height);
+	texture.width = width;
+	texture.height = height;
 
 	VmaAllocationCreateInfo allocCreateInfo = {};
 	allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
