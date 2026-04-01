@@ -104,6 +104,7 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/Display/Renderer.h"
   "Graphics/Display/CompiledGeometry.h"
   "Graphics/Display/RenderNode.h"
+  "Graphics/Display/Vertex.h"
 
   "Graphics/RendererVK/RendererVK.h"
   "Graphics/RendererVK/VkUtils.h"

@@ -524,12 +524,6 @@ RendererVK::~RendererVK()
 							 m_MatrixStateBuffer[i].allocation);
 			m_MatrixStateBuffer[i].buffer = VK_NULL_HANDLE;
 		}
-		if (m_DrawSettingsBuffer[i].buffer != VK_NULL_HANDLE) {
-			vmaDestroyBuffer(m_Allocator,
-							 m_DrawSettingsBuffer[i].buffer,
-							 m_DrawSettingsBuffer[i].allocation);
-			m_DrawSettingsBuffer[i].buffer = VK_NULL_HANDLE;
-		}
 		if (m_ShaderScratchBuffer[i].buffer != VK_NULL_HANDLE) {
 			vmaDestroyBuffer(m_Allocator,
 							 m_ShaderScratchBuffer[i].buffer,
@@ -603,6 +597,8 @@ RendererVK::InitVulkanState()
 		.set_required_features_12(vk12Features)
 		.set_required_features(vkFeatures)
 		.set_surface(static_cast<vk::SurfaceKHR>(m_Surface))
+		.prefer_gpu_device_type(vkb::PreferredDeviceType::integrated)
+		.allow_any_gpu_device_type(false)
 #ifdef __APPLE__
 		.add_required_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
 #endif
@@ -626,6 +622,9 @@ RendererVK::InitVulkanState()
 	m_PhysicalDevice = vk::raii::PhysicalDevice(
 	  m_Instance, physicalDeviceResult->physical_device);
 	m_Device = vk::raii::Device(m_PhysicalDevice, deviceResult->device);
+
+	Locator::getLogger()->debug("RendererVK: selected GPU: {}",
+								physicalDeviceResult->name);
 
 	m_GraphicsQueue = vk::raii::Queue(
 	  m_Device, deviceResult->get_queue(vkb::QueueType::graphics).value());
@@ -750,14 +749,10 @@ RendererVK::GetDescriptorBindings()
 									   1,
 									   vk::ShaderStageFlagBits::eVertex),
 		vk::DescriptorSetLayoutBinding(2,
-									   vk::DescriptorType::eStorageBuffer,
-									   1,
-									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(3,
 									   vk::DescriptorType::eSampledImage,
 									   GetMaxTextureCount(),
 									   vk::ShaderStageFlagBits::eAllGraphics),
-		vk::DescriptorSetLayoutBinding(4,
+		vk::DescriptorSetLayoutBinding(3,
 									   vk::DescriptorType::eSampler,
 									   Texture::PossibleSamplerCount,
 									   vk::ShaderStageFlagBits::eAllGraphics)
@@ -933,22 +928,27 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 				  m_Pipelines[currentPipeline].GraphicsPipeline);
 			}
 
-			if (call.Settings.VertexShaderArg != UINT64_MAX) {
-				buffer.pushConstants<uint64_t>(
-				  *m_Pipelines[0].PipelineLayout,
-				  vk::ShaderStageFlagBits::eVertex,
-				  0,
-				  { m_ShaderScratchBuffer[m_CurrentFrame].gpuAddress +
-					call.Settings.VertexShaderArg });
-			}
-			if (call.Settings.FragShaderArg != UINT64_MAX) {
-				buffer.pushConstants<uint64_t>(
-				  *m_Pipelines[0].PipelineLayout,
-				  vk::ShaderStageFlagBits::eFragment,
-				  sizeof(uint64_t),
-				  { m_ShaderScratchBuffer[m_CurrentFrame].gpuAddress +
-					call.Settings.FragShaderArg });
-			}
+			uint64_t vertexArg =
+			  call.Settings.VertexShaderArg == UINT64_MAX
+				? 0
+				: m_ShaderScratchBuffer[m_CurrentFrame].gpuAddress +
+					call.Settings.VertexShaderArg;
+
+			buffer.pushConstants<uint64_t>(*m_Pipelines[0].PipelineLayout,
+										   vk::ShaderStageFlagBits::eVertex,
+										   0,
+										   { vertexArg });
+
+			uint64_t fragArg =
+			  call.Settings.FragShaderArg == UINT64_MAX
+				? 0
+				: m_ShaderScratchBuffer[m_CurrentFrame].gpuAddress +
+					call.Settings.FragShaderArg;
+
+			buffer.pushConstants<uint64_t>(*m_Pipelines[0].PipelineLayout,
+										   vk::ShaderStageFlagBits::eFragment,
+										   sizeof(uint64_t),
+										   { fragArg });
 
 			buffer.drawIndexed(call.IndexCount, 1, call.IndexOffset, 0, 0);
 		}
@@ -995,7 +995,7 @@ RendererVK::InitBatchBuffers()
 
 	vk::DescriptorPoolSize poolSizes[3] = {};
 	poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
-	poolSizes[0].descriptorCount = 3 * FramesInFlight;
+	poolSizes[0].descriptorCount = 2 * FramesInFlight;
 	poolSizes[1].type = vk::DescriptorType::eSampledImage;
 	poolSizes[1].descriptorCount = GetMaxTextureCount() * FramesInFlight;
 	poolSizes[2].type = vk::DescriptorType::eSampler;
@@ -1024,26 +1024,13 @@ RendererVK::InitBatchBuffers()
 
 	for (int i = 0; i < FramesInFlight; i++) {
 		vk::BufferCreateInfo vertexBufferInfo{};
-		vertexBufferInfo.size = sizeof(RageSpriteVertex) * MaxDrawCount;
+		vertexBufferInfo.size = sizeof(DisplayAdapter::Vertex) * MaxDrawCount;
 		vertexBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
 		VmaAllocationCreateInfo vertexAllocInfo = {};
 		vertexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 		vertexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		vertexAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_VertexBuffer[i].Init(m_Allocator, vertexBufferInfo, vertexAllocInfo);
-
-		vk::BufferCreateInfo drawSettingsInfo{};
-		drawSettingsInfo.size =
-		  sizeof(uint32_t) +
-		  sizeof(DisplayAdapter::DrawSettings) * MaxDrawCount;
-		drawSettingsInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
-		VmaAllocationCreateInfo drawSettingsAllocInfo = {};
-		drawSettingsAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-		drawSettingsAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-		drawSettingsAllocInfo.requiredFlags =
-		  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		m_DrawSettingsBuffer[i].Init(
-		  m_Allocator, drawSettingsInfo, drawSettingsAllocInfo);
 
 		vk::BufferCreateInfo indexBufferInfo{};
 		indexBufferInfo.size = sizeof(uint32_t) * 5 * MaxDrawCount;
@@ -1084,8 +1071,6 @@ RendererVK::InitBatchBuffers()
 		  m_VertexBuffer[i].Get(), 0, VK_WHOLE_SIZE);
 		vk::DescriptorBufferInfo matrixInfo(
 		  m_MatrixStateBuffer[i].Get(), 0, VK_WHOLE_SIZE);
-		vk::DescriptorBufferInfo settingsInfo(
-		  m_DrawSettingsBuffer[i].Get(), 0, VK_WHOLE_SIZE);
 
 		std::vector<vk::WriteDescriptorSet> writes = {
 			vk::WriteDescriptorSet(m_DescriptorSets[i],
@@ -1103,14 +1088,6 @@ RendererVK::InitBatchBuffers()
 								   vk::DescriptorType::eStorageBuffer,
 								   nullptr,
 								   &matrixInfo,
-								   nullptr),
-			vk::WriteDescriptorSet(m_DescriptorSets[i],
-								   2,
-								   0,
-								   1,
-								   vk::DescriptorType::eStorageBuffer,
-								   nullptr,
-								   &settingsInfo,
 								   nullptr)
 		};
 
@@ -1140,7 +1117,7 @@ RendererVK::UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher)
 
 			vk::WriteDescriptorSet writeDescriptor = {};
 			writeDescriptor.dstSet = m_DescriptorSets[m_CurrentFrame];
-			writeDescriptor.dstBinding = 3;
+			writeDescriptor.dstBinding = 2;
 			writeDescriptor.descriptorCount = textureInfo.size();
 			writeDescriptor.descriptorType = vk::DescriptorType::eSampledImage;
 			writeDescriptor.pImageInfo = textureInfo.data();
@@ -1150,23 +1127,11 @@ RendererVK::UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher)
 
 		std::memcpy(m_VertexBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_VertexBuffer.data(),
-					sizeof(RageSpriteVertex) * batcher.m_VertexBuffer.size());
+					sizeof(DisplayAdapter::Vertex) * batcher.m_VertexBuffer.size());
 
 		std::memcpy(m_IndexBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_IndexBuffer.data(),
 					sizeof(uint32_t) * batcher.m_IndexBuffer.size());
-
-		uint8_t* settingsBuffer =
-		  (uint8_t*)m_DrawSettingsBuffer[m_CurrentFrame].GetMappedData();
-
-		uint32_t settingsCount = batcher.m_DrawSettingsBuffer.size();
-		std::memcpy(settingsBuffer, &settingsCount, sizeof(uint32_t));
-		settingsBuffer += sizeof(uint32_t);
-
-		std::memcpy(settingsBuffer,
-					batcher.m_DrawSettingsBuffer.data(),
-					sizeof(DisplayAdapter::DrawSettings) *
-					  batcher.m_DrawSettingsBuffer.size());
 
 		std::memcpy(m_ShaderScratchBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_ShaderScratchBuffer.data(),
@@ -1241,7 +1206,7 @@ RendererVK::InitTextures()
 	for (int i = 0; i < FramesInFlight; i++) {
 		vk::WriteDescriptorSet writeDescriptor = {};
 		writeDescriptor.dstSet = m_DescriptorSets[i];
-		writeDescriptor.dstBinding = 4;
+		writeDescriptor.dstBinding = 3;
 		writeDescriptor.descriptorCount = Texture::PossibleSamplerCount;
 		writeDescriptor.descriptorType = vk::DescriptorType::eSampler;
 		writeDescriptor.pImageInfo = samplerImageInfo.data();

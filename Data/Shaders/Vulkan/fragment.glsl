@@ -2,8 +2,8 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_samplerless_texture_functions : enable
 
-layout(set = 0, binding = 3) uniform texture2D textures[];
-layout(set = 0, binding = 4) uniform sampler samplers[];
+layout(set = 0, binding = 2) uniform texture2D textures[];
+layout(set = 0, binding = 3) uniform sampler samplers[];
 
 layout(location = 0) in vec4 vertexColor;
 layout(location = 1) flat in uint textureIndex;

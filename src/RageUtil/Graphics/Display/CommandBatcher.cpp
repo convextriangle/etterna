@@ -108,17 +108,15 @@ DisplayAdapter::CommandBatcher::InsertSpriteDrawCommand(
 	//    so just convert to a triangle list
 	// -- unrolled loops look funny though
 	m_MatrixStateBuffer.push_back(matrixState);
-	m_DrawSettingsBuffer.push_back(
-	  { (uint32_t)m_VertexBuffer.size(),
-		(uint32_t)m_MatrixStateBuffer.size() - 1,
-		(uint32_t)renderState.textureHandle,
-		GetSamplerFlagsFromRenderState(renderState) });
 
 	const auto previousVertexCount = m_VertexBuffer.size();
-	m_VertexBuffer.resize(previousVertexCount + vertexCount);
-	std::memcpy(&m_VertexBuffer[previousVertexCount],
-				vertexData,
-				sizeof(RageSpriteVertex) * vertexCount);
+	for (int i = 0; i < vertexCount; i++) {
+		m_VertexBuffer.push_back(
+		  { vertexData[i],
+			(uint32_t)m_MatrixStateBuffer.size() - 1,
+			(uint32_t)renderState.textureHandle,
+			GetSamplerFlagsFromRenderState(renderState) });
+	}
 
 	const auto prevCount = m_IndexBuffer.size();
 	switch (drawMode) {
@@ -260,12 +258,6 @@ DisplayAdapter::CommandBatcher::InsertCompiledGeometryDrawCommand(
 		m_MatrixStateBuffer.back().texture.m[3][1] = 0;
 	}
 
-	m_DrawSettingsBuffer.push_back(
-	  { (uint32_t)m_VertexBuffer.size(),
-		(uint32_t)m_MatrixStateBuffer.size() - 1,
-		(uint32_t)renderState.textureHandle,
-		GetSamplerFlagsFromRenderState(renderState) });
-
 	RageVColor whiteVColor = {};
 	whiteVColor.r = UINT8_MAX;
 	whiteVColor.g = UINT8_MAX;
@@ -275,7 +267,11 @@ DisplayAdapter::CommandBatcher::InsertCompiledGeometryDrawCommand(
 	const auto previousVertexCount = m_VertexBuffer.size();
 	for (int i = 0; i < meshInfo.iVertexCount; i++) {
 		const auto& vertex = geometry->m_Vertices[meshInfo.iVertexStart + i];
-		m_VertexBuffer.push_back({ vertex.p, vertex.n, whiteVColor, vertex.t });
+		m_VertexBuffer.push_back(
+		  { { vertex.p, vertex.n, whiteVColor, vertex.t },
+			(uint32_t)m_MatrixStateBuffer.size() - 1,
+			(uint32_t)renderState.textureHandle,
+			GetSamplerFlagsFromRenderState(renderState) });
 	}
 
 	const auto prevIndexCount = m_IndexBuffer.size();
@@ -337,7 +333,6 @@ void
 DisplayAdapter::CommandBatcher::Clear()
 {
 	m_VertexBuffer.clear();
-	m_DrawSettingsBuffer.clear();
 	m_IndexBuffer.clear();
 	m_MatrixStateBuffer.clear();
 	m_RenderNodes.clear();

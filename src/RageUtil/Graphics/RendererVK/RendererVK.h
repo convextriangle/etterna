@@ -131,7 +131,6 @@ class RendererVK : public DisplayAdapter::Renderer
 	std::array<PersistentBuffer, FramesInFlight> m_VertexBuffer;
 	std::array<PersistentBuffer, FramesInFlight> m_IndexBuffer;
 	std::array<PersistentBuffer, FramesInFlight> m_MatrixStateBuffer;
-	std::array<PersistentBuffer, FramesInFlight> m_DrawSettingsBuffer;
 	std::array<PersistentBuffer, FramesInFlight> m_ShaderScratchBuffer;
 	PersistentBuffer m_TextureBuffer;
 

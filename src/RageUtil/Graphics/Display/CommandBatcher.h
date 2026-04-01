@@ -10,16 +10,9 @@
 #include "MatrixState.h"
 #include "RenderState.h"
 #include "RenderNode.h"
+#include "Vertex.h"
 
 namespace DisplayAdapter {
-
-struct DrawSettings
-{
-	uint32_t FirstVertexIndex;
-	uint32_t MatrixIndex;
-	uint32_t TextureIndex;
-	uint32_t SamplerIndex;
-};
 
 class CommandBatcher
 {
@@ -45,8 +38,7 @@ class CommandBatcher
 	void Clear();
 	void FixRenderNodeOrder();
 
-	std::vector<RageSpriteVertex> m_VertexBuffer;
-	std::vector<DrawSettings> m_DrawSettingsBuffer;
+	std::vector<Vertex> m_VertexBuffer;
 	std::vector<uint32_t> m_IndexBuffer;
 	std::vector<MatrixState> m_MatrixStateBuffer;
 	std::vector<RenderNode> m_RenderNodes;
