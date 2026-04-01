@@ -597,8 +597,6 @@ RendererVK::InitVulkanState()
 		.set_required_features_12(vk12Features)
 		.set_required_features(vkFeatures)
 		.set_surface(static_cast<vk::SurfaceKHR>(m_Surface))
-		.prefer_gpu_device_type(vkb::PreferredDeviceType::integrated)
-		.allow_any_gpu_device_type(false)
 #ifdef __APPLE__
 		.add_required_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
 #endif
