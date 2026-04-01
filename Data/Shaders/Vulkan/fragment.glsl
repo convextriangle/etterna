@@ -1,5 +1,5 @@
 #version 460
-#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_samplerless_texture_functions : enable
 
 layout(set = 0, binding = 2) uniform texture2D textures[];
@@ -18,6 +18,6 @@ void main() {
         return;
     }
 
-    vec4 textureColor = texture(sampler2D(textures[textureIndex], samplers[samplerIndex]), vertexUV);
+    vec4 textureColor = texture(sampler2D(textures[nonuniformEXT(textureIndex)], samplers[samplerIndex]), vertexUV);
     fragmentColor = vertexColor * textureColor;
 }
