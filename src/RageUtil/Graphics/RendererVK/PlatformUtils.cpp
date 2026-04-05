@@ -34,6 +34,7 @@ CreateInstance(PFN_vkDebugUtilsMessengerCallbackEXT debugCallback)
 		.enable_extension(VK_KHR_SURFACE_EXTENSION_NAME)
 #ifdef _WIN32
 		.enable_extension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
+		.enable_extension(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME)
 #endif
 #ifdef __unix__
 		.enable_extension(VK_KHR_XLIB_SURFACE_EXTENSION_NAME)

@@ -675,6 +675,14 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 	}
 	swapchainBuilder.set_composite_alpha_flags(compositeAlpha);
 
+	VkSurfaceFullScreenExclusiveInfoEXT fullScreenInfo = {
+		VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT
+	};
+	fullScreenInfo.fullScreenExclusive =
+	  p.bWindowIsFullscreenBorderless ? VK_FULL_SCREEN_EXCLUSIVE_DISALLOWED_EXT
+									  : VK_FULL_SCREEN_EXCLUSIVE_ALLOWED_EXT;
+	swapchainBuilder.add_pNext(&fullScreenInfo);
+
 	auto swapchain_ret = swapchainBuilder.build();
 	if (!swapchain_ret) {
 		Locator::getLogger()->fatal(
@@ -1125,7 +1133,8 @@ RendererVK::UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher)
 
 		std::memcpy(m_VertexBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_VertexBuffer.data(),
-					sizeof(DisplayAdapter::Vertex) * batcher.m_VertexBuffer.size());
+					sizeof(DisplayAdapter::Vertex) *
+					  batcher.m_VertexBuffer.size());
 
 		std::memcpy(m_IndexBuffer[m_CurrentFrame].GetMappedData(),
 					batcher.m_IndexBuffer.data(),
