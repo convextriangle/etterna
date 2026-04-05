@@ -2,7 +2,7 @@
 #define RENDERER_VK_TEXTURE_H
 
 #include <vulkan/vulkan_raii.hpp>
-#include <vk_mem_alloc.h>
+#include <vma/vk_mem_alloc.h>
 #include <RageUtil/Graphics/RageSurface.h>
 
 struct Texture

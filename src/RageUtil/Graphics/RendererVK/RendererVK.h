@@ -19,12 +19,12 @@
 		char buffer[256];                                                      \
 		snprintf(buffer, sizeof(buffer), format, __VA_ARGS__);                 \
 		std::string str(buffer);                                               \
-		Locator::getLogger()->trace("VulkanMemoryAllocator: " + str);           \
+		Locator::getLogger()->debug("VulkanMemoryAllocator: " + str);           \
 	} while (false)
 #endif
 
 #include <vulkan/vulkan_raii.hpp>
-#include <vk_mem_alloc.h>
+#include <vma/vk_mem_alloc.h>
 #include <VkBootstrap.h>
 #include <array>
 #include <map>
