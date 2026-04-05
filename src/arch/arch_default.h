@@ -9,6 +9,11 @@
 #define DEFAULT_MOVIE_DRIVER_LIST "FFMpeg,DShow,Null"
 #define DEFAULT_SOUND_DRIVER_LIST "WaveOut,DirectSound-sw,WDMKS,Null"
 
+#include "LowLevelWindowVK/LowLevelWindowVK_Win32.h"
+#ifndef LOW_LEVEL_WINDOW_VK
+#define LOW_LEVEL_WINDOW_VK LowLevelWindowVK_Win32
+#endif
+
 #elif defined(__APPLE__)
 #include "LoadingWindow/LoadingWindow_MacOSX.h"
 #include "LowLevelWindow/LowLevelWindow_MacOSX.h"

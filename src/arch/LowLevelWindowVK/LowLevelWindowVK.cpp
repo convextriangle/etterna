@@ -6,7 +6,7 @@
 LowLevelWindowVK*
 LowLevelWindowVK::Create()
 {
-#ifndef __unix__
+#ifdef __APPLE__
 	assert(false && "Should never be called");
 	return nullptr;
 #else

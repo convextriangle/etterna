@@ -97,6 +97,8 @@ list(APPEND SMDATA_ARCH_LOWLEVEL_HPP "LowLevelWindowVK/LowLevelWindowVK.h")
 if(WIN32)
   list(APPEND SMDATA_ARCH_LOWLEVEL_SRC "LowLevelWindow/LowLevelWindow_Win32.cpp")
   list(APPEND SMDATA_ARCH_LOWLEVEL_HPP "LowLevelWindow/LowLevelWindow_Win32.h")
+  list(APPEND SMDATA_ARCH_LOWLEVEL_SRC "LowLevelWindowVK/LowLevelWindowVK_Win32.cpp")
+  list(APPEND SMDATA_ARCH_LOWLEVEL_HPP "LowLevelWindowVK/LowLevelWindowVK_Win32.h")
   
 elseif(APPLE)
   list(APPEND SMDATA_ARCH_LOWLEVEL_SRC "LowLevelWindow/LowLevelWindow_MacOSX.mm")

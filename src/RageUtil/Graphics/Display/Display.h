@@ -7,10 +7,7 @@
 #include "Renderer.h"
 #include "RenderState.h"
 #include <functional>
-
-#ifndef _WIN32
 #include "arch/LowLevelWindowVK/LowLevelWindowVK.h"
-#endif
 
 namespace DisplayAdapter {
 class Display : public RageDisplay
@@ -131,10 +128,8 @@ class Display : public RageDisplay
 	RenderState m_RenderState;
 	intptr_t m_CurrentRenderTarget = 0;
 
-#ifndef _WIN32
 	LowLevelWindowVK* m_Window = nullptr;
-#endif
 };
-} // namespace Display
+} // namespace DisplayAdapter
 
 #endif

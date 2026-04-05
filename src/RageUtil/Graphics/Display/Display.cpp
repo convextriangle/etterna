@@ -4,10 +4,6 @@
 #include <cassert>
 #include <source_location>
 
-#ifdef _WIN32
-#include "archutils/Win32/GraphicsWindow.h"
-#endif
-
 DisplayAdapter::Display::Display(std::unique_ptr<Renderer> renderer)
   : m_Renderer(std::move(renderer))
   , m_RenderState()
@@ -22,73 +18,16 @@ DisplayAdapter::Display::Init(VideoModeParams&& p,
 	Locator::getLogger()->info("Current renderer: UnstableDisplay - {}",
 							   m_Renderer->GetApiDescription());
 
-#ifdef _WIN32
-	GraphicsWindow::Initialize(false);
-#else
 	m_Window = LowLevelWindowVK::Create();
-#endif
 
 	bool ignored = false;
 	return SetVideoMode(std::move(p), ignored);
 }
 
-#ifdef _WIN32
-static BOOL CALLBACK
-EnumerateMonitors(HMONITOR monitor,
-				  HDC deviceContextHandle,
-				  LPRECT monitorRect,
-				  LPARAM userData)
-{
-	auto* out = reinterpret_cast<DisplaySpecs*>(userData);
-
-	MONITORINFOEXW monitorInfo = {};
-	monitorInfo.cbSize = sizeof(monitorInfo);
-	if (!GetMonitorInfoW(monitor, &monitorInfo)) {
-		return TRUE;
-	}
-
-	std::set<DisplayMode> modes;
-	DEVMODEW deviceMode = {};
-	deviceMode.dmSize = sizeof(deviceMode);
-	deviceMode.dmDriverExtra = 0;
-	DWORD modeIndex = 0;
-	while (
-	  EnumDisplaySettingsW(monitorInfo.szDevice, modeIndex, &deviceMode)) {
-		modes.insert({ deviceMode.dmPelsWidth,
-					   deviceMode.dmPelsHeight,
-					   static_cast<double>(deviceMode.dmDisplayFrequency) });
-		modeIndex++;
-	}
-
-	DisplayMode active = { 0, 0, 0.0 };
-	if (EnumDisplaySettingsW(
-		  monitorInfo.szDevice, ENUM_CURRENT_SETTINGS, &deviceMode)) {
-		active.width = deviceMode.dmPelsWidth;
-		active.height = deviceMode.dmPelsHeight;
-		active.refreshRate = static_cast<double>(deviceMode.dmDisplayFrequency);
-	} else if (!modes.empty()) {
-		active = *modes.begin();
-	}
-
-	RectI bounds(monitorInfo.rcMonitor.left,
-				 monitorInfo.rcMonitor.top,
-				 monitorInfo.rcMonitor.right,
-				 monitorInfo.rcMonitor.bottom);
-
-	out->insert(DisplaySpec("", "Fullscreen", modes, active, bounds));
-	return TRUE;
-}
-#endif
-
 void
 DisplayAdapter::Display::GetDisplaySpecs(DisplaySpecs& out) const
 {
-#ifdef _WIN32
-	EnumDisplayMonitors(
-	  nullptr, nullptr, EnumerateMonitors, reinterpret_cast<LPARAM>(&out));
-#else
 	m_Window->GetDisplaySpecs(out);
-#endif
 }
 
 void
@@ -101,11 +40,8 @@ DisplayAdapter::Display::ResolutionChanged()
 bool
 DisplayAdapter::Display::BeginFrame()
 {
-#ifdef _WIN32
-	GraphicsWindow::Update();
-#else
 	m_Window->Update();
-#endif
+
 	m_Batcher.Clear();
 	m_RenderState.textureFiltering = true;
 	m_RenderState.textureWrapping = false;
@@ -124,22 +60,14 @@ DisplayAdapter::Display::EndFrame()
 const ActualVideoModeParams*
 DisplayAdapter::Display::GetActualVideoModeParams() const
 {
-#ifdef _WIN32
-	return GraphicsWindow::GetParams();
-#else
 	return m_Window->GetActualVideoModeParams();
-#endif
 }
 
 std::string
 DisplayAdapter::Display::TryVideoMode(const VideoModeParams& p,
 									  bool& bNewDeviceOut)
 {
-#ifdef _WIN32
-	GraphicsWindow::CreateGraphicsWindow(p);
-#else
 	m_Window->TryVideoMode(p, bNewDeviceOut);
-#endif
 
 	if (!m_IsInitDone) {
 		m_Renderer->InitializeRenderer(p);
