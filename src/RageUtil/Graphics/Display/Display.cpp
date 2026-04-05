@@ -3,6 +3,7 @@
 #include "Core/Services/Locator.hpp"
 #include <cassert>
 #include <source_location>
+#include <RageUtil/Misc/RageMath.h>
 
 DisplayAdapter::Display::Display(std::unique_ptr<Renderer> renderer)
   : m_Renderer(std::move(renderer))
@@ -305,11 +306,13 @@ DisplayAdapter::Display::SupportsPerVertexMatrixScale()
 DisplayAdapter::MatrixState
 DisplayAdapter::Display::GetCurrentMatrixState()
 {
-	MatrixState m;
-	m.projection = *GetProjectionTop();
-	m.view = *GetViewTop();
-	m.world = *GetWorldTop();
+	MatrixState m = {};
 	m.texture = *GetTextureTop();
+
+	RageMatrix temp = {};
+
+	RageMatrixMultiply(&temp, GetViewTop(), GetWorldTop());
+	RageMatrixMultiply(&m.wvp, GetProjectionTop(), &temp);
 
 	return m;
 }

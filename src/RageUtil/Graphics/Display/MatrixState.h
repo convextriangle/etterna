@@ -7,9 +7,7 @@ namespace DisplayAdapter {
 
 struct MatrixState
 {
-	RageMatrix projection;
-	RageMatrix view;
-	RageMatrix world;
+	RageMatrix wvp;
 	RageMatrix texture;
 };
 

@@ -16,9 +16,7 @@ layout(std430, set = 0, binding = 0) readonly buffer VertexBuffer {
 };
 
 struct MatrixState {
-    mat4 projection;
-    mat4 view;
-    mat4 world;
+    mat4 wvp;
     mat4 texture;
 };
 
@@ -58,17 +56,13 @@ void main() {
     samplerIndex = currentVertex.SamplerIndex;
 
     uint matrixIndex = currentVertex.MatrixIndex;
-    mat4 world = matrices[matrixIndex].world;
-    mat4 view = matrices[matrixIndex].view;
-    mat4 proj = matrices[matrixIndex].projection;
+    mat4 wvp = matrices[matrixIndex].wvp;
     mat4 tex = matrices[matrixIndex].texture;
     
-    vec4 worldPos = world * vec4(unpackVec3(currentVertex.pos), 1.0);
-    vec4 viewPos = view * worldPos;
-    vec4 projPos = proj * viewPos;
-    projPos.z = 0.0; // whart?
+    vec4 pos = wvp * vec4(unpackVec3(currentVertex.pos), 1.0);
+    pos.z = 0.0; // whart?
     
-    gl_Position = projPos;
+    gl_Position = pos;
 
     vertexUV = unpackVec2(currentVertex.uv);
     vertexUV.x += tex[3][0];
