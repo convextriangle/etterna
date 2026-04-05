@@ -280,9 +280,24 @@ void
 RendererVK::ClearAllTextures()
 {
 	m_GraphicsQueue.waitIdle();
-	auto emptyTexture = m_Textures[0];
+
+	Texture emptyTexture = m_Textures[0];
+	for (auto& [handle, texture] : m_Textures) {
+		if (handle == 0) {
+			continue;
+		}
+
+		DestroyTexture(texture);
+		m_Textures.erase(handle);
+		m_EmptyTextureSlots.insert(handle);
+	}
+
 	m_Textures.clear();
+
 	m_Textures[0] = emptyTexture;
+	for (int i = 0; i < FramesInFlight; i++) {
+		m_PendingTextureUpdates[i] = true;
+	}
 }
 
 RageSurface*
