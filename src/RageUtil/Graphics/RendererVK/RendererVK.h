@@ -24,7 +24,11 @@
 #endif
 
 #include <vulkan/vulkan_raii.hpp>
+#if __has_include(<vma/vk_mem_alloc.h>)
 #include <vma/vk_mem_alloc.h>
+#else
+#include <vk_mem_alloc.h>
+#endif
 #include <VkBootstrap.h>
 #include <array>
 #include <map>

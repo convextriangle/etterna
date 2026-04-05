@@ -122,7 +122,7 @@ find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
 target_link_libraries(Etterna PRIVATE
     Vulkan::Vulkan
     Vulkan::shaderc_combined) 
-target_include_directories(Etterna PRIVATE ${Vulkan_INCLUDE_DIRS})    
+target_include_directories(Etterna PRIVATE ${Vulkan_INCLUDE_DIR})    
 
 if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
   target_link_libraries(Etterna PRIVATE sse2neon)

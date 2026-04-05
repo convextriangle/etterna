@@ -310,38 +310,31 @@ RendererVK::CreateScreenshot()
 	  m_SwapchainImages[((int)m_CurrentFrame - 1 + FramesInFlight) %
 						FramesInFlight];
 
-	vk::ImageCreateInfo destImageInfo = {};
-	destImageInfo.imageType = vk::ImageType::e2D;
-	destImageInfo.format = vk::Format::eR8G8B8A8Unorm;
-	destImageInfo.extent.width = m_SwapchainExtent.width;
-	destImageInfo.extent.height = m_SwapchainExtent.height;
-	destImageInfo.extent.depth = 1;
-	destImageInfo.arrayLayers = 1;
-	destImageInfo.mipLevels = 1;
-	destImageInfo.initialLayout = vk::ImageLayout::eUndefined;
-	destImageInfo.samples = vk::SampleCountFlagBits::e1;
-	destImageInfo.tiling = vk::ImageTiling::eLinear;
-	destImageInfo.usage = vk::ImageUsageFlagBits::eTransferDst;
+	VkImageCreateInfo imageInfo = {};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageInfo.extent = { m_SwapchainExtent.width, m_SwapchainExtent.height, 1 };
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
+	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-	vk::raii::Image destImage(m_Device, destImageInfo);
-	vk::MemoryRequirements memoryReqs = destImage.getMemoryRequirements();
-	vk::MemoryAllocateInfo memoryAllocInfo = {};
-	memoryAllocInfo.allocationSize = memoryReqs.size;
+	VmaAllocationCreateInfo allocInfo = {};
+	allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+	allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-	auto memoryTypeIndex =
-	  GetMemoryType(memoryReqs.memoryTypeBits,
-					vk::MemoryPropertyFlagBits::eHostVisible |
-					  vk::MemoryPropertyFlagBits::eHostCoherent,
-					m_PhysicalDevice.getMemoryProperties());
-	if (!memoryTypeIndex.has_value()) {
-		Locator::getLogger()->error("RendererVK: failed to screenshot (can't "
-									"find memory type for image creation)");
-		Fail();
-	}
-
-	memoryAllocInfo.memoryTypeIndex = *memoryTypeIndex;
-	auto destImageMemory = m_Device.allocateMemory(memoryAllocInfo);
-	destImage.bindMemory(destImageMemory, 0);
+	VkImage destImage;
+	VmaAllocation allocation;
+	VmaAllocationInfo allocInfoOut;
+	ThrowIfFail(vmaCreateImage(m_Allocator,
+							   &imageInfo,
+							   &allocInfo,
+							   &destImage,
+							   &allocation,
+							   &allocInfoOut));
 
 	m_TextureCopyBuffer.reset();
 	m_TextureCopyBuffer.begin({});
@@ -449,20 +442,13 @@ RendererVK::CreateScreenshot()
 	ThrowIfFail(m_Device.waitForFences({ fence }, VK_TRUE, Timeout));
 
 	vk::ImageSubresource subresource{ vk::ImageAspectFlagBits::eColor, 0, 0 };
-	vk::SubresourceLayout subresourceLayout =
-	  destImage.getSubresourceLayout(subresource);
-
-	vk::MemoryMapInfo memoryMapInfo = {};
-	memoryMapInfo.memory = destImageMemory;
-	memoryMapInfo.size = VK_WHOLE_SIZE;
+	vk::SubresourceLayout subresourceLayout = {};
+	vkGetImageSubresourceLayout(
+	  *m_Device, destImage, &*subresource, &*subresourceLayout);
 
 	uint8_t* data = nullptr;
-	ThrowIfFail(vkMapMemory(*m_Device,
-							*destImageMemory,
-							0,
-							VK_WHOLE_SIZE,
-							0,
-							reinterpret_cast<void**>(&data)));
+	ThrowIfFail(
+	  vmaMapMemory(m_Allocator, allocation, reinterpret_cast<void**>(&data)));
 
 	RageSurface* surface = CreateSurface(m_SwapchainExtent.width,
 										 m_SwapchainExtent.height,
@@ -477,7 +463,8 @@ RendererVK::CreateScreenshot()
 		surface->pixels[i] = ((i + 1) % 4) ? data[i] : 255;
 	}
 
-	vkUnmapMemory(*m_Device, *destImageMemory);
+	vmaUnmapMemory(m_Allocator, allocation);
+	vmaDestroyImage(m_Allocator, destImage, allocation);
 
 	return surface;
 }
@@ -701,6 +688,7 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 	}
 	swapchainBuilder.set_composite_alpha_flags(compositeAlpha);
 
+#ifdef _WIN32
 	VkSurfaceFullScreenExclusiveInfoEXT fullScreenInfo = {
 		VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT
 	};
@@ -708,6 +696,7 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 	  p.bWindowIsFullscreenBorderless ? VK_FULL_SCREEN_EXCLUSIVE_DISALLOWED_EXT
 									  : VK_FULL_SCREEN_EXCLUSIVE_ALLOWED_EXT;
 	swapchainBuilder.add_pNext(&fullScreenInfo);
+#endif
 
 	auto swapchain_ret = swapchainBuilder.build();
 	if (!swapchain_ret) {
