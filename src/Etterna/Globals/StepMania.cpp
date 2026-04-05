@@ -30,7 +30,10 @@
 #include "Etterna/Screen/Others/Screen.h"
 #include "Etterna/Globals/GameLoop.h"
 #include "RageUtil/Graphics/Display/Display.h"
+
+#if defined(WITH_VULKAN)
 #include "RageUtil/Graphics/RendererVK/RendererVK.h"
+#endif
 
 #if !defined(SUPPORT_OPENGL) && !defined(SUPPORT_D3D)
 #define SUPPORT_OPENGL
@@ -819,11 +822,13 @@ CreateDisplay()
 				pRet = new RageDisplay_D3D;
 #endif
 			}
+#if defined(WITH_VULKAN)
 #if !defined(__APPLE__)
 			else if (CompareNoCase(sRenderer, "vulkan") == 0) {
 				pRet =
 				  new DisplayAdapter::Display(std::make_unique<RendererVK>());
 			}
+#endif
 #endif
 			else if (CompareNoCase(sRenderer, "null") == 0) {
 				return new RageDisplay_Null;

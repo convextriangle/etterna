@@ -43,6 +43,7 @@ add_executable(Etterna)
 
 # Project Compile Options
 set(WITH_CRASHPAD TRUE CACHE BOOL "Compile with Crash Handler (Requires depot_tools installed)")
+set(WITH_VULKAN TRUE CACHE BOOL "Compile Vulkan support (Requires Vulkan SDK to be installed and VULKAN_SDK environment variable to be set to SDK root dir)")
 
 ## Setting Target Properties
 ### Set a different name for each output binary depending on what build configuration is.
@@ -116,16 +117,19 @@ target_link_libraries(Etterna PRIVATE plog::plog)
 target_link_libraries(Etterna PRIVATE nowide::nowide)
 target_link_libraries(Etterna PRIVATE ghc_filesystem)
 
-target_link_libraries(Etterna PRIVATE vk-bootstrap::vk-bootstrap)
-target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
+if(WITH_VULKAN)
+    target_compile_definitions(Etterna PRIVATE WITH_VULKAN)
+    target_link_libraries(Etterna PRIVATE vk-bootstrap::vk-bootstrap)
+    target_link_libraries(Etterna PRIVATE VulkanMemoryAllocator)
 
-find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
-target_link_libraries(Etterna PRIVATE
-    Vulkan::Vulkan
-    Vulkan::shaderc_combined) 
+    find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
+    target_link_libraries(Etterna PRIVATE
+        Vulkan::Vulkan
+        Vulkan::shaderc_combined) 
 
-if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
-  target_link_libraries(Etterna PRIVATE sse2neon)
+    if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
+        target_link_libraries(Etterna PRIVATE sse2neon)
+    endif()
 endif()
 
 # If the user wants crashpad, and the target exists (in-case

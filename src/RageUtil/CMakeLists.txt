@@ -64,16 +64,20 @@ list(APPEND SMDATA_RAGE_GRAPHICS_SRC
   "Graphics/RageTextureID.cpp"
   "Graphics/RageTextureManager.cpp"
   "Graphics/RageTextureRenderTarget.cpp"
-
-  "Graphics/Display/CommandBatcher.cpp"
-  "Graphics/Display/CompiledGeometry.cpp"
-  "Graphics/Display/Display.cpp"
-  "Graphics/RendererVK/RendererVK.cpp"
-  "Graphics/RendererVK/VkUtils.cpp"
-  "Graphics/RendererVK/PersistentBuffer.cpp"
-  "Graphics/RendererVK/RenderTargetVK.cpp"
-  "Graphics/RendererVK/PlatformUtils.cpp"
 )
+
+if(WITH_VULKAN)
+  list(APPEND SMDATA_RAGE_GRAPHICS_SRC
+    "Graphics/Display/CommandBatcher.cpp"
+    "Graphics/Display/CompiledGeometry.cpp"
+    "Graphics/Display/Display.cpp"
+    "Graphics/RendererVK/RendererVK.cpp"
+    "Graphics/RendererVK/VkUtils.cpp"
+    "Graphics/RendererVK/PersistentBuffer.cpp"
+    "Graphics/RendererVK/RenderTargetVK.cpp"
+    "Graphics/RendererVK/PlatformUtils.cpp")
+endif()
+
 list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/RageBitmapTexture.h"
   "Graphics/RageDisplay.h"
@@ -105,14 +109,17 @@ list(APPEND SMDATA_RAGE_GRAPHICS_HPP
   "Graphics/Display/CompiledGeometry.h"
   "Graphics/Display/RenderNode.h"
   "Graphics/Display/Vertex.h"
-
-  "Graphics/RendererVK/RendererVK.h"
-  "Graphics/RendererVK/VkUtils.h"
-  "Graphics/RendererVK/PersistentBuffer.h"
-  "Graphics/RendererVK/Texture.h"
-  "Graphics/RendererVK/RenderTargetVK.h"
-  "Graphics/RendererVK/PlatformUtils.h"
 )
+
+if(WITH_VULKAN)
+  list(APPEND SMDATA_RAGE_GRAPHICS_HPP
+    "Graphics/RendererVK/RendererVK.h"
+    "Graphics/RendererVK/VkUtils.h"
+    "Graphics/RendererVK/PersistentBuffer.h"
+    "Graphics/RendererVK/Texture.h"
+    "Graphics/RendererVK/RenderTargetVK.h"
+    "Graphics/RendererVK/PlatformUtils.h")
+endif()
 
 if(WIN32)
   list(APPEND SMDATA_RAGE_GRAPHICS_SRC "Graphics/RageDisplay_D3D.cpp")
