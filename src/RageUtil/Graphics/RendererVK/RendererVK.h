@@ -19,7 +19,7 @@
 		char buffer[256];                                                      \
 		snprintf(buffer, sizeof(buffer), format, __VA_ARGS__);                 \
 		std::string str(buffer);                                               \
-		Locator::getLogger()->warn("VulkanMemoryAllocator: " + str);           \
+		Locator::getLogger()->trace("VulkanMemoryAllocator: " + str);           \
 	} while (false)
 #endif
 
@@ -28,7 +28,7 @@
 #include <VkBootstrap.h>
 #include <array>
 #include <map>
-#include <unordered_set>
+#include <set>
 #include <utility>
 #include <optional>
 #include "VkUtils.h"
@@ -106,6 +106,7 @@ class RendererVK : public DisplayAdapter::Renderer
 	void InitCommandPool();
 
 	std::vector<vk::raii::CommandBuffer> m_CommandBuffers;
+	vk::raii::CommandBuffer m_TextureCopyBuffer = nullptr;
 	void InitCommandBuffers();
 
 	void TransitionImageLayout(vk::Image& image,
@@ -140,8 +141,8 @@ class RendererVK : public DisplayAdapter::Renderer
 	void InitBatchBuffers();
 	void UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher);
 
-	std::unordered_map<intptr_t, Texture> m_Textures;
-	std::unordered_set<intptr_t> m_EmptyTextureSlots;
+	std::map<intptr_t, Texture> m_Textures;
+	std::set<intptr_t> m_EmptyTextureSlots;
 	int GetMaxTextureSize();
 	int GetMaxTextureCount();
 	void DestroyTexture(Texture& texture);
