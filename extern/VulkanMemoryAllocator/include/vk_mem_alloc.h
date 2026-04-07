@@ -3091,7 +3091,7 @@ VmaAllocatorCreateInfo::pVulkanFunctions. Other members can be null.
 #endif
 
 #ifndef VMA_USE_STL_SHARED_MUTEX
-    #if __cplusplus >= 201703L || _MSVC_LANG >= 201703L // C++17
+    #if !defined(__APPLE__) && (__cplusplus >= 201703L || _MSVC_LANG >= 201703L) // C++17
         #define VMA_USE_STL_SHARED_MUTEX 1
     // Visual studio defines __cplusplus properly only when passed additional parameter: /Zc:__cplusplus
     // Otherwise it is always 199711L, despite shared_mutex works since Visual Studio 2015 Update 2.
