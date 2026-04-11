@@ -18,6 +18,6 @@ void main() {
         return;
     }
 
-    vec4 textureColor = texture(sampler2D(textures[nonuniformEXT(textureIndex)], samplers[samplerIndex]), vertexUV);
+    vec4 textureColor = texture(sampler2D(textures[nonuniformEXT(textureIndex)], samplers[nonuniformEXT(samplerIndex)]), vertexUV);
     fragmentColor = vertexColor * textureColor;
 }

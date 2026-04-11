@@ -207,6 +207,7 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 		barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
 		barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 	} else {
+		barrier.srcAccessMask = vk::AccessFlags();
 		barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 		barrier.oldLayout = vk::ImageLayout::eUndefined;
 		barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
@@ -220,7 +221,7 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	barrier.subresourceRange.layerCount = 1;
 	copyBuffer.pipelineBarrier(texture.initialized
 								 ? vk::PipelineStageFlagBits::eAllGraphics
-								 : vk::PipelineStageFlagBits::eHost,
+								 : vk::PipelineStageFlagBits::eTopOfPipe,
 							   vk::PipelineStageFlagBits::eTransfer,
 							   {},
 							   {},
@@ -255,8 +256,16 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	vk::SubmitInfo submitInfo = {};
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &(*copyBuffer);
-	m_GraphicsQueue.submit({ submitInfo });
-	m_GraphicsQueue.waitIdle();
+
+	vk::FenceCreateInfo fenceInfo;
+	vk::raii::Fence fence(m_Device, fenceInfo);
+	m_GraphicsQueue.submit({ submitInfo }, fence);
+
+	auto result = m_Device.waitForFences({ fence }, VK_TRUE, Timeout);
+	if (result != vk::Result::eSuccess) {
+		Locator::getLogger()->error("Texture upload fence wait failed: {}",
+									vk::to_string(result));
+	}
 
 	texture.initialized = true;
 	texture.currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -979,7 +988,8 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 					call.Settings.VertexShaderArg;
 
 			buffer.pushConstants<uint64_t>(*m_Pipelines[0].PipelineLayout,
-										   vk::ShaderStageFlagBits::eVertex,
+										   vk::ShaderStageFlagBits::eVertex |
+											 vk::ShaderStageFlagBits::eFragment,
 										   0,
 										   { vertexArg });
 
@@ -990,7 +1000,8 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 					call.Settings.FragShaderArg;
 
 			buffer.pushConstants<uint64_t>(*m_Pipelines[0].PipelineLayout,
-										   vk::ShaderStageFlagBits::eFragment,
+										   vk::ShaderStageFlagBits::eVertex |
+											 vk::ShaderStageFlagBits::eFragment,
 										   sizeof(uint64_t),
 										   { fragArg });
 
@@ -1410,17 +1421,15 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 		  vk::raii::DescriptorSetLayout(m_Device, layoutInfo);
 	}
 
-	std::array<vk::PushConstantRange, 2> pushConstants = {};
-	pushConstants[0].size = sizeof(uint64_t);
-	pushConstants[0].stageFlags = vk::ShaderStageFlagBits::eVertex;
-	pushConstants[1].offset = sizeof(uint64_t);
-	pushConstants[1].size = sizeof(uint64_t);
-	pushConstants[1].stageFlags = vk::ShaderStageFlagBits::eFragment;
+	std::array<vk::PushConstantRange, 1> pushConstants = {};
+	pushConstants[0].size = sizeof(uint64_t) * 2;
+	pushConstants[0].stageFlags =
+	  vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {};
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &*m_DescriptorSetLayout;
-	pipelineLayoutInfo.pushConstantRangeCount = 2;
+	pipelineLayoutInfo.pushConstantRangeCount = 1;
 	pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
 
 	info.PipelineLayout =
