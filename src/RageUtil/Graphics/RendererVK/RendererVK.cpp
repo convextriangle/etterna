@@ -260,12 +260,7 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	vk::FenceCreateInfo fenceInfo;
 	vk::raii::Fence fence(m_Device, fenceInfo);
 	m_GraphicsQueue.submit({ submitInfo }, fence);
-
-	auto result = m_Device.waitForFences({ fence }, VK_TRUE, Timeout);
-	if (result != vk::Result::eSuccess) {
-		Locator::getLogger()->error("Texture upload fence wait failed: {}",
-									vk::to_string(result));
-	}
+	ThrowIfFail(m_Device.waitForFences({ fence }, VK_TRUE, Timeout));
 
 	texture.initialized = true;
 	texture.currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -1384,7 +1379,7 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	rasterizer.depthClampEnable = vk::False;
 	rasterizer.rasterizerDiscardEnable = vk::False;
 	rasterizer.polygonMode = vk::PolygonMode::eFill;
-	rasterizer.cullMode = vk::CullModeFlagBits::eBack;
+	rasterizer.cullMode = vk::CullModeFlagBits::eFront;
 	rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
 	rasterizer.depthBiasEnable = vk::False;
 	rasterizer.depthBiasSlopeFactor = 1.0f;
@@ -1443,6 +1438,12 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	// the storage buffer
 	vk::PipelineVertexInputStateCreateInfo vertexInfo = {};
 
+	vk::PipelineDepthStencilStateCreateInfo depthStencil{};
+	depthStencil.depthTestEnable = VK_FALSE;
+	depthStencil.depthWriteEnable = VK_FALSE;
+	depthStencil.depthCompareOp = vk::CompareOp::eAlways;
+	depthStencil.stencilTestEnable = VK_FALSE;
+
 	vk::GraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.pNext = &pipelineRenderingCreateInfo;
 	pipelineInfo.stageCount = 2;
@@ -1456,6 +1457,7 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	pipelineInfo.pVertexInputState = &vertexInfo;
 	pipelineInfo.layout = info.PipelineLayout;
 	pipelineInfo.renderPass = nullptr;
+	pipelineInfo.pDepthStencilState = &depthStencil;
 
 	info.GraphicsPipeline = vk::raii::Pipeline(m_Device, nullptr, pipelineInfo);
 

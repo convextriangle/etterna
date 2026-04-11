@@ -137,15 +137,15 @@ DisplayAdapter::CommandBatcher::InsertSpriteDrawCommand(
 				m_IndexBuffer[prevCount + i * 6 + 0] =
 				  previousVertexCount + i * 4 + 0;
 				m_IndexBuffer[prevCount + i * 6 + 1] =
-				  previousVertexCount + i * 4 + 1;
-				m_IndexBuffer[prevCount + i * 6 + 2] =
 				  previousVertexCount + i * 4 + 2;
+				m_IndexBuffer[prevCount + i * 6 + 2] =
+				  previousVertexCount + i * 4 + 1;
 				m_IndexBuffer[prevCount + i * 6 + 3] =
 				  previousVertexCount + i * 4 + 2;
 				m_IndexBuffer[prevCount + i * 6 + 4] =
-				  previousVertexCount + i * 4 + 3;
-				m_IndexBuffer[prevCount + i * 6 + 5] =
 				  previousVertexCount + i * 4 + 0;
+				m_IndexBuffer[prevCount + i * 6 + 5] =
+				  previousVertexCount + i * 4 + 3;
 			}
 
 			break;
