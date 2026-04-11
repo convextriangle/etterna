@@ -106,7 +106,6 @@ class RendererVK : public DisplayAdapter::Renderer
 	void InitCommandPool();
 
 	std::vector<vk::raii::CommandBuffer> m_CommandBuffers;
-	vk::raii::CommandBuffer m_TextureCopyBuffer = nullptr;
 	void InitCommandBuffers();
 
 	void TransitionImageLayout(vk::Image& image,

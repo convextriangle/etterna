@@ -182,11 +182,18 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	assert(img->pitch == width * sizeof(uint32_t));
 	assert(m_Textures.contains(textureHandle));
 
-	m_TextureCopyBuffer.reset();
+	vk::CommandBufferAllocateInfo bufferInfo = {};
+	bufferInfo.level = vk::CommandBufferLevel::ePrimary;
+	bufferInfo.commandPool = m_CommandPool;
+	bufferInfo.commandBufferCount = 1;
+
+	auto buffers = m_Device.allocateCommandBuffers(bufferInfo);
+	assert(buffers.size() == 1);
+	auto& copyBuffer = buffers[0];
 
 	vk::CommandBufferBeginInfo beginInfo = {};
 	beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-	m_TextureCopyBuffer.begin(beginInfo);
+	copyBuffer.begin(beginInfo);
 
 	auto& texture = m_Textures[textureHandle];
 	std::memcpy(m_TextureBuffer.GetMappedData(),
@@ -211,14 +218,14 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	barrier.subresourceRange.baseMipLevel = 0;
 	barrier.subresourceRange.levelCount = 1;
 	barrier.subresourceRange.layerCount = 1;
-	m_TextureCopyBuffer.pipelineBarrier(
-	  texture.initialized ? vk::PipelineStageFlagBits::eAllGraphics
-						  : vk::PipelineStageFlagBits::eHost,
-	  vk::PipelineStageFlagBits::eTransfer,
-	  {},
-	  {},
-	  {},
-	  { barrier });
+	copyBuffer.pipelineBarrier(texture.initialized
+								 ? vk::PipelineStageFlagBits::eAllGraphics
+								 : vk::PipelineStageFlagBits::eHost,
+							   vk::PipelineStageFlagBits::eTransfer,
+							   {},
+							   {},
+							   {},
+							   { barrier });
 
 	vk::BufferImageCopy imageCopy = {};
 	imageCopy.imageExtent =
@@ -227,32 +234,29 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	imageCopy.imageSubresource.mipLevel = 0;
 	imageCopy.imageSubresource.baseArrayLayer = 0;
 	imageCopy.imageSubresource.layerCount = 1;
-	m_TextureCopyBuffer.copyBufferToImage(m_TextureBuffer.buffer,
-										  texture.image,
-										  vk::ImageLayout::eTransferDstOptimal,
-										  { imageCopy });
+	copyBuffer.copyBufferToImage(m_TextureBuffer.buffer,
+								 texture.image,
+								 vk::ImageLayout::eTransferDstOptimal,
+								 { imageCopy });
 
 	barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
 	barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 	barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
 	barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-	m_TextureCopyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-										vk::PipelineStageFlagBits::eAllGraphics,
-										{},
-										{},
-										{},
-										{ barrier });
+	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+							   vk::PipelineStageFlagBits::eAllGraphics,
+							   {},
+							   {},
+							   {},
+							   { barrier });
 
-	m_TextureCopyBuffer.end();
+	copyBuffer.end();
 
 	vk::SubmitInfo submitInfo = {};
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &(*m_TextureCopyBuffer);
-
-	vk::FenceCreateInfo fenceInfo = {};
-	vk::raii::Fence fence(m_Device, fenceInfo);
-	m_GraphicsQueue.submit({ submitInfo }, fence);
-	ThrowIfFail(m_Device.waitForFences({ fence }, VK_TRUE, Timeout));
+	submitInfo.pCommandBuffers = &(*copyBuffer);
+	m_GraphicsQueue.submit({ submitInfo });
+	m_GraphicsQueue.waitIdle();
 
 	texture.initialized = true;
 	texture.currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -310,34 +314,47 @@ RendererVK::CreateScreenshot()
 	  m_SwapchainImages[((int)m_CurrentFrame - 1 + FramesInFlight) %
 						FramesInFlight];
 
-	VkImageCreateInfo imageInfo = {};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	imageInfo.extent = { m_SwapchainExtent.width, m_SwapchainExtent.height, 1 };
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
-	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	vk::ImageCreateInfo destImageInfo = {};
+	destImageInfo.imageType = vk::ImageType::e2D;
+	destImageInfo.format = vk::Format::eR8G8B8A8Unorm;
+	destImageInfo.extent.width = m_SwapchainExtent.width;
+	destImageInfo.extent.height = m_SwapchainExtent.height;
+	destImageInfo.extent.depth = 1;
+	destImageInfo.arrayLayers = 1;
+	destImageInfo.mipLevels = 1;
+	destImageInfo.initialLayout = vk::ImageLayout::eUndefined;
+	destImageInfo.samples = vk::SampleCountFlagBits::e1;
+	destImageInfo.tiling = vk::ImageTiling::eLinear;
+	destImageInfo.usage = vk::ImageUsageFlagBits::eTransferDst;
 
-	VmaAllocationCreateInfo allocInfo = {};
-	allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-	allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	vk::raii::Image destImage(m_Device, destImageInfo);
+	vk::MemoryRequirements memoryReqs = destImage.getMemoryRequirements();
+	vk::MemoryAllocateInfo memoryAllocInfo = {};
+	memoryAllocInfo.allocationSize = memoryReqs.size;
 
-	VkImage destImage;
-	VmaAllocation allocation;
-	VmaAllocationInfo allocInfoOut;
-	ThrowIfFail(vmaCreateImage(m_Allocator,
-							   &imageInfo,
-							   &allocInfo,
-							   &destImage,
-							   &allocation,
-							   &allocInfoOut));
+	auto memoryTypeIndex =
+	  GetMemoryType(memoryReqs.memoryTypeBits,
+					vk::MemoryPropertyFlagBits::eHostVisible |
+					  vk::MemoryPropertyFlagBits::eHostCoherent,
+					m_PhysicalDevice.getMemoryProperties());
+	if (!memoryTypeIndex.has_value()) {
+		Locator::getLogger()->error("RendererVK: failed to screenshot (can't "
+									"find memory type for image creation)");
+		Fail();
+	}
 
-	m_TextureCopyBuffer.reset();
-	m_TextureCopyBuffer.begin({});
+	memoryAllocInfo.memoryTypeIndex = *memoryTypeIndex;
+	auto destImageMemory = m_Device.allocateMemory(memoryAllocInfo);
+	destImage.bindMemory(destImageMemory, 0);
+
+	vk::CommandBufferAllocateInfo copyBufferInfo = {};
+	copyBufferInfo.level = vk::CommandBufferLevel::ePrimary;
+	copyBufferInfo.commandPool = m_CommandPool;
+	copyBufferInfo.commandBufferCount = 1;
+	vk::raii::CommandBuffer copyBuffer =
+	  std::move(m_Device.allocateCommandBuffers(copyBufferInfo)[0]);
+
+	copyBuffer.begin({});
 
 	vk::ImageMemoryBarrier barrier = {};
 	barrier.srcAccessMask = vk::AccessFlagBits::eNone;
@@ -348,12 +365,12 @@ RendererVK::CreateScreenshot()
 	barrier.subresourceRange =
 	  vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
 
-	m_TextureCopyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-										vk::PipelineStageFlagBits::eTransfer,
-										{},
-										{},
-										{},
-										{ barrier });
+	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+							   vk::PipelineStageFlagBits::eTransfer,
+							   {},
+							   {},
+							   {},
+							   { barrier });
 
 	barrier.srcAccessMask = vk::AccessFlagBits::eMemoryRead;
 	barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
@@ -361,12 +378,12 @@ RendererVK::CreateScreenshot()
 	barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
 	barrier.image = sourceImage;
 
-	m_TextureCopyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-										vk::PipelineStageFlagBits::eTransfer,
-										{},
-										{},
-										{},
-										{ barrier });
+	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+							   vk::PipelineStageFlagBits::eTransfer,
+							   {},
+							   {},
+							   {},
+							   { barrier });
 
 	if (supportsBlitting) {
 		vk::Offset3D blitSize = {};
@@ -382,12 +399,12 @@ RendererVK::CreateScreenshot()
 		blitRegion.dstSubresource.layerCount = 1;
 		blitRegion.dstOffsets[1] = blitSize;
 
-		m_TextureCopyBuffer.blitImage(sourceImage,
-									  vk::ImageLayout::eTransferSrcOptimal,
-									  destImage,
-									  vk::ImageLayout::eTransferDstOptimal,
-									  { blitRegion },
-									  vk::Filter::eNearest);
+		copyBuffer.blitImage(sourceImage,
+							 vk::ImageLayout::eTransferSrcOptimal,
+							 destImage,
+							 vk::ImageLayout::eTransferDstOptimal,
+							 { blitRegion },
+							 vk::Filter::eNearest);
 	} else {
 		vk::ImageCopy copyRegion = {};
 		copyRegion.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
@@ -398,11 +415,11 @@ RendererVK::CreateScreenshot()
 		copyRegion.extent.height = m_SwapchainExtent.height;
 		copyRegion.extent.depth = 1;
 
-		m_TextureCopyBuffer.copyImage(sourceImage,
-									  vk::ImageLayout::eTransferSrcOptimal,
-									  destImage,
-									  vk::ImageLayout::eTransferDstOptimal,
-									  { copyRegion });
+		copyBuffer.copyImage(sourceImage,
+							 vk::ImageLayout::eTransferSrcOptimal,
+							 destImage,
+							 vk::ImageLayout::eTransferDstOptimal,
+							 { copyRegion });
 	}
 
 	barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
@@ -411,12 +428,12 @@ RendererVK::CreateScreenshot()
 	barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
 	barrier.image = destImage;
 
-	m_TextureCopyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-										vk::PipelineStageFlagBits::eTransfer,
-										{},
-										{},
-										{},
-										{ barrier });
+	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+							   vk::PipelineStageFlagBits::eTransfer,
+							   {},
+							   {},
+							   {},
+							   { barrier });
 
 	barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
 	barrier.dstAccessMask = vk::AccessFlagBits::eMemoryRead;
@@ -424,17 +441,17 @@ RendererVK::CreateScreenshot()
 	barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
 	barrier.image = sourceImage;
 
-	m_TextureCopyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-										vk::PipelineStageFlagBits::eTransfer,
-										{},
-										{},
-										{},
-										{ barrier });
-	m_TextureCopyBuffer.end();
+	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+							   vk::PipelineStageFlagBits::eTransfer,
+							   {},
+							   {},
+							   {},
+							   { barrier });
+	copyBuffer.end();
 
 	vk::SubmitInfo submitInfo = {};
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &(*m_TextureCopyBuffer);
+	submitInfo.pCommandBuffers = &(*copyBuffer);
 
 	vk::FenceCreateInfo fenceInfo = {};
 	vk::raii::Fence fence(m_Device, fenceInfo);
@@ -442,13 +459,20 @@ RendererVK::CreateScreenshot()
 	ThrowIfFail(m_Device.waitForFences({ fence }, VK_TRUE, Timeout));
 
 	vk::ImageSubresource subresource{ vk::ImageAspectFlagBits::eColor, 0, 0 };
-	vk::SubresourceLayout subresourceLayout = {};
-	vkGetImageSubresourceLayout(
-	  *m_Device, destImage, &*subresource, &*subresourceLayout);
+	vk::SubresourceLayout subresourceLayout =
+	  destImage.getSubresourceLayout(subresource);
+
+	vk::MemoryMapInfo memoryMapInfo = {};
+	memoryMapInfo.memory = destImageMemory;
+	memoryMapInfo.size = VK_WHOLE_SIZE;
 
 	uint8_t* data = nullptr;
-	ThrowIfFail(
-	  vmaMapMemory(m_Allocator, allocation, reinterpret_cast<void**>(&data)));
+	ThrowIfFail(vkMapMemory(*m_Device,
+							*destImageMemory,
+							0,
+							VK_WHOLE_SIZE,
+							0,
+							reinterpret_cast<void**>(&data)));
 
 	RageSurface* surface = CreateSurface(m_SwapchainExtent.width,
 										 m_SwapchainExtent.height,
@@ -463,8 +487,7 @@ RendererVK::CreateScreenshot()
 		surface->pixels[i] = ((i + 1) % 4) ? data[i] : 255;
 	}
 
-	vmaUnmapMemory(m_Allocator, allocation);
-	vmaDestroyImage(m_Allocator, destImage, allocation);
+	vkUnmapMemory(*m_Device, *destImageMemory);
 
 	return surface;
 }
@@ -800,13 +823,6 @@ RendererVK::InitCommandBuffers()
 	allocInfo.commandBufferCount = FramesInFlight;
 
 	m_CommandBuffers = vk::raii::CommandBuffers(m_Device, allocInfo);
-
-	vk::CommandBufferAllocateInfo copyAllocInfo{};
-	copyAllocInfo.commandPool = m_CommandPool;
-	copyAllocInfo.level = vk::CommandBufferLevel::ePrimary;
-	copyAllocInfo.commandBufferCount = 1;
-	m_TextureCopyBuffer =
-	  std::move(vk::raii::CommandBuffers(m_Device, copyAllocInfo)[0]);
 }
 
 void
