@@ -1379,7 +1379,7 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	rasterizer.depthClampEnable = vk::False;
 	rasterizer.rasterizerDiscardEnable = vk::False;
 	rasterizer.polygonMode = vk::PolygonMode::eFill;
-	rasterizer.cullMode = vk::CullModeFlagBits::eFront;
+	rasterizer.cullMode = vk::CullModeFlagBits::eBack;
 	rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
 	rasterizer.depthBiasEnable = vk::False;
 	rasterizer.depthBiasSlopeFactor = 1.0f;

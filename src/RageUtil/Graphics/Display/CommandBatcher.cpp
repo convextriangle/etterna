@@ -137,15 +137,15 @@ DisplayAdapter::CommandBatcher::InsertSpriteDrawCommand(
 				m_IndexBuffer[prevCount + i * 6 + 0] =
 				  previousVertexCount + i * 4 + 0;
 				m_IndexBuffer[prevCount + i * 6 + 1] =
-				  previousVertexCount + i * 4 + 2;
-				m_IndexBuffer[prevCount + i * 6 + 2] =
 				  previousVertexCount + i * 4 + 1;
+				m_IndexBuffer[prevCount + i * 6 + 2] =
+				  previousVertexCount + i * 4 + 2;
 				m_IndexBuffer[prevCount + i * 6 + 3] =
 				  previousVertexCount + i * 4 + 2;
 				m_IndexBuffer[prevCount + i * 6 + 4] =
-				  previousVertexCount + i * 4 + 0;
-				m_IndexBuffer[prevCount + i * 6 + 5] =
 				  previousVertexCount + i * 4 + 3;
+				m_IndexBuffer[prevCount + i * 6 + 5] =
+				  previousVertexCount + i * 4 + 0;
 			}
 
 			break;
@@ -208,27 +208,30 @@ DisplayAdapter::CommandBatcher::InsertSpriteDrawCommand(
 			m_IndexBuffer.resize(prevCount + 12 * (vertexCount - 3) / 3);
 			for (size_t i = 0; i < (vertexCount - 3) / 3; i++) {
 				m_IndexBuffer[prevCount + i * 12 + 0] =
-				  previousVertexCount + i * 3 + 1;
-				m_IndexBuffer[prevCount + i * 12 + 1] =
 				  previousVertexCount + i * 3 + 3;
+				m_IndexBuffer[prevCount + i * 12 + 1] =
+				  previousVertexCount + i * 3 + 1;
 				m_IndexBuffer[prevCount + i * 12 + 2] =
 				  previousVertexCount + i * 3 + 0;
+
 				m_IndexBuffer[prevCount + i * 12 + 3] =
-				  previousVertexCount + i * 3 + 1;
-				m_IndexBuffer[prevCount + i * 12 + 4] =
 				  previousVertexCount + i * 3 + 4;
+				m_IndexBuffer[prevCount + i * 12 + 4] =
+				  previousVertexCount + i * 3 + 1;
 				m_IndexBuffer[prevCount + i * 12 + 5] =
 				  previousVertexCount + i * 3 + 3;
+
 				m_IndexBuffer[prevCount + i * 12 + 6] =
-				  previousVertexCount + i * 3 + 1;
-				m_IndexBuffer[prevCount + i * 12 + 7] =
 				  previousVertexCount + i * 3 + 5;
+				m_IndexBuffer[prevCount + i * 12 + 7] =
+				  previousVertexCount + i * 3 + 1;
 				m_IndexBuffer[prevCount + i * 12 + 8] =
 				  previousVertexCount + i * 3 + 4;
+
 				m_IndexBuffer[prevCount + i * 12 + 9] =
-				  previousVertexCount + i * 3 + 1;
-				m_IndexBuffer[prevCount + i * 12 + 10] =
 				  previousVertexCount + i * 3 + 2;
+				m_IndexBuffer[prevCount + i * 12 + 10] =
+				  previousVertexCount + i * 3 + 1;
 				m_IndexBuffer[prevCount + i * 12 + 11] =
 				  previousVertexCount + i * 3 + 5;
 			}
