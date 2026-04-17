@@ -92,7 +92,15 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 	presentInfoKHR.pImageIndices = &imageIndex;
 
 	try {
+		DISPLAY->FrameLimitBeforeVsync();
+
+		const auto beforePresent = std::chrono::steady_clock::now();
 		result = m_PresentQueue.presentKHR(presentInfoKHR);
+		const auto afterPresent = std::chrono::steady_clock::now();
+		DISPLAY->SetPresentTime(afterPresent - beforePresent);
+
+		DISPLAY->FrameLimitAfterVsync(
+		  DISPLAY->GetActualVideoModeParams()->rate);
 	} catch (vk::OutOfDateKHRError error) {
 		RecreateSwapchain(*p);
 		return;
