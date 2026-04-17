@@ -1240,9 +1240,10 @@ RendererVK::SetBlendMode(BlendMode mode, vk::raii::CommandBuffer& buffer)
 
 		case BLEND_NO_EFFECT: {
 			blendEquation.srcColorBlendFactor = vk::BlendFactor::eZero;
-			blendEquation.dstColorBlendFactor = vk::BlendFactor::eZero;
-			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eZero;
 			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+			colorWriteMask = vk::ColorComponentFlags(0);
 			break;
 		}
 
