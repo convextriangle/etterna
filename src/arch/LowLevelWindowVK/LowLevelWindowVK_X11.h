@@ -24,6 +24,7 @@ class LowLevelWindowVK_X11 : public LowLevelWindowVK
 
   private:
 	bool NetWMSupported(Display* Dpy, Atom feature) const;
+	void RestoreOutputConfig();
 
 	Atom wmDeleteMessage = None;
 	std::unique_ptr<ActualVideoModeParams> CurrentParams;
