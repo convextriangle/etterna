@@ -1038,6 +1038,10 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		renderInfo.pColorAttachments = &colorInfo;
 		renderInfo.pDepthAttachment = &depthInfo;
 
+		buffer.setScissor(
+		  0,
+		  vk::Rect2D(vk::Offset2D(0, 0),
+					 vk::Extent2D(extent.width, extent.height)));
 		buffer.setViewport(0,
 						   vk::Viewport(0.0f,
 										static_cast<float>(extent.height),
@@ -1045,19 +1049,39 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 										-static_cast<float>(extent.height),
 										0.0f,
 										1.0f));
-		buffer.setScissor(
-		  0,
-		  vk::Rect2D(vk::Offset2D(0, 0),
-					 vk::Extent2D(extent.width, extent.height)));
 
 		buffer.beginRendering(renderInfo);
 
 		for (auto& call : node.DrawCalls) {
-			buffer.setDepthTestEnable(VK_TRUE);
-			buffer.setDepthWriteEnable(VK_TRUE);
+			buffer.setDepthTestEnable(
+			  call.DepthTestMode != ZTEST_OFF ? VK_TRUE : VK_FALSE);
+			buffer.setDepthWriteEnable(
+			  call.DepthWriteEnabled ? VK_TRUE : VK_FALSE);
+
+			vk::CompareOp depthCompareOp = vk::CompareOp::eAlways;
+			switch (call.DepthTestMode) {
+				case ZTEST_OFF: {
+					break;
+				}
+				case ZTEST_WRITE_ON_PASS: {
+					depthCompareOp = vk::CompareOp::eLessOrEqual;
+					break;
+				}
+				case ZTEST_WRITE_ON_FAIL: {
+					depthCompareOp = vk::CompareOp::eGreater;
+					break;
+				}
+				default: {
+					Locator::getLogger()->error(
+					  "Invalid ZTestMode encountered: {}",
+					  call.DepthTestMode);
+					Fail();
+				}
+			}
 			buffer.setDepthCompareOp(vk::CompareOp::eLessOrEqual);
 
-			SetBlendMode(BLEND_NORMAL, buffer);
+			SetBlendMode(call.BlendingMode, buffer);
+
 			if (call.Settings.GraphicsPipeline != currentPipeline) {
 				currentPipeline = call.Settings.GraphicsPipeline;
 				buffer.bindPipeline(
@@ -1215,7 +1239,10 @@ RendererVK::SetBlendMode(BlendMode mode, vk::raii::CommandBuffer& buffer)
 		}
 
 		case BLEND_NO_EFFECT: {
-			enableBlending = VK_FALSE;
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eOne;
 			break;
 		}
 

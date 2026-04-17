@@ -8,9 +8,12 @@ namespace DisplayAdapter {
 
 struct RenderState
 {
-	bool textureWrapping;
-	bool textureFiltering;
-	intptr_t textureHandle;
+	bool textureWrapping = false;
+	bool textureFiltering = false;
+	intptr_t textureHandle = 0;
+	BlendMode blendingMode = BLEND_NORMAL;
+	ZTestMode depthTestMode = ZTEST_OFF;
+	bool depthWriteEnabled = false;
 };
 
 } // namespace DisplayAdapter

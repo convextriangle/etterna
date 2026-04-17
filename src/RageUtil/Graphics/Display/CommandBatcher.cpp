@@ -101,12 +101,6 @@ DisplayAdapter::CommandBatcher::InsertSpriteDrawCommand(
 	assert(drawMode != DrawMode::Invalid);
 	assert(drawMode != DrawMode::CompiledGeometry);
 
-	// -- changing draw mode in the middle of the queue would likely require
-	// switching pipeline state objects
-	//	  (pipeline objects are chonky)
-	//	  and most of the ye olde draw modes aren't supported
-	//    so just convert to a triangle list
-	// -- unrolled loops look funny though
 	m_MatrixStateBuffer.push_back(matrixState);
 
 	const auto previousVertexCount = m_VertexBuffer.size();
@@ -308,28 +302,42 @@ DisplayAdapter::CommandBatcher::HandleDrawCommand(
 	auto& node = m_RenderNodes[m_CurrentNodeIndex];
 	if (!node.DrawCalls.size()) {
 		m_RenderNodes[m_CurrentNodeIndex].DrawCalls.push_back(
-		  { *m_CurrentPipeline, (size_t)indexOffset, (size_t)0 });
+		  { *m_CurrentPipeline,
+			(size_t)indexOffset,
+			(size_t)0,
+			renderState.blendingMode,
+			renderState.depthTestMode,
+			renderState.depthWriteEnabled });
 	}
 
 	// if we previously filled in a different draw call, we should create a new
 	// one
+	// or if we changed render state stuffs
 
-	// why does this not work when i replace
-	// node.DrawCalls[node.DrawCalls.size() - 1] with a reference to
-	// node.DrawCalls.back()???
+	bool filledPreviousCall =
+	  node.DrawCalls[node.DrawCalls.size() - 1].IndexCount != 0 &&
+	  node.DrawCalls[node.DrawCalls.size() - 1].IndexCount +
+		  node.DrawCalls[node.DrawCalls.size() - 1].IndexOffset !=
+		indexOffset;
+	bool differentRenderState =
+	  !filledPreviousCall &&
+	  std::tie(node.DrawCalls[node.DrawCalls.size() - 1].BlendingMode,
+			   node.DrawCalls[node.DrawCalls.size() - 1].DepthTestMode,
+			   node.DrawCalls[node.DrawCalls.size() - 1].DepthWriteEnabled) !=
+		std::tie(renderState.blendingMode,
+				 renderState.depthTestMode,
+				 renderState.depthWriteEnabled);
 
-	if (node.DrawCalls[node.DrawCalls.size() - 1].IndexCount != 0 &&
-		node.DrawCalls[node.DrawCalls.size() - 1].IndexCount +
-			node.DrawCalls[node.DrawCalls.size() - 1].IndexOffset !=
-		  indexOffset) {
-		node.DrawCalls.push_back(
-		  { *m_CurrentPipeline, (size_t)indexOffset, (size_t)0 });
+	if (filledPreviousCall || differentRenderState) {
+		node.DrawCalls.push_back({ *m_CurrentPipeline,
+								   (size_t)indexOffset,
+								   (size_t)0,
+								   renderState.blendingMode,
+								   renderState.depthTestMode,
+								   renderState.depthWriteEnabled });
 	}
 
 	node.DrawCalls[node.DrawCalls.size() - 1].IndexCount += indexCount;
-
-	// insane edgecase from earlier
-	assert(node.DrawCalls.back().IndexCount != 0);
 }
 
 void

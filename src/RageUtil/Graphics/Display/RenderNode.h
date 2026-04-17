@@ -19,6 +19,9 @@ struct DrawCall
 	PipelineSettings Settings = {};
 	size_t IndexOffset = 0;
 	size_t IndexCount = 0;
+	BlendMode BlendingMode = BLEND_NORMAL;
+	ZTestMode DepthTestMode = ZTEST_OFF;
+	bool DepthWriteEnabled = false;
 };
 
 struct RenderNode

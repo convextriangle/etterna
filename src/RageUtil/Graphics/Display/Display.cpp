@@ -176,6 +176,36 @@ DisplayAdapter::Display::SetTextureFiltering(TextureUnit tu, bool b)
 	m_RenderState.textureFiltering = b;
 }
 
+void
+DisplayAdapter::Display::SetBlendMode(BlendMode mode)
+{
+	m_RenderState.blendingMode = mode;
+}
+
+void
+DisplayAdapter::Display::SetZWrite(bool b)
+{
+	m_RenderState.depthWriteEnabled = b;
+}
+
+void
+DisplayAdapter::Display::SetZTestMode(ZTestMode mode)
+{
+	m_RenderState.depthTestMode = mode;
+}
+
+bool
+DisplayAdapter::Display::IsZWriteEnabled() const
+{
+	return m_RenderState.depthWriteEnabled;
+}
+
+bool
+DisplayAdapter::Display::IsZTestEnabled() const
+{
+	return m_RenderState.depthTestMode != ZTEST_OFF;
+}
+
 #pragma endregion
 
 #pragma region Draw queueing
@@ -340,27 +370,12 @@ DisplayAdapter::Display::SetGraphicsPipeline(
 #pragma region Unsupported / old graphics API functions
 
 void
-DisplayAdapter::Display::SetBlendMode(BlendMode mode)
-{
-}
-
-void
 DisplayAdapter::Display::SetTextureMode(TextureUnit tu, TextureMode tm)
 {
 }
 
 void
-DisplayAdapter::Display::SetZWrite(bool b)
-{
-}
-
-void
 DisplayAdapter::Display::SetZBias(float f)
-{
-}
-
-void
-DisplayAdapter::Display::SetZTestMode(ZTestMode mode)
 {
 }
 
@@ -377,18 +392,6 @@ DisplayAdapter::Display::SetAlphaTest(bool b)
 void
 DisplayAdapter::Display::ClearZBuffer()
 {
-}
-
-bool
-DisplayAdapter::Display::IsZWriteEnabled() const
-{
-	return false;
-}
-
-bool
-DisplayAdapter::Display::IsZTestEnabled() const
-{
-	return false;
 }
 
 void
