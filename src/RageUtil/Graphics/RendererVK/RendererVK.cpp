@@ -526,6 +526,13 @@ RendererVK::~RendererVK()
 		DestroyTexture(texture);
 	}
 
+	if (m_DepthImage != nullptr) {
+		m_DepthView = nullptr;
+		vmaDestroyImage(m_Allocator, m_DepthImage, m_DepthAllocation);
+		m_DepthImage = nullptr;
+		m_DepthAllocation = nullptr;
+	}
+
 	if (m_TextureBuffer.buffer != VK_NULL_HANDLE) {
 		vmaDestroyBuffer(
 		  m_Allocator, m_TextureBuffer.buffer, m_TextureBuffer.allocation);
@@ -645,6 +652,7 @@ RendererVK::InitVulkanState()
 		.set_required_features_12(vk12Features)
 		.set_required_features(vkFeatures)
 		.set_surface(static_cast<vk::SurfaceKHR>(m_Surface))
+		.add_required_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME)
 #ifdef __APPLE__
 		.add_required_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
 #endif
@@ -656,8 +664,15 @@ RendererVK::InitVulkanState()
 		Fail();
 	}
 
+	VkPhysicalDeviceExtendedDynamicState3FeaturesEXT dynamicState3Features{};
+	dynamicState3Features.sType =
+	  VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
+	dynamicState3Features.extendedDynamicState3ColorBlendEnable = VK_TRUE;
+	dynamicState3Features.extendedDynamicState3ColorBlendEquation = VK_TRUE;
+	dynamicState3Features.extendedDynamicState3ColorWriteMask = VK_TRUE;
+
 	vkb::DeviceBuilder deviceBuilder(*physicalDeviceResult);
-	auto deviceResult = deviceBuilder.build();
+	auto deviceResult = deviceBuilder.add_pNext(&dynamicState3Features).build();
 	if (!deviceResult) {
 		Locator::getLogger()->fatal(
 		  "RendererVK: device creation failed - {}",
@@ -690,6 +705,17 @@ RendererVK::InitVulkanState()
 	allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
 	ThrowIfFail(vmaCreateAllocator(&allocatorInfo, &m_Allocator));
+
+	const std::vector<vk::Format> depthFormats{ vk::Format::eD32SfloatS8Uint,
+												vk::Format::eD24UnormS8Uint };
+	for (const auto& format : depthFormats) {
+		auto props = m_PhysicalDevice.getFormatProperties2(format);
+		if (props.formatProperties.optimalTilingFeatures &
+			vk::FormatFeatureFlagBits::eDepthStencilAttachment) {
+			m_DepthFormat = format;
+			break;
+		}
+	}
 }
 
 void
@@ -748,6 +774,39 @@ RendererVK::InitSwapchain(const VideoModeParams& p)
 	m_ImageFormat = static_cast<vk::Format>(vkbSwapchain.image_format);
 	m_SwapchainExtent =
 	  vk::Extent2D(vkbSwapchain.extent.width, vkbSwapchain.extent.height);
+
+	vk::ImageCreateInfo depthImageInfo = {};
+	depthImageInfo.imageType = vk::ImageType::e2D;
+	depthImageInfo.format = m_DepthFormat;
+	depthImageInfo.extent =
+	  vk::Extent3D(vkbSwapchain.extent.width, vkbSwapchain.extent.height, 1);
+	depthImageInfo.mipLevels = 1;
+	depthImageInfo.arrayLayers = 1;
+	depthImageInfo.samples = vk::SampleCountFlagBits::e1;
+	depthImageInfo.tiling = vk::ImageTiling::eOptimal;
+	depthImageInfo.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
+	depthImageInfo.initialLayout = vk::ImageLayout::eUndefined;
+
+	VmaAllocationCreateInfo depthAllocInfo = {};
+	depthAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+	depthAllocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+	ThrowIfFail(vmaCreateImage(m_Allocator,
+							   &*depthImageInfo,
+							   &depthAllocInfo,
+							   &m_DepthImage,
+							   &m_DepthAllocation,
+							   nullptr));
+
+	vk::ImageViewCreateInfo depthViewInfo = {};
+	depthViewInfo.image = m_DepthImage;
+	depthViewInfo.viewType = vk::ImageViewType::e2D;
+	depthViewInfo.format = m_DepthFormat;
+	vk::ImageSubresourceRange subRange = {};
+	subRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+	subRange.levelCount = 1;
+	subRange.layerCount = 1;
+	depthViewInfo.subresourceRange = subRange;
+	m_DepthView = vk::raii::ImageView(m_Device, depthViewInfo);
 }
 
 void
@@ -758,6 +817,7 @@ RendererVK::RecreateSwapchain(const VideoModeParams& p)
 	CleanupSwapchain();
 	InitSwapchain(p);
 	InitImageViews();
+	InitSyncStructures();
 }
 
 void
@@ -765,6 +825,13 @@ RendererVK::CleanupSwapchain()
 {
 	m_SwapchainImageViews.clear();
 	m_Swapchain = nullptr;
+
+	if (m_DepthImage != nullptr) {
+		m_DepthView = nullptr;
+		vmaDestroyImage(m_Allocator, m_DepthImage, m_DepthAllocation);
+		m_DepthImage = nullptr;
+		m_DepthAllocation = nullptr;
+	}
 }
 
 void
@@ -945,7 +1012,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 			  vk::ImageLayout::eColorAttachmentOptimal;
 		}
 
-		vk::RenderingAttachmentInfo colorInfo{};
+		vk::RenderingAttachmentInfo colorInfo = {};
 		colorInfo.imageView = view;
 		colorInfo.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
 		colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
@@ -955,12 +1022,21 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 			colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
 			colorInfo.clearValue = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 0.0f);
 		}
-		vk::RenderingInfo renderInfo{};
+
+		vk::RenderingAttachmentInfo depthInfo = {};
+		depthInfo.imageView = m_DepthView;
+		depthInfo.imageLayout = vk::ImageLayout::eAttachmentOptimal;
+		depthInfo.loadOp = vk::AttachmentLoadOp::eClear;
+		depthInfo.storeOp = vk::AttachmentStoreOp::eDontCare;
+		depthInfo.clearValue = vk::ClearDepthStencilValue(1.0f, 0);
+
+		vk::RenderingInfo renderInfo = {};
 		renderInfo.renderArea =
 		  vk::Rect2D{ { 0, 0 }, { extent.width, extent.height } };
 		renderInfo.layerCount = 1;
 		renderInfo.colorAttachmentCount = 1;
 		renderInfo.pColorAttachments = &colorInfo;
+		renderInfo.pDepthAttachment = &depthInfo;
 
 		buffer.setViewport(0,
 						   vk::Viewport(0.0f,
@@ -977,6 +1053,11 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		buffer.beginRendering(renderInfo);
 
 		for (auto& call : node.DrawCalls) {
+			buffer.setDepthTestEnable(VK_TRUE);
+			buffer.setDepthWriteEnable(VK_TRUE);
+			buffer.setDepthCompareOp(vk::CompareOp::eLessOrEqual);
+
+			SetBlendMode(BLEND_NORMAL, buffer);
 			if (call.Settings.GraphicsPipeline != currentPipeline) {
 				currentPipeline = call.Settings.GraphicsPipeline;
 				buffer.bindPipeline(
@@ -1033,6 +1114,120 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 	}
 
 	buffer.end();
+}
+
+void
+RendererVK::SetBlendMode(BlendMode mode, vk::raii::CommandBuffer& buffer)
+{
+	vk::Bool32 enableBlending = VK_TRUE;
+	vk::ColorComponentFlags colorWriteMask =
+	  vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+	  vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+	vk::ColorBlendEquationEXT blendEquation{};
+	blendEquation.colorBlendOp = vk::BlendOp::eAdd;
+	blendEquation.alphaBlendOp = vk::BlendOp::eAdd;
+
+	switch (mode) {
+		case BLEND_NORMAL: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+			blendEquation.dstColorBlendFactor =
+			  vk::BlendFactor::eOneMinusSrcAlpha;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eSrcAlpha;
+			blendEquation.dstAlphaBlendFactor =
+			  vk::BlendFactor::eOneMinusSrcAlpha;
+			break;
+		}
+
+		case BLEND_ADD: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eSrcAlpha;
+			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+			break;
+		}
+
+		case BLEND_SUBTRACT: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eSrcAlpha;
+			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eZero;
+			break;
+		}
+
+		case BLEND_MODULATE: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eSrcColor;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eSrcColor;
+			break;
+		}
+
+		case BLEND_COPY_SRC: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eZero;
+			break;
+		}
+
+		case BLEND_ALPHA_MASK: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eSrcAlpha;
+			break;
+		}
+
+		case BLEND_ALPHA_KNOCK_OUT: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.dstAlphaBlendFactor =
+			  vk::BlendFactor::eOneMinusSrcAlpha;
+			break;
+		}
+
+		case BLEND_ALPHA_MULTIPLY: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eZero;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eSrcAlpha;
+			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eZero;
+			break;
+		}
+
+		case BLEND_WEIGHTED_MULTIPLY: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eDstColor;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eSrcColor;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eDstColor;
+			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eSrcColor;
+			break;
+		}
+
+		case BLEND_INVERT_DEST: {
+			blendEquation.srcColorBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.dstColorBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.colorBlendOp = vk::BlendOp::eSubtract;
+			blendEquation.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+			blendEquation.alphaBlendOp = vk::BlendOp::eSubtract;
+			break;
+		}
+
+		case BLEND_NO_EFFECT: {
+			enableBlending = VK_FALSE;
+			break;
+		}
+
+		default: {
+			Locator::getLogger()->error("Invalid BlendMode: {}", mode);
+			Fail();
+		}
+	}
+
+	buffer.setColorBlendEnableEXT(0, { enableBlending });
+	buffer.setColorWriteMaskEXT(0, { colorWriteMask });
+	buffer.setColorBlendEquationEXT(0, { blendEquation });
 }
 
 void
@@ -1371,7 +1566,13 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	};
 
 	std::vector dynamicStates = { vk::DynamicState::eViewport,
-								  vk::DynamicState::eScissor };
+								  vk::DynamicState::eScissor,
+								  vk::DynamicState::eDepthWriteEnable,
+								  vk::DynamicState::eDepthTestEnable,
+								  vk::DynamicState::eDepthCompareOp,
+								  vk::DynamicState::eColorBlendEnableEXT,
+								  vk::DynamicState::eColorBlendEquationEXT,
+								  vk::DynamicState::eColorWriteMaskEXT };
 
 	vk::PipelineDynamicStateCreateInfo dynamicState{};
 	dynamicState.dynamicStateCount =
@@ -1397,24 +1598,6 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
 	multisampling.sampleShadingEnable = vk::False;
 
-	vk::PipelineColorBlendAttachmentState colorBlendAttachment;
-	colorBlendAttachment.blendEnable = vk::True;
-	colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
-	colorBlendAttachment.dstColorBlendFactor =
-	  vk::BlendFactor::eOneMinusSrcAlpha;
-	colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
-	colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eSrcAlpha;
-	colorBlendAttachment.dstAlphaBlendFactor =
-	  vk::BlendFactor::eOneMinusSrcAlpha;
-	colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
-	colorBlendAttachment.colorWriteMask =
-	  vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-	  vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-
-	vk::PipelineColorBlendStateCreateInfo colorBlending{};
-	colorBlending.attachmentCount = 1;
-	colorBlending.pAttachments = &colorBlendAttachment;
-
 	if (m_DescriptorSetLayout == nullptr) {
 		std::vector<vk::DescriptorSetLayoutBinding> bindings =
 		  GetDescriptorBindings();
@@ -1438,19 +1621,29 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	info.PipelineLayout =
 	  vk::raii::PipelineLayout(m_Device, pipelineLayoutInfo);
 
-	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo = {};
+	vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
+	colorBlendAttachment.blendEnable = VK_FALSE;
+	colorBlendAttachment.colorWriteMask =
+	  vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+	  vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+	vk::PipelineColorBlendStateCreateInfo colorBlending{};
+	colorBlending.attachmentCount = 1;
+	colorBlending.pAttachments = &colorBlendAttachment;
+
+	vk::PipelineDepthStencilStateCreateInfo depthStencil{};
+	depthStencil.depthTestEnable = VK_TRUE;
+	depthStencil.depthWriteEnable = VK_TRUE;
+	depthStencil.depthCompareOp = vk::CompareOp::eLessOrEqual;
+
+	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{};
 	pipelineRenderingCreateInfo.colorAttachmentCount = 1;
 	pipelineRenderingCreateInfo.pColorAttachmentFormats = &m_ImageFormat;
+	pipelineRenderingCreateInfo.depthAttachmentFormat = m_DepthFormat;
 
 	// we don't actually need any vertex info since we're reading stuffs from
 	// the storage buffer
 	vk::PipelineVertexInputStateCreateInfo vertexInfo = {};
-
-	vk::PipelineDepthStencilStateCreateInfo depthStencil{};
-	depthStencil.depthTestEnable = VK_FALSE;
-	depthStencil.depthWriteEnable = VK_FALSE;
-	depthStencil.depthCompareOp = vk::CompareOp::eAlways;
-	depthStencil.stencilTestEnable = VK_FALSE;
 
 	vk::GraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.pNext = &pipelineRenderingCreateInfo;
@@ -1460,12 +1653,12 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pMultisampleState = &multisampling;
-	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = &dynamicState;
 	pipelineInfo.pVertexInputState = &vertexInfo;
 	pipelineInfo.layout = info.PipelineLayout;
 	pipelineInfo.renderPass = nullptr;
 	pipelineInfo.pDepthStencilState = &depthStencil;
+	pipelineInfo.pColorBlendState = &colorBlending;
 
 	info.GraphicsPipeline = vk::raii::Pipeline(m_Device, nullptr, pipelineInfo);
 

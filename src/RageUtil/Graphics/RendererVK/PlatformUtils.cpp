@@ -69,5 +69,6 @@ CreateSurfaceKHR(const vk::raii::Instance& instance)
 #endif
 #ifdef __APPLE__
 	// TODO: use vkCreateMacOSSurfaceMVK or vkCreateMetalSurfaceEXT?
+	return nullptr;
 #endif
 }

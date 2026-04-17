@@ -81,12 +81,16 @@ class RendererVK : public DisplayAdapter::Renderer
 	vk::raii::Queue m_PresentQueue = nullptr;
 	uint32_t m_PresentQueueFamily = 0;
 	VmaAllocator m_Allocator = nullptr;
+	vk::Format m_DepthFormat = {};
 	void InitVulkanState();
 
 	vk::raii::SwapchainKHR m_Swapchain = nullptr;
 	vk::Extent2D m_SwapchainExtent;
 	std::vector<vk::Image> m_SwapchainImages;
 	vk::Format m_ImageFormat = {};
+	VkImage m_DepthImage = nullptr;
+	VmaAllocation m_DepthAllocation = nullptr;
+	vk::raii::ImageView m_DepthView = nullptr;
 
 	bool m_SwapchainIsInvalid = false;
 	void InitSwapchain(const VideoModeParams& p);
@@ -124,6 +128,7 @@ class RendererVK : public DisplayAdapter::Renderer
 	void InitSyncStructures();
 	void RecordCommands(uint32_t imageIndex,
 						const DisplayAdapter::CommandBatcher& batcher);
+	void SetBlendMode(BlendMode mode, vk::raii::CommandBuffer& buffer);
 
 	constexpr static size_t FramesInFlight = 3;
 	constexpr static size_t MaxDrawCount = 25'000;
