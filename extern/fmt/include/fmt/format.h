@@ -351,7 +351,7 @@ inline typename Container::value_type* get_data(Container& c) {
   return c.data();
 }
 
-#if defined(_SECURE_SCL) && _SECURE_SCL
+#if 0
 // Make a checked iterator to avoid MSVC warnings.
 template <typename T> using checked_ptr = stdext::checked_array_iterator<T*>;
 template <typename T> checked_ptr<T> make_checked(T* p, size_t size) {
