@@ -2106,7 +2106,6 @@ local function getClearStatsForGroup(group)
             local scorestack = SCOREMAN:GetScoresByKey(chart:GetChartKey())
 
             -- scorestack is nil if no scores on the chart
-            -- skip if the chart has negbpms: these scores are always invalid for now and ruin lamps
             if scorestack ~= nil then
                 -- the scores are in lists for each rate
                 -- find the highest
@@ -2214,7 +2213,7 @@ function WHEELDATA.RefreshStats(self)
                 if curcount ~= nil then
                     self.TotalStats.clearPerGrade[grade] = curcount + count
                 else
-                    self.TotalStats.clearPerGrade[grade] = 1
+                    self.TotalStats.clearPerGrade[grade] = count
                 end
             end
         end

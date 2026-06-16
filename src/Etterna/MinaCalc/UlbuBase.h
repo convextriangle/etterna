@@ -252,7 +252,7 @@ struct Bazoinkazoink
 	}
 
 	virtual void set_sequenced_base_diffs(const int& itv) const {
-
+		
 	}
 
 	virtual void run_dependent_pmod_loop() {
