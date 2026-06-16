@@ -1501,6 +1501,8 @@ RendererVK::InitTextures()
 	RageSurface* img =
 	  CreateSurface(1, 1, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
 	CreateTexture(img, true);
+
+	delete img;
 }
 
 void
