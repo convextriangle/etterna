@@ -60,7 +60,7 @@ void main() {
     mat4 tex = matrices[matrixIndex].texture;
     
     vec4 pos = wvp * vec4(unpackVec3(currentVertex.pos), 1.0);
-    pos.z = pos.z * 0.5 + 0.5; // [-1; 1] -> [0; 1] because reasons
+    pos.z = (pos.w - pos.z) * 0.5; // [-1; 1] -> [0; 1] because reasons
     
     gl_Position = pos;
 
