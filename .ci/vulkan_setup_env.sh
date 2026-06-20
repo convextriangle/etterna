@@ -34,7 +34,7 @@ function preset_env() {
         Windows|MINGW*) os=windows ; basedir=$(pwd -W) ;;
         *) echo "unknown runner_os: $runner_os" ; exit 7 ; ;;
     esac
-    version='latest' # hi hello
+    version='1.4.341.1' # hi hello
     sdk_dir=${VULKAN_SDK:-$basedir/VULKAN_SDK}
     test -d $sdk_dir || mkdir -pv $sdk_dir
     if [[ $version == 'latest' ]] ; then
