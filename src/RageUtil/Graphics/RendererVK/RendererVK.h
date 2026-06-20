@@ -131,7 +131,7 @@ class RendererVK : public DisplayAdapter::Renderer
 	void SetBlendMode(BlendMode mode, vk::raii::CommandBuffer& buffer);
 
 	constexpr static size_t FramesInFlight = 3;
-	constexpr static size_t MaxDrawCount = 25'000;
+	constexpr static size_t MaxDrawCount = 100'000;
 
 	std::array<PersistentBuffer, FramesInFlight> m_VertexBuffer;
 	std::array<PersistentBuffer, FramesInFlight> m_IndexBuffer;
