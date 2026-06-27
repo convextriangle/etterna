@@ -558,6 +558,12 @@ RendererVK::~RendererVK()
 							 m_MatrixStateBuffer[i].allocation);
 			m_MatrixStateBuffer[i].buffer = VK_NULL_HANDLE;
 		}
+		if (m_StagingBuffer[i].buffer != VK_NULL_HANDLE) {
+			vmaDestroyBuffer(m_Allocator,
+							 m_StagingBuffer[i].buffer,
+							 m_StagingBuffer[i].allocation);
+			m_StagingBuffer[i].buffer = VK_NULL_HANDLE;
+		}
 		if (m_ShaderScratchBuffer[i].buffer != VK_NULL_HANDLE) {
 			vmaDestroyBuffer(m_Allocator,
 							 m_ShaderScratchBuffer[i].buffer,
@@ -972,6 +978,47 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 	auto& buffer = m_CommandBuffers[m_CurrentFrame];
 	buffer.begin({});
 
+	vk::BufferCopy stagingCopy{};
+	stagingCopy.srcOffset = 0;
+	stagingCopy.dstOffset = 0;
+	stagingCopy.size =
+	  sizeof(DisplayAdapter::Vertex) * batcher.m_VertexBuffer.size();
+	buffer.copyBuffer(m_StagingBuffer[m_CurrentFrame].buffer,
+					  m_VertexBuffer[m_CurrentFrame].buffer,
+					  { stagingCopy });
+
+	stagingCopy.srcOffset += stagingCopy.size;
+	stagingCopy.size = sizeof(uint32_t) * batcher.m_IndexBuffer.size();
+	buffer.copyBuffer(m_StagingBuffer[m_CurrentFrame].buffer,
+					  m_IndexBuffer[m_CurrentFrame].buffer,
+					  { stagingCopy });
+
+	stagingCopy.srcOffset += stagingCopy.size;
+	stagingCopy.size =
+	  sizeof(DisplayAdapter::MatrixState) * batcher.m_MatrixStateBuffer.size();
+	buffer.copyBuffer(m_StagingBuffer[m_CurrentFrame].buffer,
+					  m_MatrixStateBuffer[m_CurrentFrame].buffer,
+					  { stagingCopy });
+
+	vk::MemoryBarrier2 memoryBarrier{};
+	memoryBarrier.srcStageMask = vk::PipelineStageFlagBits2::eCopy;
+	memoryBarrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+	memoryBarrier.dstStageMask =
+	  vk::PipelineStageFlagBits2::eVertexAttributeInput |
+	  vk::PipelineStageFlagBits2::eIndexInput |
+	  vk::PipelineStageFlagBits2::eVertexShader |
+	  vk::PipelineStageFlagBits2::eFragmentShader;
+	memoryBarrier.dstAccessMask = vk::AccessFlagBits2::eVertexAttributeRead |
+								  vk::AccessFlagBits2::eIndexRead |
+								  vk::AccessFlagBits2::eShaderRead;
+
+	vk::DependencyInfo dependencyInfo{};
+	dependencyInfo.dependencyFlags = {};
+	dependencyInfo.memoryBarrierCount = 1;
+	dependencyInfo.pMemoryBarriers = &memoryBarrier;
+
+	buffer.pipelineBarrier2(dependencyInfo);
+
 	buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 							  *m_Pipelines[0].PipelineLayout,
 							  0,
@@ -1055,8 +1102,8 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		for (auto& call : node.DrawCalls) {
 			buffer.setDepthTestEnable(
 			  call.DepthTestMode != ZTEST_OFF ? VK_TRUE : VK_FALSE);
-			buffer.setDepthWriteEnable(
-			  call.DepthWriteEnabled ? VK_TRUE : VK_FALSE);
+			buffer.setDepthWriteEnable(call.DepthWriteEnabled ? VK_TRUE
+															  : VK_FALSE);
 
 			vk::CompareOp depthCompareOp = vk::CompareOp::eAlways;
 			switch (call.DepthTestMode) {
@@ -1073,8 +1120,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 				}
 				default: {
 					Locator::getLogger()->error(
-					  "Invalid ZTestMode encountered: {}",
-					  call.DepthTestMode);
+					  "Invalid ZTestMode encountered: {}", call.DepthTestMode);
 					Fail();
 				}
 			}
@@ -1306,32 +1352,49 @@ RendererVK::InitBatchBuffers()
 	for (int i = 0; i < FramesInFlight; i++) {
 		vk::BufferCreateInfo vertexBufferInfo{};
 		vertexBufferInfo.size = sizeof(DisplayAdapter::Vertex) * MaxDrawCount;
-		vertexBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
+		vertexBufferInfo.usage = vk::BufferUsageFlagBits::eTransferDst |
+								 vk::BufferUsageFlagBits::eStorageBuffer;
 		VmaAllocationCreateInfo vertexAllocInfo = {};
-		vertexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-		vertexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-		vertexAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		vertexAllocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+		vertexAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
+								VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		m_VertexBuffer[i].Init(m_Allocator, vertexBufferInfo, vertexAllocInfo);
 
 		vk::BufferCreateInfo indexBufferInfo{};
-		indexBufferInfo.size = sizeof(uint32_t) * 5 * MaxDrawCount;
-		indexBufferInfo.usage = vk::BufferUsageFlagBits::eIndexBuffer;
+		indexBufferInfo.size = sizeof(uint32_t) * 4 * MaxDrawCount;
+		indexBufferInfo.usage = vk::BufferUsageFlagBits::eIndexBuffer |
+								vk::BufferUsageFlagBits::eTransferDst;
 		VmaAllocationCreateInfo indexAllocInfo = {};
-		indexAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-		indexAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-		indexAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		indexAllocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+		indexAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
+							   VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		m_IndexBuffer[i].Init(m_Allocator, indexBufferInfo, indexAllocInfo);
 
 		vk::BufferCreateInfo matrixBufferInfo{};
 		matrixBufferInfo.size =
 		  sizeof(DisplayAdapter::MatrixState) * MaxDrawCount;
-		matrixBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
+		matrixBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer |
+								 vk::BufferUsageFlagBits::eTransferDst;
 		VmaAllocationCreateInfo matrixAllocInfo = {};
-		matrixAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-		matrixAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-		matrixAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		matrixAllocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+		matrixAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
+								VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		m_MatrixStateBuffer[i].Init(
 		  m_Allocator, matrixBufferInfo, matrixAllocInfo);
+
+		vk::BufferCreateInfo stagingBufferInfo{};
+		stagingBufferInfo.size =
+		  sizeof(DisplayAdapter::Vertex) * MaxDrawCount +
+		  sizeof(uint32_t) * 4 * MaxDrawCount +
+		  sizeof(DisplayAdapter::MatrixState) * MaxDrawCount;
+		stagingBufferInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
+		VmaAllocationCreateInfo stagingAllocInfo{};
+		stagingAllocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+		stagingAllocInfo.flags =
+		  VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+		  VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		m_StagingBuffer[i].Init(
+		  m_Allocator, stagingBufferInfo, stagingAllocInfo);
 
 		vk::BufferCreateInfo scratchBufferInfo{};
 		scratchBufferInfo.size = sizeof(uint8_t) * 1'000'000;
@@ -1408,22 +1471,29 @@ RendererVK::UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher)
 		return;
 	}
 
-	std::memcpy(m_VertexBuffer[m_CurrentFrame].GetMappedData(),
+	uint8_t* stagingBuffer =
+	  static_cast<uint8_t*>(m_StagingBuffer[m_CurrentFrame].GetMappedData());
+	std::memcpy(stagingBuffer,
 				batcher.m_VertexBuffer.data(),
 				sizeof(DisplayAdapter::Vertex) * batcher.m_VertexBuffer.size());
 
-	std::memcpy(m_IndexBuffer[m_CurrentFrame].GetMappedData(),
+	stagingBuffer +=
+	  sizeof(DisplayAdapter::Vertex) * batcher.m_VertexBuffer.size();
+
+	std::memcpy(stagingBuffer,
 				batcher.m_IndexBuffer.data(),
 				sizeof(uint32_t) * batcher.m_IndexBuffer.size());
+
+	stagingBuffer += sizeof(uint32_t) * batcher.m_IndexBuffer.size();
+
+	std::memcpy(stagingBuffer,
+				batcher.m_MatrixStateBuffer.data(),
+				sizeof(DisplayAdapter::MatrixState) *
+				  batcher.m_MatrixStateBuffer.size());
 
 	std::memcpy(m_ShaderScratchBuffer[m_CurrentFrame].GetMappedData(),
 				batcher.m_ShaderScratchBuffer.data(),
 				sizeof(uint8_t) * batcher.m_ShaderScratchBuffer.size());
-
-	std::memcpy(m_MatrixStateBuffer[m_CurrentFrame].GetMappedData(),
-				batcher.m_MatrixStateBuffer.data(),
-				sizeof(DisplayAdapter::MatrixState) *
-				  batcher.m_MatrixStateBuffer.size());
 }
 
 int
