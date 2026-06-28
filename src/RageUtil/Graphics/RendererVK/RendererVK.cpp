@@ -60,7 +60,8 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 	auto [result, imageIndex] = m_Swapchain.acquireNextImage(
 	  Timeout, *m_PresentCompleteSemaphore[m_CurrentFrame], nullptr);
 
-	if (result == vk::Result::eErrorOutOfDateKHR || m_SwapchainIsInvalid) {
+	if (result == vk::Result::eErrorOutOfDateKHR ||
+		result == vk::Result::eSuboptimalKHR || m_SwapchainIsInvalid) {
 		RecreateSwapchain(*p);
 		m_SwapchainIsInvalid = false;
 		return;
@@ -132,7 +133,7 @@ RendererVK::CreateTexture(RageSurface* img, bool RGBA8)
 	texture.height = img->h;
 
 	VmaAllocationCreateInfo allocCreateInfo = {};
-	allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+	allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
 	VkImageCreateInfo imageInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 	imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -315,6 +316,9 @@ RendererVK::ClearAllTextures()
 RageSurface*
 RendererVK::CreateScreenshot()
 {
+	// synchronization2 would require CreateScreenshot to basically return a
+	// future / allow OnRender to run to copy the frame without hazards and then
+	// go back to CreateScreenshot? so using legacy synchronization...
 	auto props =
 	  m_PhysicalDevice.getFormatProperties(vk::Format::eR8G8B8A8Unorm);
 
@@ -339,25 +343,21 @@ RendererVK::CreateScreenshot()
 	destImageInfo.tiling = vk::ImageTiling::eLinear;
 	destImageInfo.usage = vk::ImageUsageFlagBits::eTransferDst;
 
-	vk::raii::Image destImage(m_Device, destImageInfo);
-	vk::MemoryRequirements memoryReqs = destImage.getMemoryRequirements();
-	vk::MemoryAllocateInfo memoryAllocInfo = {};
-	memoryAllocInfo.allocationSize = memoryReqs.size;
+	VmaAllocationCreateInfo allocCreateInfo = {};
+	allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+	allocCreateInfo.flags =
+	  VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+	  VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-	auto memoryTypeIndex =
-	  GetMemoryType(memoryReqs.memoryTypeBits,
-					vk::MemoryPropertyFlagBits::eHostVisible |
-					  vk::MemoryPropertyFlagBits::eHostCoherent,
-					m_PhysicalDevice.getMemoryProperties());
-	if (!memoryTypeIndex.has_value()) {
-		Locator::getLogger()->error("RendererVK: failed to screenshot (can't "
-									"find memory type for image creation)");
-		Fail();
-	}
-
-	memoryAllocInfo.memoryTypeIndex = *memoryTypeIndex;
-	auto destImageMemory = m_Device.allocateMemory(memoryAllocInfo);
-	destImage.bindMemory(destImageMemory, 0);
+	VkImage destImageRaw = VK_NULL_HANDLE;
+	VmaAllocation destAlloc = VK_NULL_HANDLE;
+	VmaAllocationInfo destAllocInfo = {};
+	ThrowIfFail(vmaCreateImage(m_Allocator,
+							   &*destImageInfo,
+							   &allocCreateInfo,
+							   &destImageRaw,
+							   &destAlloc,
+							   &destAllocInfo));
 
 	vk::CommandBufferAllocateInfo copyBufferInfo = {};
 	copyBufferInfo.level = vk::CommandBufferLevel::ePrimary;
@@ -373,7 +373,7 @@ RendererVK::CreateScreenshot()
 	barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 	barrier.oldLayout = vk::ImageLayout::eUndefined;
 	barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
-	barrier.image = destImage;
+	barrier.image = destImageRaw;
 	barrier.subresourceRange =
 	  vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
 
@@ -413,7 +413,7 @@ RendererVK::CreateScreenshot()
 
 		copyBuffer.blitImage(sourceImage,
 							 vk::ImageLayout::eTransferSrcOptimal,
-							 destImage,
+							 destImageRaw,
 							 vk::ImageLayout::eTransferDstOptimal,
 							 { blitRegion },
 							 vk::Filter::eNearest);
@@ -429,7 +429,7 @@ RendererVK::CreateScreenshot()
 
 		copyBuffer.copyImage(sourceImage,
 							 vk::ImageLayout::eTransferSrcOptimal,
-							 destImage,
+							 destImageRaw,
 							 vk::ImageLayout::eTransferDstOptimal,
 							 { copyRegion });
 	}
@@ -438,7 +438,7 @@ RendererVK::CreateScreenshot()
 	barrier.dstAccessMask = vk::AccessFlagBits::eMemoryRead;
 	barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
 	barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
-	barrier.image = destImage;
+	barrier.image = destImageRaw;
 
 	copyBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
 							   vk::PipelineStageFlagBits::eTransfer,
@@ -470,21 +470,14 @@ RendererVK::CreateScreenshot()
 	m_GraphicsQueue.submit({ submitInfo }, fence);
 	ThrowIfFail(m_Device.waitForFences({ fence }, VK_TRUE, Timeout));
 
-	vk::ImageSubresource subresource{ vk::ImageAspectFlagBits::eColor, 0, 0 };
-	vk::SubresourceLayout subresourceLayout =
-	  destImage.getSubresourceLayout(subresource);
+	VkImageSubresource subresource{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
+	VkSubresourceLayout subresourceLayout = {};
 
-	vk::MemoryMapInfo memoryMapInfo = {};
-	memoryMapInfo.memory = destImageMemory;
-	memoryMapInfo.size = VK_WHOLE_SIZE;
+	vkGetImageSubresourceLayout(
+	  (vk::Device)m_Device, destImageRaw, &subresource, &subresourceLayout);
 
-	uint8_t* data = nullptr;
-	ThrowIfFail(vkMapMemory(*m_Device,
-							*destImageMemory,
-							0,
-							VK_WHOLE_SIZE,
-							0,
-							reinterpret_cast<void**>(&data)));
+	uint8_t* data = static_cast<uint8_t*>(destAllocInfo.pMappedData) +
+					subresourceLayout.offset;
 
 	RageSurface* surface = CreateSurface(m_SwapchainExtent.width,
 										 m_SwapchainExtent.height,
@@ -494,12 +487,30 @@ RendererVK::CreateScreenshot()
 										 0x00ff0000,
 										 0xff000000);
 
-	for (size_t i = 0; i < 4LLU * surface->w * surface->h; i++) {
-		// set alpha to 255 because it broke otherwise for some reason :(
-		surface->pixels[i] = ((i + 1) % 4) ? data[i] : 255;
+	auto* dest = reinterpret_cast<uint32_t*>(surface->pixels);
+
+	bool needsSwizzle =
+	  !supportsBlitting && (m_ImageFormat == vk::Format::eB8G8R8A8Unorm);
+
+	for (uint32_t y = 0; y < surface->h; y++) {
+		const auto* row = reinterpret_cast<const uint32_t*>(
+		  data + y * subresourceLayout.rowPitch);
+
+		if (needsSwizzle) {
+			for (uint32_t x = 0; x < surface->w; x++) {
+				const uint32_t p = row[x];
+				dest[y * surface->w + x] =
+				  ((p & 0x00ff0000u) >> 16) | ((p & 0x0000ff00u)) |
+				  ((p & 0x000000ffu) << 16) | 0xff000000u;
+			}
+		} else {
+			for (uint32_t x = 0; x < surface->w; x++) {
+				dest[y * surface->w + x] = row[x] | 0xff000000u;
+			}
+		}
 	}
 
-	vkUnmapMemory(*m_Device, *destImageMemory);
+	vmaDestroyImage(m_Allocator, destImageRaw, destAlloc);
 
 	return surface;
 }
@@ -1124,7 +1135,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 					Fail();
 				}
 			}
-			buffer.setDepthCompareOp(vk::CompareOp::eLessOrEqual);
+			buffer.setDepthCompareOp(depthCompareOp);
 
 			SetBlendMode(call.BlendingMode, buffer);
 
@@ -1310,8 +1321,10 @@ RendererVK::InitBatchBuffers()
 	uint32_t textureDims = GetMaxTextureSize();
 
 	VmaAllocationCreateInfo textureAllocInfo = {};
-	textureAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	textureAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+	textureAllocInfo.flags =
+	  VMA_ALLOCATION_CREATE_MAPPED_BIT |
+	  VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+	textureAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 	textureAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
 	vk::BufferCreateInfo textureInfo = {};
@@ -1356,8 +1369,6 @@ RendererVK::InitBatchBuffers()
 								 vk::BufferUsageFlagBits::eStorageBuffer;
 		VmaAllocationCreateInfo vertexAllocInfo = {};
 		vertexAllocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-		vertexAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
-								VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		m_VertexBuffer[i].Init(m_Allocator, vertexBufferInfo, vertexAllocInfo);
 
 		vk::BufferCreateInfo indexBufferInfo{};
@@ -1366,8 +1377,6 @@ RendererVK::InitBatchBuffers()
 								vk::BufferUsageFlagBits::eTransferDst;
 		VmaAllocationCreateInfo indexAllocInfo = {};
 		indexAllocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-		indexAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
-							   VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		m_IndexBuffer[i].Init(m_Allocator, indexBufferInfo, indexAllocInfo);
 
 		vk::BufferCreateInfo matrixBufferInfo{};
@@ -1377,8 +1386,6 @@ RendererVK::InitBatchBuffers()
 								 vk::BufferUsageFlagBits::eTransferDst;
 		VmaAllocationCreateInfo matrixAllocInfo = {};
 		matrixAllocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-		matrixAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
-								VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		m_MatrixStateBuffer[i].Init(
 		  m_Allocator, matrixBufferInfo, matrixAllocInfo);
 
@@ -1401,8 +1408,10 @@ RendererVK::InitBatchBuffers()
 		scratchBufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer |
 								  vk::BufferUsageFlagBits::eShaderDeviceAddress;
 		VmaAllocationCreateInfo scratchAllocInfo = {};
-		scratchAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-		scratchAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		scratchAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+		scratchAllocInfo.flags =
+		  VMA_ALLOCATION_CREATE_MAPPED_BIT |
+		  VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 		scratchAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_ShaderScratchBuffer[i].Init(
 		  m_Allocator, scratchBufferInfo, scratchAllocInfo);
