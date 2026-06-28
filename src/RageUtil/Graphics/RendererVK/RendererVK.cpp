@@ -1379,9 +1379,7 @@ RendererVK::InitBatchBuffers()
 	std::vector<vk::DescriptorBindingFlags> bindingFlags(
 	  textureBindings.size(),
 	  vk::DescriptorBindingFlagBits::eUpdateAfterBind |
-		vk::DescriptorBindingFlagBits::ePartiallyBound |
-		vk::DescriptorBindingFlagBits::eUpdateUnusedWhilePending |
-		vk::DescriptorBindingFlagBits::eVariableDescriptorCount);
+		vk::DescriptorBindingFlagBits::ePartiallyBound);
 
 	vk::DescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo(
 	  bindingFlags);
