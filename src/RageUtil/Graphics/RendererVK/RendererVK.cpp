@@ -37,9 +37,9 @@ RendererVK::InitializeRenderer(const VideoModeParams& p)
 	InitVulkanState();
 	InitSwapchain(p);
 	InitImageViews();
+	InitBatchBuffers();
 	InitGraphicsPipeline();
 	InitCommandPool();
-	InitBatchBuffers();
 	InitCommandBuffers();
 	InitSyncStructures();
 	InitTextures();
@@ -169,10 +169,8 @@ RendererVK::CreateTexture(RageSurface* img, bool RGBA8)
 	m_Textures.insert({ currentHandle, texture });
 
 	UpdateTexture(currentHandle, img, 0, 0, img->w, img->h);
+	UpdateTextureDescriptor(currentHandle);
 
-	for (int i = 0; i < FramesInFlight; i++) {
-		m_PendingTextureUpdates[i].set(currentHandle);
-	}
 	return currentHandle;
 }
 
@@ -283,10 +281,7 @@ RendererVK::DeleteTexture(intptr_t handle)
 	DestroyTexture(m_Textures[handle]);
 	m_Textures.erase(handle);
 	m_EmptyTextureSlots.insert(handle);
-
-	for (int i = 0; i < FramesInFlight; i++) {
-		m_PendingTextureUpdates[i].set(handle);
-	}
+	UpdateTextureDescriptor(handle);
 }
 
 void
@@ -307,8 +302,8 @@ RendererVK::ClearAllTextures()
 	m_Textures.clear();
 
 	m_Textures[0] = emptyTexture;
-	for (int i = 0; i < FramesInFlight; i++) {
-		m_PendingTextureUpdates[i].set();
+	for (int i = 1; i < GetMaxTextureCount(); i++) {
+		UpdateTextureDescriptor(i);
 	}
 }
 
@@ -655,6 +650,8 @@ RendererVK::InitVulkanState()
 	vk12Features.runtimeDescriptorArray = vk::True;
 	vk12Features.shaderSampledImageArrayNonUniformIndexing = vk::True;
 	vk12Features.scalarBlockLayout = vk::True;
+	vk12Features.descriptorBindingSampledImageUpdateAfterBind = vk::True;
+	vk12Features.descriptorBindingPartiallyBound = vk::True;
 
 	VkPhysicalDeviceFeatures vkFeatures = {};
 	vkFeatures.samplerAnisotropy = vk::True;
@@ -878,15 +875,20 @@ RendererVK::InitGraphicsPipeline()
 std::vector<vk::DescriptorSetLayoutBinding>
 RendererVK::GetDescriptorBindings()
 {
+	return { vk::DescriptorSetLayoutBinding(0,
+											vk::DescriptorType::eStorageBuffer,
+											1,
+											vk::ShaderStageFlagBits::eVertex),
+			 vk::DescriptorSetLayoutBinding(1,
+											vk::DescriptorType::eStorageBuffer,
+											1,
+											vk::ShaderStageFlagBits::eVertex) };
+}
+
+std::vector<vk::DescriptorSetLayoutBinding>
+RendererVK::GetTextureBindings()
+{
 	return {
-		vk::DescriptorSetLayoutBinding(0,
-									   vk::DescriptorType::eStorageBuffer,
-									   1,
-									   vk::ShaderStageFlagBits::eVertex),
-		vk::DescriptorSetLayoutBinding(1,
-									   vk::DescriptorType::eStorageBuffer,
-									   1,
-									   vk::ShaderStageFlagBits::eVertex),
 		vk::DescriptorSetLayoutBinding(2,
 									   vk::DescriptorType::eSampledImage,
 									   GetMaxTextureCount(),
@@ -896,6 +898,25 @@ RendererVK::GetDescriptorBindings()
 									   Texture::PossibleSamplerCount,
 									   vk::ShaderStageFlagBits::eAllGraphics)
 	};
+}
+
+void
+RendererVK::UpdateTextureDescriptor(int index)
+{
+	vk::DescriptorImageInfo imageInfo{};
+	imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+	imageInfo.imageView = m_EmptyTextureSlots.contains(index)
+							? m_Textures[0].view
+							: m_Textures[index].view;
+
+	vk::WriteDescriptorSet write{};
+	write.dstSet = m_TextureDescriptorSet;
+	write.dstBinding = 2;
+	write.dstArrayElement = index;
+	write.descriptorCount = 1;
+	write.descriptorType = vk::DescriptorType::eSampledImage;
+	write.pImageInfo = &imageInfo;
+	m_Device.updateDescriptorSets({ write }, {});
 }
 
 void
@@ -1032,7 +1053,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 	buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 							  *m_Pipelines[0].PipelineLayout,
 							  0,
-							  { *m_DescriptorSets[m_CurrentFrame] },
+							  { *m_DescriptorSets[m_CurrentFrame], *m_TextureDescriptorSet },
 							  nullptr);
 	buffer.bindIndexBuffer(
 	  m_IndexBuffer[m_CurrentFrame].Get(), 0, vk::IndexType::eUint32);
@@ -1332,34 +1353,67 @@ RendererVK::InitBatchBuffers()
 	textureInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
 	m_TextureBuffer.Init(m_Allocator, textureInfo, textureAllocInfo);
 
-	vk::DescriptorPoolSize poolSizes[3] = {};
+	vk::DescriptorPoolSize poolSizes[1] = {};
 	poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
 	poolSizes[0].descriptorCount = 2 * FramesInFlight;
-	poolSizes[1].type = vk::DescriptorType::eSampledImage;
-	poolSizes[1].descriptorCount = GetMaxTextureCount() * FramesInFlight;
-	poolSizes[2].type = vk::DescriptorType::eSampler;
-	poolSizes[2].descriptorCount =
-	  Texture::PossibleSamplerCount * FramesInFlight;
 
 	vk::DescriptorPoolCreateInfo poolInfo = {};
 	poolInfo.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
-	poolInfo.poolSizeCount = 3;
+	poolInfo.poolSizeCount = 1;
 	poolInfo.pPoolSizes = poolSizes;
 	poolInfo.maxSets = FramesInFlight;
 	m_DescriptorPool = vk::raii::DescriptorPool(m_Device, poolInfo);
 
-	std::vector<vk::DescriptorSetLayoutBinding> bindings =
-	  GetDescriptorBindings();
+	auto bindings = GetDescriptorBindings();
 	vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
 
 	m_DescriptorSetLayout = vk::raii::DescriptorSetLayout(m_Device, layoutInfo);
 
 	std::vector<vk::DescriptorSetLayout> layouts(FramesInFlight,
 												 *m_DescriptorSetLayout);
-
 	vk::DescriptorSetAllocateInfo allocInfo(
 	  *m_DescriptorPool, FramesInFlight, layouts.data());
 	m_DescriptorSets = m_Device.allocateDescriptorSets(allocInfo);
+
+	auto textureBindings = GetTextureBindings();
+	std::vector<vk::DescriptorBindingFlags> bindingFlags(
+	  textureBindings.size(),
+	  vk::DescriptorBindingFlagBits::eUpdateAfterBind |
+		vk::DescriptorBindingFlagBits::ePartiallyBound |
+		vk::DescriptorBindingFlagBits::eUpdateUnusedWhilePending |
+		vk::DescriptorBindingFlagBits::eVariableDescriptorCount);
+
+	vk::DescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo(
+	  bindingFlags);
+
+	vk::DescriptorSetLayoutCreateInfo textureLayoutInfo({}, textureBindings);
+	textureLayoutInfo.pNext = &bindingFlagsInfo;
+	textureLayoutInfo.flags =
+	  vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool;
+
+	m_TextureLayout =
+	  vk::raii::DescriptorSetLayout(m_Device, textureLayoutInfo);
+
+	vk::DescriptorPoolSize texturePoolSizes[2] = {};
+	texturePoolSizes[0].type = vk::DescriptorType::eSampledImage;
+	texturePoolSizes[0].descriptorCount = GetMaxTextureCount();
+	texturePoolSizes[1].type = vk::DescriptorType::eSampler;
+	texturePoolSizes[1].descriptorCount = Texture::PossibleSamplerCount;
+
+	vk::DescriptorPoolCreateInfo texturePoolInfo = {};
+	texturePoolInfo.flags = vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind;
+	texturePoolInfo.poolSizeCount = 2;
+	texturePoolInfo.pPoolSizes = texturePoolSizes;
+	texturePoolInfo.maxSets = 1;
+
+	m_TextureDescriptorPool =
+	  vk::raii::DescriptorPool(m_Device, texturePoolInfo);
+
+	vk::DescriptorSetAllocateInfo textureSetAllocInfo(
+	  *m_TextureDescriptorPool, 1, &*m_TextureLayout);
+
+	m_TextureDescriptorSet =
+	  std::move(m_Device.allocateDescriptorSets(textureSetAllocInfo)[0]);
 
 	for (int i = 0; i < FramesInFlight; i++) {
 		vk::BufferCreateInfo vertexBufferInfo{};
@@ -1450,62 +1504,6 @@ RendererVK::InitBatchBuffers()
 void
 RendererVK::UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher)
 {
-	if (m_PendingTextureUpdates[m_CurrentFrame].any()) {
-		std::vector<vk::DescriptorImageInfo> textureInfo;
-		textureInfo.reserve(GetMaxTextureCount());
-		std::vector<vk::WriteDescriptorSet> writes;
-
-		int rangeStart = -1;
-		int rangeCount = 0;
-
-		for (int i = 0; i < GetMaxTextureCount(); ++i) {
-			if (!m_PendingTextureUpdates[m_CurrentFrame][i]) {
-				continue;
-			}
-			vk::DescriptorImageInfo info{};
-			info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-			info.imageView = m_EmptyTextureSlots.contains(i)
-							   ? m_Textures[0].view
-							   : m_Textures[i].view;
-			textureInfo.push_back(info);
-
-			if (rangeStart == -1 || i != rangeStart + rangeCount) {
-				if (rangeStart != -1) {
-					vk::WriteDescriptorSet write{};
-					write.dstSet = m_DescriptorSets[m_CurrentFrame];
-					write.dstBinding = 2;
-					write.dstArrayElement = rangeStart;
-					write.descriptorCount = rangeCount;
-					write.descriptorType = vk::DescriptorType::eSampledImage;
-					write.pImageInfo =
-					  &textureInfo[textureInfo.size() - rangeCount];
-					writes.push_back(write);
-				}
-				rangeStart = i;
-				rangeCount = 1;
-			} else {
-				rangeCount++;
-			}
-		}
-
-		if (rangeStart != -1) {
-			vk::WriteDescriptorSet write{};
-			write.dstSet = m_DescriptorSets[m_CurrentFrame];
-			write.dstBinding = 2;
-			write.dstArrayElement = static_cast<uint32_t>(rangeStart);
-			write.descriptorCount = static_cast<uint32_t>(rangeCount);
-			write.descriptorType = vk::DescriptorType::eSampledImage;
-			write.pImageInfo = &textureInfo[textureInfo.size() - rangeCount];
-			writes.push_back(write);
-		}
-
-		if (!writes.empty()) {
-			m_Device.updateDescriptorSets(writes, {});
-		}
-
-		m_PendingTextureUpdates[m_CurrentFrame].reset();
-	}
-
 	if (batcher.m_VertexBuffer.empty()) {
 		return;
 	}
@@ -1596,16 +1594,14 @@ RendererVK::InitTextures()
 		samplerImageInfo[i].sampler = m_Samplers[i];
 	}
 
-	for (int i = 0; i < FramesInFlight; i++) {
-		vk::WriteDescriptorSet writeDescriptor = {};
-		writeDescriptor.dstSet = m_DescriptorSets[i];
-		writeDescriptor.dstBinding = 3;
-		writeDescriptor.descriptorCount = Texture::PossibleSamplerCount;
-		writeDescriptor.descriptorType = vk::DescriptorType::eSampler;
-		writeDescriptor.pImageInfo = samplerImageInfo.data();
+	vk::WriteDescriptorSet writeDescriptor = {};
+	writeDescriptor.dstSet = m_TextureDescriptorSet;
+	writeDescriptor.dstBinding = 3;
+	writeDescriptor.descriptorCount = Texture::PossibleSamplerCount;
+	writeDescriptor.descriptorType = vk::DescriptorType::eSampler;
+	writeDescriptor.pImageInfo = samplerImageInfo.data();
 
-		m_Device.updateDescriptorSets({ writeDescriptor }, nullptr);
-	}
+	m_Device.updateDescriptorSets({ writeDescriptor }, nullptr);
 
 	for (int i = 0; i < GetMaxTextureCount(); i++) {
 		m_EmptyTextureSlots.insert(i);
@@ -1741,23 +1737,16 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 	multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
 	multisampling.sampleShadingEnable = vk::False;
 
-	if (m_DescriptorSetLayout == nullptr) {
-		std::vector<vk::DescriptorSetLayoutBinding> bindings =
-		  GetDescriptorBindings();
-		vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
-
-		m_DescriptorSetLayout =
-		  vk::raii::DescriptorSetLayout(m_Device, layoutInfo);
-	}
-
 	std::array<vk::PushConstantRange, 1> pushConstants = {};
 	pushConstants[0].size = sizeof(uint64_t) * 2;
 	pushConstants[0].stageFlags =
 	  vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
 
+	vk::DescriptorSetLayout layouts[] = { *m_DescriptorSetLayout,
+										  *m_TextureLayout };
+
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {};
-	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &*m_DescriptorSetLayout;
+	pipelineLayoutInfo.setSetLayouts(layouts);
 	pipelineLayoutInfo.pushConstantRangeCount = 1;
 	pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
 

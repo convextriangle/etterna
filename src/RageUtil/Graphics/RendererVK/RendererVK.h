@@ -19,7 +19,7 @@
 		char buffer[256];                                                      \
 		snprintf(buffer, sizeof(buffer), format, __VA_ARGS__);                 \
 		std::string str(buffer);                                               \
-		Locator::getLogger()->debug("VulkanMemoryAllocator: " + str);           \
+		Locator::getLogger()->debug("VulkanMemoryAllocator: " + str);          \
 	} while (false)
 #endif
 
@@ -103,9 +103,17 @@ class RendererVK : public DisplayAdapter::Renderer
 
 	std::vector<PipelineInfo> m_Pipelines;
 	vk::raii::DescriptorSetLayout m_DescriptorSetLayout = nullptr;
+	vk::raii::DescriptorSetLayout m_TextureLayout = nullptr;
 	std::map<std::pair<std::string, std::string>, intptr_t> m_PipelineLookup;
 	void InitGraphicsPipeline();
 	std::vector<vk::DescriptorSetLayoutBinding> GetDescriptorBindings();
+	std::vector<vk::raii::DescriptorSet> m_DescriptorSets;
+	vk::raii::DescriptorPool m_DescriptorPool = nullptr;
+
+	std::vector<vk::DescriptorSetLayoutBinding> GetTextureBindings();
+	vk::raii::DescriptorSet m_TextureDescriptorSet = nullptr;
+	vk::raii::DescriptorPool m_TextureDescriptorPool = nullptr;
+	void UpdateTextureDescriptor(int index);
 
 	vk::raii::CommandPool m_CommandPool = nullptr;
 	void InitCommandPool();
@@ -141,9 +149,6 @@ class RendererVK : public DisplayAdapter::Renderer
 	std::array<PersistentBuffer, FramesInFlight> m_StagingBuffer;
 	PersistentBuffer m_TextureBuffer;
 
-	std::vector<vk::raii::DescriptorSet> m_DescriptorSets;
-	vk::raii::DescriptorPool m_DescriptorPool = nullptr;
-
 	void InitBatchBuffers();
 	void UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher);
 
@@ -155,7 +160,6 @@ class RendererVK : public DisplayAdapter::Renderer
 	void DestroyTexture(Texture& texture);
 
 	std::array<vk::raii::Sampler, Texture::PossibleSamplerCount> m_Samplers;
-	std::array<std::bitset<Texture::MaxTextures>, FramesInFlight> m_PendingTextureUpdates;
 	void InitTextures();
 	void ResolutionChanged() override;
 
