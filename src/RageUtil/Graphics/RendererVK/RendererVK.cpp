@@ -230,7 +230,7 @@ RendererVK::UpdateTexture(intptr_t textureHandle,
 	barrier.subresourceRange.layerCount = 1;
 	copyBuffer.pipelineBarrier(texture.initialized
 								 ? vk::PipelineStageFlagBits::eAllGraphics
-								 : vk::PipelineStageFlagBits::eTopOfPipe,
+								 : vk::PipelineStageFlagBits::eNone,
 							   vk::PipelineStageFlagBits::eTransfer,
 							   {},
 							   {},
@@ -1184,7 +1184,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 		  vk::AccessFlagBits2::eColorAttachmentWrite,
 		  swapchain ? vk::AccessFlags2() : vk::AccessFlagBits2::eShaderRead,
 		  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-		  swapchain ? vk::PipelineStageFlagBits2::eBottomOfPipe
+		  swapchain ? vk::PipelineStageFlagBits2::eNone
 					: vk::PipelineStageFlagBits2::eAllGraphics,
 		  buffer);
 
