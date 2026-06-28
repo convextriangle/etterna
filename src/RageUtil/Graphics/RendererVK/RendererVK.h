@@ -34,6 +34,7 @@
 #include "VkUtils.h"
 #include "Texture.h"
 #include "PersistentBuffer.h"
+#include <bitset>
 
 struct PipelineInfo
 {
@@ -150,10 +151,11 @@ class RendererVK : public DisplayAdapter::Renderer
 	std::set<intptr_t> m_EmptyTextureSlots;
 	int GetMaxTextureSize();
 	int GetMaxTextureCount();
+	int m_TextureCount = 0;
 	void DestroyTexture(Texture& texture);
 
 	std::array<vk::raii::Sampler, Texture::PossibleSamplerCount> m_Samplers;
-	std::array<bool, FramesInFlight> m_PendingTextureUpdates;
+	std::array<std::bitset<Texture::MaxTextures>, FramesInFlight> m_PendingTextureUpdates;
 	void InitTextures();
 	void ResolutionChanged() override;
 

@@ -171,7 +171,7 @@ RendererVK::CreateTexture(RageSurface* img, bool RGBA8)
 	UpdateTexture(currentHandle, img, 0, 0, img->w, img->h);
 
 	for (int i = 0; i < FramesInFlight; i++) {
-		m_PendingTextureUpdates[i] = true;
+		m_PendingTextureUpdates[i].set(currentHandle);
 	}
 	return currentHandle;
 }
@@ -285,7 +285,7 @@ RendererVK::DeleteTexture(intptr_t handle)
 	m_EmptyTextureSlots.insert(handle);
 
 	for (int i = 0; i < FramesInFlight; i++) {
-		m_PendingTextureUpdates[i] = true;
+		m_PendingTextureUpdates[i].set(handle);
 	}
 }
 
@@ -301,7 +301,6 @@ RendererVK::ClearAllTextures()
 		}
 
 		DestroyTexture(texture);
-		m_Textures.erase(handle);
 		m_EmptyTextureSlots.insert(handle);
 	}
 
@@ -309,7 +308,7 @@ RendererVK::ClearAllTextures()
 
 	m_Textures[0] = emptyTexture;
 	for (int i = 0; i < FramesInFlight; i++) {
-		m_PendingTextureUpdates[i] = true;
+		m_PendingTextureUpdates[i].set();
 	}
 }
 
@@ -1451,29 +1450,60 @@ RendererVK::InitBatchBuffers()
 void
 RendererVK::UpdateBatchBuffers(const DisplayAdapter::CommandBatcher& batcher)
 {
-	if (m_PendingTextureUpdates[m_CurrentFrame]) {
-		m_PendingTextureUpdates[m_CurrentFrame] = false;
+	if (m_PendingTextureUpdates[m_CurrentFrame].any()) {
+		std::vector<vk::DescriptorImageInfo> textureInfo;
+		textureInfo.reserve(GetMaxTextureCount());
+		std::vector<vk::WriteDescriptorSet> writes;
 
-		std::vector<vk::DescriptorImageInfo> textureInfo(GetMaxTextureCount());
-		for (int i = 0; i < textureInfo.size(); i++) {
-			textureInfo[i].imageLayout =
-			  vk::ImageLayout::eShaderReadOnlyOptimal;
+		int rangeStart = -1;
+		int rangeCount = 0;
 
-			if (m_EmptyTextureSlots.contains(i)) {
-				textureInfo[i].imageView = m_Textures[0].view;
+		for (int i = 0; i < GetMaxTextureCount(); ++i) {
+			if (!m_PendingTextureUpdates[m_CurrentFrame][i]) {
+				continue;
+			}
+			vk::DescriptorImageInfo info{};
+			info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+			info.imageView = m_EmptyTextureSlots.contains(i)
+							   ? m_Textures[0].view
+							   : m_Textures[i].view;
+			textureInfo.push_back(info);
+
+			if (rangeStart == -1 || i != rangeStart + rangeCount) {
+				if (rangeStart != -1) {
+					vk::WriteDescriptorSet write{};
+					write.dstSet = m_DescriptorSets[m_CurrentFrame];
+					write.dstBinding = 2;
+					write.dstArrayElement = rangeStart;
+					write.descriptorCount = rangeCount;
+					write.descriptorType = vk::DescriptorType::eSampledImage;
+					write.pImageInfo =
+					  &textureInfo[textureInfo.size() - rangeCount];
+					writes.push_back(write);
+				}
+				rangeStart = i;
+				rangeCount = 1;
 			} else {
-				textureInfo[i].imageView = m_Textures[i].view;
+				rangeCount++;
 			}
 		}
 
-		vk::WriteDescriptorSet writeDescriptor = {};
-		writeDescriptor.dstSet = m_DescriptorSets[m_CurrentFrame];
-		writeDescriptor.dstBinding = 2;
-		writeDescriptor.descriptorCount = textureInfo.size();
-		writeDescriptor.descriptorType = vk::DescriptorType::eSampledImage;
-		writeDescriptor.pImageInfo = textureInfo.data();
+		if (rangeStart != -1) {
+			vk::WriteDescriptorSet write{};
+			write.dstSet = m_DescriptorSets[m_CurrentFrame];
+			write.dstBinding = 2;
+			write.dstArrayElement = static_cast<uint32_t>(rangeStart);
+			write.descriptorCount = static_cast<uint32_t>(rangeCount);
+			write.descriptorType = vk::DescriptorType::eSampledImage;
+			write.pImageInfo = &textureInfo[textureInfo.size() - rangeCount];
+			writes.push_back(write);
+		}
 
-		m_Device.updateDescriptorSets({ writeDescriptor }, {});
+		if (!writes.empty()) {
+			m_Device.updateDescriptorSets(writes, {});
+		}
+
+		m_PendingTextureUpdates[m_CurrentFrame].reset();
 	}
 
 	if (batcher.m_VertexBuffer.empty()) {
@@ -1515,10 +1545,14 @@ RendererVK::GetMaxTextureSize()
 int
 RendererVK::GetMaxTextureCount()
 {
-	return std::min(
-	  static_cast<size_t>(Texture::MaxTextures),
-	  m_PhysicalDevice.getProperties().limits.maxDescriptorSetSampledImages /
-		FramesInFlight);
+	if (!m_TextureCount) {
+		m_TextureCount = std::min(static_cast<size_t>(Texture::MaxTextures),
+								  m_PhysicalDevice.getProperties()
+									  .limits.maxDescriptorSetSampledImages /
+									FramesInFlight);
+	}
+
+	return m_TextureCount;
 }
 
 void
