@@ -75,7 +75,9 @@ if(WITH_VULKAN)
     "Graphics/RendererVK/VkUtils.cpp"
     "Graphics/RendererVK/PersistentBuffer.cpp"
     "Graphics/RendererVK/RenderTargetVK.cpp"
-    "Graphics/RendererVK/PlatformUtils.cpp")
+    "Graphics/RendererVK/PlatformUtils.cpp"
+    "Graphics/RendererVK/PipelineCache.cpp"
+  )
 endif()
 
 list(APPEND SMDATA_RAGE_GRAPHICS_HPP
@@ -118,7 +120,9 @@ if(WITH_VULKAN)
     "Graphics/RendererVK/PersistentBuffer.h"
     "Graphics/RendererVK/Texture.h"
     "Graphics/RendererVK/RenderTargetVK.h"
-    "Graphics/RendererVK/PlatformUtils.h")
+    "Graphics/RendererVK/PlatformUtils.h"
+    "Graphics/RendererVK/PipelineCache.h"
+  )
 endif()
 
 if(WIN32)

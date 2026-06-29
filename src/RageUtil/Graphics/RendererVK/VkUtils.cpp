@@ -12,6 +12,7 @@
 #include "Core/Services/Locator.hpp"
 #include <Etterna/Globals/global.h>
 #include <shaderc/shaderc.hpp>
+#include <RageUtil/File/RageFile.h>
 
 void
 ThrowIfFail(VkResult result, const std::source_location location)
@@ -74,11 +75,7 @@ LoadShaderFromFile(std::string path,
 				   vk::raii::Device& device,
 				   ShaderType shaderType)
 {
-#ifdef _WIN32
-	if (path[0] == '/') {
-		path = path.substr(1);
-	}
-#endif
+	RageFile file;
 
 	shaderc_shader_kind shaderKind = {};
 	switch (shaderType) {
@@ -92,17 +89,21 @@ LoadShaderFromFile(std::string path,
 			assert(false && "Invalid shader type specified!");
 	}
 
-	std::ifstream inputFile(path);
-	std::stringstream contents;
-	contents << inputFile.rdbuf();
-	auto shaderBlob = CompileShader("meow", shaderKind, contents.str());
+	if (!file.Open(path)) {
+		throw std::runtime_error(file.GetError());
+	}
 
-	VkShaderModuleCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.pNext = nullptr;
+	std::string contents;
+	if (file.Read(contents) == -1) {
+		throw std::runtime_error("Failed to read shader file at " + path);
+	}
+
+	auto shaderBlob = CompileShader("meow", shaderKind, contents);
+
+	vk::ShaderModuleCreateInfo createInfo = {};
 	createInfo.codeSize = shaderBlob.size() * sizeof(uint32_t);
 	createInfo.pCode = shaderBlob.data();
-
+	
 	return vk::raii::ShaderModule(device, createInfo);
 }
 

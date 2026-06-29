@@ -527,6 +527,8 @@ RendererVK::~RendererVK()
 		m_Device.waitIdle();
 	}
 
+	m_Cache->WriteToDisk();
+
 	for (auto& [handle, texture] : m_Textures) {
 		DestroyTexture(texture);
 	}
@@ -576,10 +578,6 @@ RendererVK::~RendererVK()
 			m_ShaderScratchBuffer[i].buffer = VK_NULL_HANDLE;
 		}
 	}
-
-	// likely the only thing that needs to be cleaned up manually (because
-	// descriptor pool should exist on descriptor sets' deletion)
-	m_DescriptorSets.clear();
 
 	if (m_Allocator != nullptr) {
 		vmaDestroyAllocator(m_Allocator);
@@ -867,9 +865,16 @@ RendererVK::InitImageViews()
 void
 RendererVK::InitGraphicsPipeline()
 {
-	CreateGraphicsPipeline(
-	  FILEMAN->ResolvePath("Data/Shaders/Vulkan/vertex.glsl"),
-	  FILEMAN->ResolvePath("Data/Shaders/Vulkan/fragment.glsl"));
+	m_Cache.emplace();
+	m_Cache->m_Device = &m_Device;
+	m_Cache->m_DescriptorSetLayout = m_DescriptorSetLayout;
+	m_Cache->m_TextureLayout = m_TextureLayout;
+	m_Cache->m_DepthFormat = m_DepthFormat;
+	m_Cache->m_ImageFormat = m_ImageFormat;
+	m_Cache->Init();
+
+	CreateGraphicsPipeline("Data/Shaders/Vulkan/vertex.glsl",
+						   "Data/Shaders/Vulkan/fragment.glsl");
 }
 
 std::vector<vk::DescriptorSetLayoutBinding>
@@ -1050,11 +1055,12 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 
 	buffer.pipelineBarrier2(dependencyInfo);
 
-	buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-							  *m_Pipelines[0].PipelineLayout,
-							  0,
-							  { *m_DescriptorSets[m_CurrentFrame], *m_TextureDescriptorSet },
-							  nullptr);
+	buffer.bindDescriptorSets(
+	  vk::PipelineBindPoint::eGraphics,
+	  *m_Cache->m_Pipelines[0].PipelineLayout,
+	  0,
+	  { *m_DescriptorSets[m_CurrentFrame], *m_TextureDescriptorSet },
+	  nullptr);
 	buffer.bindIndexBuffer(
 	  m_IndexBuffer[m_CurrentFrame].Get(), 0, vk::IndexType::eUint32);
 
@@ -1163,7 +1169,7 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 				currentPipeline = call.Settings.GraphicsPipeline;
 				buffer.bindPipeline(
 				  vk::PipelineBindPoint::eGraphics,
-				  m_Pipelines[currentPipeline].GraphicsPipeline);
+				  m_Cache->m_Pipelines[currentPipeline].GraphicsPipeline);
 			}
 
 			uint64_t vertexArg =
@@ -1172,11 +1178,12 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 				: m_ShaderScratchBuffer[m_CurrentFrame].gpuAddress +
 					call.Settings.VertexShaderArg;
 
-			buffer.pushConstants<uint64_t>(*m_Pipelines[0].PipelineLayout,
-										   vk::ShaderStageFlagBits::eVertex |
-											 vk::ShaderStageFlagBits::eFragment,
-										   0,
-										   { vertexArg });
+			buffer.pushConstants<uint64_t>(
+			  *m_Cache->m_Pipelines[0].PipelineLayout,
+			  vk::ShaderStageFlagBits::eVertex |
+				vk::ShaderStageFlagBits::eFragment,
+			  0,
+			  { vertexArg });
 
 			uint64_t fragArg =
 			  call.Settings.FragShaderArg == UINT64_MAX
@@ -1184,11 +1191,12 @@ RendererVK::RecordCommands(uint32_t imageIndex,
 				: m_ShaderScratchBuffer[m_CurrentFrame].gpuAddress +
 					call.Settings.FragShaderArg;
 
-			buffer.pushConstants<uint64_t>(*m_Pipelines[0].PipelineLayout,
-										   vk::ShaderStageFlagBits::eVertex |
-											 vk::ShaderStageFlagBits::eFragment,
-										   sizeof(uint64_t),
-										   { fragArg });
+			buffer.pushConstants<uint64_t>(
+			  *m_Cache->m_Pipelines[0].PipelineLayout,
+			  vk::ShaderStageFlagBits::eVertex |
+				vk::ShaderStageFlagBits::eFragment,
+			  sizeof(uint64_t),
+			  { fragArg });
 
 			buffer.drawIndexed(call.IndexCount, 1, call.IndexOffset, 0, 0);
 		}
@@ -1399,7 +1407,9 @@ RendererVK::InitBatchBuffers()
 	texturePoolSizes[1].descriptorCount = Texture::PossibleSamplerCount;
 
 	vk::DescriptorPoolCreateInfo texturePoolInfo = {};
-	texturePoolInfo.flags = vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind;
+	texturePoolInfo.flags =
+	  vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind |
+	  vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
 	texturePoolInfo.poolSizeCount = 2;
 	texturePoolInfo.pPoolSizes = texturePoolSizes;
 	texturePoolInfo.maxSets = 1;
@@ -1663,6 +1673,7 @@ RendererVK::CreateRenderTargetTexture(int width, int height)
 	texture.currentLayout = vk::ImageLayout::eUndefined;
 
 	m_Textures.insert({ currentHandle, texture });
+	UpdateTextureDescriptor(currentHandle);
 
 	return currentHandle;
 }
@@ -1671,129 +1682,9 @@ intptr_t
 RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 								   const std::string& fragmentShaderPath)
 {
-	auto previousPipeline =
-	  m_PipelineLookup.find({ vertexShaderPath, fragmentShaderPath });
-
-	if (previousPipeline != m_PipelineLookup.end()) {
-		return previousPipeline->second;
-	} else {
-		m_PipelineLookup[{ vertexShaderPath, fragmentShaderPath }] =
-		  m_Pipelines.size();
-	}
-
-	PipelineInfo info = {};
-
-	auto fragmentShader =
-	  LoadShaderFromFile(fragmentShaderPath, m_Device, ShaderType_Fragment);
-	auto vertexShader =
-	  LoadShaderFromFile(vertexShaderPath, m_Device, ShaderType_Vertex);
-
-	vk::PipelineShaderStageCreateInfo vertexShaderStageInfo{};
-	vertexShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
-	vertexShaderStageInfo.module = vertexShader,
-	vertexShaderStageInfo.pName = "main";
-
-	vk::PipelineShaderStageCreateInfo fragmentShaderStageInfo{};
-	fragmentShaderStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
-	fragmentShaderStageInfo.module = fragmentShader,
-	fragmentShaderStageInfo.pName = "main";
-
-	vk::PipelineShaderStageCreateInfo shaderStages[] = {
-		vertexShaderStageInfo, fragmentShaderStageInfo
-	};
-
-	std::vector dynamicStates = { vk::DynamicState::eViewport,
-								  vk::DynamicState::eScissor,
-								  vk::DynamicState::eDepthWriteEnable,
-								  vk::DynamicState::eDepthTestEnable,
-								  vk::DynamicState::eDepthCompareOp,
-								  vk::DynamicState::eColorBlendEnableEXT,
-								  vk::DynamicState::eColorBlendEquationEXT,
-								  vk::DynamicState::eColorWriteMaskEXT };
-
-	vk::PipelineDynamicStateCreateInfo dynamicState{};
-	dynamicState.dynamicStateCount =
-	  static_cast<uint32_t>(dynamicStates.size());
-	dynamicState.pDynamicStates = dynamicStates.data();
-
-	vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
-	inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
-
-	vk::PipelineViewportStateCreateInfo viewportState({}, 1, {}, 1);
-
-	vk::PipelineRasterizationStateCreateInfo rasterizer{};
-	rasterizer.depthClampEnable = vk::False;
-	rasterizer.rasterizerDiscardEnable = vk::False;
-	rasterizer.polygonMode = vk::PolygonMode::eFill;
-	rasterizer.cullMode = vk::CullModeFlagBits::eBack;
-	rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
-	rasterizer.depthBiasEnable = vk::False;
-	rasterizer.depthBiasSlopeFactor = 1.0f;
-	rasterizer.lineWidth = 1.0f;
-
-	vk::PipelineMultisampleStateCreateInfo multisampling{};
-	multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
-	multisampling.sampleShadingEnable = vk::False;
-
-	std::array<vk::PushConstantRange, 1> pushConstants = {};
-	pushConstants[0].size = sizeof(uint64_t) * 2;
-	pushConstants[0].stageFlags =
-	  vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
-
-	vk::DescriptorSetLayout layouts[] = { *m_DescriptorSetLayout,
-										  *m_TextureLayout };
-
-	vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {};
-	pipelineLayoutInfo.setSetLayouts(layouts);
-	pipelineLayoutInfo.pushConstantRangeCount = 1;
-	pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
-
-	info.PipelineLayout =
-	  vk::raii::PipelineLayout(m_Device, pipelineLayoutInfo);
-
-	vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
-	colorBlendAttachment.blendEnable = VK_FALSE;
-	colorBlendAttachment.colorWriteMask =
-	  vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-	  vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-
-	vk::PipelineColorBlendStateCreateInfo colorBlending{};
-	colorBlending.attachmentCount = 1;
-	colorBlending.pAttachments = &colorBlendAttachment;
-
-	vk::PipelineDepthStencilStateCreateInfo depthStencil{};
-	depthStencil.depthTestEnable = VK_TRUE;
-	depthStencil.depthWriteEnable = VK_TRUE;
-	depthStencil.depthCompareOp = vk::CompareOp::eLessOrEqual;
-
-	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{};
-	pipelineRenderingCreateInfo.colorAttachmentCount = 1;
-	pipelineRenderingCreateInfo.pColorAttachmentFormats = &m_ImageFormat;
-	pipelineRenderingCreateInfo.depthAttachmentFormat = m_DepthFormat;
-
-	// we don't actually need any vertex info since we're reading stuffs from
-	// the storage buffer
-	vk::PipelineVertexInputStateCreateInfo vertexInfo = {};
-
-	vk::GraphicsPipelineCreateInfo pipelineInfo = {};
-	pipelineInfo.pNext = &pipelineRenderingCreateInfo;
-	pipelineInfo.stageCount = 2;
-	pipelineInfo.pStages = shaderStages;
-	pipelineInfo.pInputAssemblyState = &inputAssembly;
-	pipelineInfo.pViewportState = &viewportState;
-	pipelineInfo.pRasterizationState = &rasterizer;
-	pipelineInfo.pMultisampleState = &multisampling;
-	pipelineInfo.pDynamicState = &dynamicState;
-	pipelineInfo.pVertexInputState = &vertexInfo;
-	pipelineInfo.layout = info.PipelineLayout;
-	pipelineInfo.renderPass = nullptr;
-	pipelineInfo.pDepthStencilState = &depthStencil;
-	pipelineInfo.pColorBlendState = &colorBlending;
-
-	info.GraphicsPipeline = vk::raii::Pipeline(m_Device, nullptr, pipelineInfo);
-
-	m_Pipelines.push_back(std::move(info));
-	return static_cast<intptr_t>(m_Pipelines.size() - 1);
+	assert(m_Cache.has_value());
+	return m_Cache->CreateGraphicsPipeline(vertexShaderPath,
+										   fragmentShaderPath);
 }
 
 void

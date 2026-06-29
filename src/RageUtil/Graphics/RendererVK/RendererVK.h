@@ -35,12 +35,7 @@
 #include "Texture.h"
 #include "PersistentBuffer.h"
 #include <bitset>
-
-struct PipelineInfo
-{
-	vk::raii::PipelineLayout PipelineLayout = nullptr;
-	vk::raii::Pipeline GraphicsPipeline = nullptr;
-};
+#include "PipelineCache.h"
 
 class RendererVK : public DisplayAdapter::Renderer
 {
@@ -101,18 +96,16 @@ class RendererVK : public DisplayAdapter::Renderer
 	std::vector<vk::raii::ImageView> m_SwapchainImageViews;
 	void InitImageViews();
 
-	std::vector<PipelineInfo> m_Pipelines;
 	vk::raii::DescriptorSetLayout m_DescriptorSetLayout = nullptr;
 	vk::raii::DescriptorSetLayout m_TextureLayout = nullptr;
-	std::map<std::pair<std::string, std::string>, intptr_t> m_PipelineLookup;
 	void InitGraphicsPipeline();
 	std::vector<vk::DescriptorSetLayoutBinding> GetDescriptorBindings();
-	std::vector<vk::raii::DescriptorSet> m_DescriptorSets;
 	vk::raii::DescriptorPool m_DescriptorPool = nullptr;
+	std::vector<vk::raii::DescriptorSet> m_DescriptorSets;
 
 	std::vector<vk::DescriptorSetLayoutBinding> GetTextureBindings();
-	vk::raii::DescriptorSet m_TextureDescriptorSet = nullptr;
 	vk::raii::DescriptorPool m_TextureDescriptorPool = nullptr;
+	vk::raii::DescriptorSet m_TextureDescriptorSet = nullptr;
 	void UpdateTextureDescriptor(int index);
 
 	vk::raii::CommandPool m_CommandPool = nullptr;
@@ -162,8 +155,9 @@ class RendererVK : public DisplayAdapter::Renderer
 	std::array<vk::raii::Sampler, Texture::PossibleSamplerCount> m_Samplers;
 	void InitTextures();
 	void ResolutionChanged() override;
-
 	intptr_t CreateRenderTargetTexture(int width, int height);
+
+	std::optional<PipelineCache> m_Cache;
 };
 
 #endif
