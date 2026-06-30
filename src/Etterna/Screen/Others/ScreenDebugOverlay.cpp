@@ -1167,6 +1167,7 @@ class DebugLineReloadTheme : public IDebugLine
 	{
 		THEME->ReloadMetrics();
 		TEXTUREMAN->ReloadAll();
+		DISPLAY->ReloadPipelines();
 		NOTESKIN->RefreshNoteSkinData(GAMESTATE->m_pCurGame);
 		CodeDetector::RefreshCacheItems();
 		// HACK: Don't update text below. Return immediately because this screen

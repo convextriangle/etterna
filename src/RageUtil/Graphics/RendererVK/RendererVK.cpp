@@ -1688,6 +1688,12 @@ RendererVK::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 }
 
 void
+RendererVK::ReloadPipelines()
+{
+	m_Cache->ReloadPipelines();
+}
+
+void
 RendererVK::TryVideoMode(const VideoModeParams& params)
 {
 	m_Device.waitIdle();

@@ -424,6 +424,7 @@ class RageDisplay
 	  const std::string& fragmentShaderPath) {
 		return 0;
 	}
+	virtual void ReloadPipelines() {}
 	virtual void SetGraphicsPipeline(
 	  intptr_t pipeline,
 	  const std::vector<uint8_t>& vertexShaderArgs,

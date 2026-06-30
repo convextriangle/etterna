@@ -1659,7 +1659,7 @@ Actor::SetShaders(const std::string& vertexShaderPath,
 				  const std::string& fragmentShaderPath)
 {
 	m_CustomShaders = DISPLAY->CreateGraphicsPipeline(
-	  FILEMAN->ResolvePath(vertexShaderPath), FILEMAN->ResolvePath(fragmentShaderPath));
+	  vertexShaderPath, fragmentShaderPath);
 }
 
 void

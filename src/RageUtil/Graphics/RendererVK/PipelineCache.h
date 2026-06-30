@@ -11,6 +11,8 @@ struct PipelineInfo
 {
 	vk::raii::PipelineLayout PipelineLayout = nullptr;
 	vk::raii::Pipeline GraphicsPipeline = nullptr;
+	std::string VertexShaderPath;
+	std::string FragmentShaderPath;
 };
 
 struct PipelineCache
@@ -19,8 +21,9 @@ struct PipelineCache
 
 	void Init();
 	void WriteToDisk();
+	void ReloadPipelines();
 	intptr_t CreateGraphicsPipeline(const std::string& vertexShaderPath,
-									const std::string& fragmentShaderPath);
+									const std::string& fragmentShaderPath, bool reload = false);
 
 	std::vector<PipelineInfo> m_Pipelines;
 	std::map<std::pair<std::string, std::string>, intptr_t> m_PipelineLookup;

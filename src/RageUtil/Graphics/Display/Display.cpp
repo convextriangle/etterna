@@ -367,6 +367,12 @@ DisplayAdapter::Display::SetGraphicsPipeline(
 	  pipeline, vertexShaderArgs, fragShaderArgs, persist);
 }
 
+void
+DisplayAdapter::Display::ReloadPipelines()
+{
+	m_Renderer->ReloadPipelines();
+}
+
 #pragma region Unsupported / old graphics API functions
 
 void

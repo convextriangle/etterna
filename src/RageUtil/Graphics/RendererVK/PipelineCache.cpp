@@ -38,25 +38,42 @@ PipelineCache::WriteToDisk()
 	file.Write(data.data(), data.size());
 }
 
+void
+PipelineCache::ReloadPipelines()
+{
+	assert(m_Device != nullptr);
+	m_Device->waitIdle();
+
+	for (auto& pipeline : m_Pipelines) {
+		CreateGraphicsPipeline(
+		  pipeline.VertexShaderPath, pipeline.FragmentShaderPath, true);
+	}
+}
+
 intptr_t
 PipelineCache::CreateGraphicsPipeline(const std::string& vertexShaderPath,
-									  const std::string& fragmentShaderPath)
+									  const std::string& fragmentShaderPath,
+									  bool reload)
 {
 	assert(m_Device != nullptr);
 	assert(m_TextureLayout != nullptr);
 	assert(m_DescriptorSetLayout != nullptr);
 
-	auto previousPipeline =
-	  m_PipelineLookup.find({ vertexShaderPath, fragmentShaderPath });
+	if (!reload) {
+		auto previousPipeline =
+		  m_PipelineLookup.find({ vertexShaderPath, fragmentShaderPath });
 
-	if (previousPipeline != m_PipelineLookup.end()) {
-		return previousPipeline->second;
-	} else {
-		m_PipelineLookup[{ vertexShaderPath, fragmentShaderPath }] =
-		  m_Pipelines.size();
+		if (previousPipeline != m_PipelineLookup.end()) {
+			return previousPipeline->second;
+		} else {
+			m_PipelineLookup[{ vertexShaderPath, fragmentShaderPath }] =
+			  m_Pipelines.size();
+		}
 	}
 
 	PipelineInfo info = {};
+	info.VertexShaderPath = vertexShaderPath;
+	info.FragmentShaderPath = fragmentShaderPath;
 
 	auto fragmentShader =
 	  LoadShaderFromFile(fragmentShaderPath, *m_Device, ShaderType_Fragment);
@@ -167,6 +184,24 @@ PipelineCache::CreateGraphicsPipeline(const std::string& vertexShaderPath,
 
 	info.GraphicsPipeline =
 	  vk::raii::Pipeline(*m_Device, m_DriverCache, pipelineInfo);
+
+	if (reload) {
+		int index = -1;
+		for (int i = 0; auto& pipeline : m_Pipelines) {
+			if (pipeline.VertexShaderPath == vertexShaderPath &&
+				pipeline.FragmentShaderPath == fragmentShaderPath) {
+				index = i;
+				break;
+			}
+
+			i++;
+		}
+
+		assert(index != -1 && "Only existing pipelines should be refreshed");
+
+		m_Pipelines[index] = std::move(info);
+		return index;
+	}
 
 	m_Pipelines.push_back(std::move(info));
 	return static_cast<intptr_t>(m_Pipelines.size() - 1);

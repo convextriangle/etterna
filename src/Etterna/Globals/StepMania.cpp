@@ -1328,6 +1328,7 @@ HandleGlobalInputs(const InputEventPlus& input)
 			// Shift+F2: refresh metrics,noteskin cache and CodeDetector cache
 			// only
 			THEME->ReloadMetrics();
+			DISPLAY->ReloadPipelines();
 			NOTESKIN->RefreshNoteSkinData(GAMESTATE->m_pCurGame);
 			CodeDetector::RefreshCacheItems();
 			SCREENMAN->SystemMessage(RELOADED_METRICS);
@@ -1335,12 +1336,14 @@ HandleGlobalInputs(const InputEventPlus& input)
 		} else if (bIsCtrlHeld && !bIsShiftHeld) {
 			// Ctrl+F2: reload scripts only
 			THEME->UpdateLuaGlobals();
+			DISPLAY->ReloadPipelines();
 			SCREENMAN->SystemMessage(RELOADED_SCRIPTS);
 			MESSAGEMAN->Broadcast(Message_ReloadedScripts);
 		} else if (bIsCtrlHeld && bIsShiftHeld) {
 			// Shift+Ctrl+F2: reload overlay screens (and metrics, since themers
 			// are likely going to do this after changing metrics.)
 			THEME->ReloadMetrics();
+			DISPLAY->ReloadPipelines();
 			SCREENMAN->ReloadOverlayScreens();
 			SCREENMAN->SystemMessage(RELOADED_OVERLAY_SCREENS);
 			MESSAGEMAN->Broadcast(Message_ReloadedMetrics);
@@ -1349,6 +1352,7 @@ HandleGlobalInputs(const InputEventPlus& input)
 			// F2 alone: refresh metrics, textures, noteskins, codedetector
 			// cache
 			THEME->ReloadMetrics();
+			DISPLAY->ReloadPipelines();
 			TEXTUREMAN->ReloadAll();
 			NOTESKIN->RefreshNoteSkinData(GAMESTATE->m_pCurGame);
 			CodeDetector::RefreshCacheItems();

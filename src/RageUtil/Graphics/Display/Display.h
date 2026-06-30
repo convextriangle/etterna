@@ -85,6 +85,7 @@ class Display : public RageDisplay
 							 const std::vector<uint8_t>& vertexShaderArgs,
 							 const std::vector<uint8_t>& fragShaderArgs,
 							 bool persist) override;
+	void ReloadPipelines() override;
 	intptr_t CreateRenderTarget(const RenderTargetParam& param,
 								int& iTextureWidthOut,
 								int& iTextureHeightOut) override;
