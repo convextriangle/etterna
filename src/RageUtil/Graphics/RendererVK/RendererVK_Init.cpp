@@ -512,6 +512,12 @@ RendererVK::InitSwapchain(uint32_t width,
 						  bool smoothLines,
 						  int refreshRate)
 {
+	if (height == 0 || width == 0) {
+		throw std::runtime_error("RendererVK: requested swapchain has zeroed "
+								 "out width/height, failing silently "
+								 "(window was minimized?)");
+	}
+
 	m_SwapchainVSync = vSync;
 	m_SwapchainBorderless = borderlessWindow;
 	m_SmoothLines = smoothLines;
@@ -577,6 +583,13 @@ RendererVK::InitSwapchain(uint32_t width,
 	}
 
 	vkb::Swapchain vkbSwapchain = swapchain_ret.value();
+
+	if (vkbSwapchain.extent.height == 0 || vkbSwapchain.extent.width == 0) {
+		vkb::destroy_swapchain(vkbSwapchain);
+		throw std::runtime_error(
+		  "RendererVK: built swapchain has zeroed out extent, failing silently "
+		  "(window was minimized?)");
+	}
 
 	m_Swapchain = vk::raii::SwapchainKHR(m_Device, vkbSwapchain.swapchain);
 	m_SwapchainImages = m_Swapchain.getImages();
