@@ -127,9 +127,6 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 	presentInfoKHR.pImageIndices = &imageIndex;
 
 	try {
-		// for frame pacing/limiting there's VK_EXT_present_timing but it's
-		// kinda fresh at the time of writing so eh
-
 		const auto beforePresent = std::chrono::steady_clock::now();
 
 		if (m_ResolvedSettings.NvidiaLowLatency2 == VFH_Require) {
@@ -138,6 +135,14 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 			marker.marker = vk::LatencyMarkerNV::ePresentStart;
 
 			m_Swapchain.setLatencyMarkerNV(marker);
+		}
+
+		bool useBuiltinFrameLimiter =
+		  m_ResolvedSettings.NvidiaLowLatency2 == VFH_Disable &&
+		  m_ResolvedSettings.PresentTiming == VFH_Disable;
+
+		if (useBuiltinFrameLimiter) {
+			DISPLAY->FrameLimitBeforeVsync();
 		}
 
 		result = m_PresentQueue.presentKHR(presentInfoKHR);
@@ -154,6 +159,11 @@ RendererVK::OnRender(const ActualVideoModeParams* p,
 
 		const auto afterPresent = std::chrono::steady_clock::now();
 		DISPLAY->SetPresentTime(afterPresent - beforePresent);
+
+		if (useBuiltinFrameLimiter) {
+			DISPLAY->FrameLimitAfterVsync(
+			  DISPLAY->GetActualVideoModeParams()->rate);
+		}
 	} catch (vk::OutOfDateKHRError error) {
 		m_SwapchainIsInvalid = true;
 		return;
